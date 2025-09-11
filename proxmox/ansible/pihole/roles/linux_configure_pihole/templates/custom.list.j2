@@ -1,0 +1,6 @@
+# This file is managed by Ansible - DO NOT EDIT MANUALLY
+# Changes will be overwritten on next playbook run
+
+{% for entry in pihole_custom_dns %}
+{{ entry.ip }} {{ entry.hostname }}.{{ pihole_domain }}
+{% endfor %}

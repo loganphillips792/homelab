@@ -1,0 +1,12 @@
+# DNS domain suffix
+pihole_domain: "homelab"
+
+# Custom DNS entries
+pihole_custom_dns:
+  - { hostname: "grafana", ip: "10.0.0.47" }
+  - { hostname: "homepage", ip: "10.0.0.48" } 
+  - { hostname: "pihole", ip: "10.0.0.49" }
+  - { hostname: "nas", ip: "10.0.0.50" }
+  - { hostname: "router", ip: "10.0.0.1" }
+  - { hostname: "plex", ip: "10.0.0.51" }
+  - { hostname: "nextcloud", ip: "10.0.0.52" }

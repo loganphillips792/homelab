@@ -1,0 +1,52 @@
+---
+- name: Create media directories
+  file:
+    path: "{{ item }}"
+    state: directory
+    mode: '0755'
+  loop:
+    - /media/movies
+    - /media/tvshows
+    - /media/music
+
+- name: Create Jellyfin config and cache directories
+  file:
+    path: "{{ item.path }}"
+    state: directory
+    mode: '0755'
+    owner: 1000
+    group: 1000
+  loop:
+    - { path: "/var/lib/jellyfin" }
+    - { path: "/var/lib/jellyfin/log" }
+    - { path: "/var/cache/jellyfin" }
+    - { path: "/var/cache/jellyfin/transcodes" }
+    - { path: "/var/cache/fontconfig" }
+
+- name: Create Jellyfin Docker container
+  docker_container:
+    name: jellyfin
+    image: jellyfin/jellyfin
+    state: started
+    privileged: true
+    restart_policy: unless-stopped
+    network_mode: host
+    user: "1000:1000"  # Default LXC user
+    volumes:
+      - "/var/lib/jellyfin:/config"
+      - "/var/cache/jellyfin:/cache"
+      - "type=bind,source=/media/movies,target=/media/movies"
+      - "type=bind,source=/media/tvshows,target=/media/tvshows"
+      - "type=bind,source=/media/music,target=/media/music"
+    security_opts: "apparmor=unconfined"
+    env:
+      TZ: "America/Chicago"
+      JELLYFIN_FFMPEG: "/usr/lib/jellyfin-ffmpeg/ffmpeg"
+      JELLYFIN_FFPROBE: "/usr/lib/jellyfin-ffmpeg/ffprobe"
+      JELLYFIN_SERVICE_ARGS: "--ffmpeg=/usr/lib/jellyfin-ffmpeg/ffmpeg"
+
+# - name: Allow Jellyfin port 8096 in UFW
+#   community.general.ufw:
+#     rule: allow
+#     port: "8096"
+#     proto: tcp

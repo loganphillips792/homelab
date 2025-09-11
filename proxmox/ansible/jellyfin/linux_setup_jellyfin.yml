@@ -1,0 +1,8 @@
+- hosts: "jellyfin_servers"
+  serial: 1
+  become: true
+  become_user: root
+  roles:
+  - { role: "linux_ping", tags: "linux_ping" }
+  - { role: "linux_install_jellyfin", tags: "linux_install_jellyfin" }
+  - { role: "linux_configure_jellyfin", tags: "linux_configure_jellyfin" }

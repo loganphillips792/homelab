@@ -1,0 +1,72 @@
+---
+- name: Install required system packages
+  apt:
+    name:
+      - git
+      - python3
+      - build-essential
+    state: present
+    update_cache: yes
+
+- name: Update apt cache
+  apt:
+    update_cache: yes
+  when: ansible_os_family == 'Debian'
+
+- name: Install Node.js prerequisites
+  apt:
+    name:
+      - curl
+      - gnupg
+    state: present
+
+- name: Add NodeSource repository
+  shell: |
+    curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
+  args:
+    creates: /etc/apt/sources.list.d/nodesource.list
+
+- name: Install Node.js (includes npm)
+  apt:
+    name: nodejs
+    state: present
+  register: node_install
+  retries: 3
+  delay: 10
+  until: node_install is succeeded
+
+- name: Verify Node.js installation
+  command: node --version
+  register: node_version
+  changed_when: false
+
+- name: Verify npm installation
+  command: npm --version
+  register: npm_version
+  changed_when: false
+
+- name: Install PM2 globally
+  npm:
+    name: pm2
+    global: yes
+    state: present
+
+- name: Install PM2 logrotate
+  npm:
+    name: pm2-logrotate
+    global: yes
+    state: present
+
+- name: Clone Uptime Kuma repository
+  git:
+    repo: https://github.com/louislam/uptime-kuma.git
+    dest: /opt/uptime-kuma
+    version: master
+    clone: yes
+    update: yes
+    force: yes
+
+- name: Run npm setup (install dependencies and build)
+  command: npm run setup
+  args:
+    chdir: /opt/uptime-kuma

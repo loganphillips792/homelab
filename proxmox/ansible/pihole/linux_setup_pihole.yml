@@ -1,0 +1,15 @@
+- hosts: "pihole_servers"
+  serial: 1
+  become: true
+  become_user: root
+  roles:
+  - { role: "linux_ping", tags: "linux_ping" }
+  - { role: "linux_install_pihole", tags: "linux_install_pihole" }
+  - { role: "linux_configure_pihole", tags: "linux_configure_pihole" }
+
+- hosts: "all:!pihole_servers"
+  serial: 1
+  become: true
+  become_user: root
+  roles:
+  - { role: "linux_configure_dns", tags: "linux_configure_dns" }
