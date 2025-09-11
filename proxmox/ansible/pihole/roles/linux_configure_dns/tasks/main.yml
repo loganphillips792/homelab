@@ -1,0 +1,29 @@
+---
+- name: Install resolvconf if needed
+  apt:
+    name: resolvconf
+    state: present
+    update_cache: yes
+  when: ansible_os_family == 'Debian'
+
+- name: Configure DNS settings
+  blockinfile:
+    path: /etc/resolv.conf
+    block: |
+      nameserver 10.0.0.49
+      search homelab
+    create: yes
+    marker: "# {mark} ANSIBLE MANAGED BLOCK - DNS"
+
+- name: Make DNS settings persistent
+  lineinfile:
+    path: /etc/resolvconf/resolv.conf.d/head
+    line: "nameserver 10.0.0.49"
+    create: yes
+    state: present
+
+- name: Restart resolvconf service
+  service:
+    name: resolvconf
+    state: restarted
+  when: ansible_os_family == 'Debian'

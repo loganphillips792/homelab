@@ -1,0 +1,17 @@
+# Minimal Pi-hole config to seed Local DNS records in UI (v6)
+
+[dns]
+  # Local domain suffix
+  domain = "homelab"
+
+  # Custom host records; appear in UI under Local DNS -> DNS Records
+  hosts = [
+    "10.0.0.47 grafana grafana.homelab",
+    "10.0.0.48 homepage homepage.homelab",
+    "10.0.0.49 pihole pihole.homelab",
+    "10.0.0.50 nas nas.homelab",
+    "10.0.0.1 router router.homelab",
+    "10.0.0.51 plex plex.homelab",
+    "10.0.0.52 nextcloud nextcloud.homelab"
+  ]
+

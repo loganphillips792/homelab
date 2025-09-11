@@ -1,0 +1,36 @@
+---
+- name: Create n8n directories
+  file:
+    path: "{{ item }}"
+    state: directory
+    mode: '0755'
+  loop:
+    - /etc/n8n
+    - /var/lib/n8n
+
+- name: Install n8n globally
+  npm:
+    name: n8n
+    global: yes
+    state: present
+
+- name: Verify n8n installation
+  command: n8n --version
+  register: n8n_version
+  changed_when: false
+
+- debug:
+    msg: "n8n {{ n8n_version.stdout }} installed successfully"
+
+- name: Create n8n systemd service directory
+  file:
+    path: /etc/systemd/system
+    state: directory
+    mode: '0755'
+
+- name: Create n8n service account
+  user:
+    name: n8n
+    system: yes
+    shell: /bin/false
+    home: /var/lib/n8n
