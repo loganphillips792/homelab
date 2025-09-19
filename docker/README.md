@@ -2,6 +2,7 @@
 `cd docker`
 `docker compose up --build `
 `docker compose -f docker/docker-compose.yml up -d --force-recreate pihole`
+`docker compose up --build jellyfin`
 
 # Services
 
@@ -99,6 +100,14 @@ http://localhost/admin/
 
 not natively. Uptime Kuma doesn’t read a static config file on start; it stores monitors
 in a SQLite DB under /app/data. You will have to manually import the backup file.
+
+## Tailscale
+
+1. Create account at https://login.tailscale.com/admin
+2. Generate auth key and add to env variable
+3. `docker compose up --build tailscale`
+4. Go to `https://login.tailscale.com/admin/machines` and you should see the machine
+
 
 
 

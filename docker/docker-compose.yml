@@ -1,6 +1,21 @@
 version: '3.8'
 
 services:
+  tailscale:
+    image: tailscale/tailscale:latest
+    hostname: tailscale
+    environment:
+      -  TS_AUTHKEY=tskey-auth-k5gUCHV3DN11CNTRL-eQAy4NhmqggbnmQvRxyDhgyQYSng8SBe
+      # - TS_EXTRA_ARGS=--advertise-tags=tag:container
+      - TS_STATE_DIR=/var/lib/tailscale
+      - TS_USERSPACE=false
+    volumes:
+      - ./tailscale/state:/var/lib/tailscale
+    devices:
+      - /dev/net/tun:/dev/net/tun
+    cap_add:
+      - NET_ADMIN
+    restart: unless-stopped
   postgres: # For N8N
     image: postgres:16
     restart: always
@@ -100,6 +115,13 @@ services:
     networks:
       - kafka-network
   
+  gatus:
+    image: twinproduction/gatus:latest
+    ports:
+      - 8082:8080
+    volumes:
+      - ./gatus/config:/config
+
   dozzle:
     container_name: dozzle
     image: amir20/dozzle:latest
@@ -239,6 +261,51 @@ services:
       - uptime_kuma_data:/app/data
     restart: unless-stopped
 
+  jellyfin:
+    image: jellyfin/jellyfin
+    container_name: jellyfin
+    # user: "1000:1000"
+    volumes:
+      - ./jellyfin/config:/config
+      - ./jellyfin/cache:/cache
+      # Media libraries: update these with your actual host paths.
+      # - type: bind
+      #   source: /mnt/media
+      #   target: /media
+      # - type: bind
+      #   source: /mnt/media2
+      #   target: /media2
+      #   read_only: true
+      # Optional - extra fonts to be used during transcoding with subtitle burn-in
+      # - type: bind
+      #   source: /usr/local/share/fonts
+      #   target: /usr/local/share/fonts/custom
+      #   read_only: true
+    restart: 'unless-stopped'
+    # Optional - alternative address used for autodiscovery
+    environment:
+      - JELLYFIN_PublishedServerUrl=http://example.com
+    ports:
+      - "8096:8096"
+
+  glance:
+    container_name: glance
+    image: glanceapp/glance
+    restart: unless-stopped
+    volumes:
+      - ./glance/config:/app/config
+      - ./glance/assets:/app/assets
+      - /etc/localtime:/etc/localtime:ro
+      # Optionally, also mount docker socket if you want to use the docker containers widget
+      # - /var/run/docker.sock:/var/run/docker.sock:ro
+    ports:
+      - 8084:8080
+    environment:
+      - MY_SECRET_TOKEN=123456
+
+
+  # redis:
+    
 
 volumes:
   kafka-data:
