@@ -1,0 +1,15 @@
+module.exports = {
+  apps: [{
+    name: "n8n",
+    script: "n8n",
+    env: {
+      N8N_BASIC_AUTH_ACTIVE: "{{ n8n_basic_auth_active | default('false') }}",
+      N8N_BASIC_AUTH_USER: "{{ n8n_basic_auth_user | default('admin') }}",
+      N8N_BASIC_AUTH_PASSWORD: "{{ n8n_basic_auth_password | default('password') }}",
+      N8N_PROTOCOL: "{{ n8n_protocol | default('http') }}",
+      N8N_HOST: "{% if n8n_protocol | default('http') == 'http' %}localhost{% else %}{{ n8n_host | default('localhost') }}{% endif %}",
+      N8N_PORT: "{{ n8n_port | default('5678') }}",
+      N8N_SECURE_COOKIE: "{% if n8n_protocol | default('http') == 'http' %}false{% else %}true{% endif %}"
+    }
+  }]
+}

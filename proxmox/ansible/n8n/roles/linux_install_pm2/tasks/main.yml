@@ -1,0 +1,23 @@
+---
+- name: Install PM2 globally
+  npm:
+    name: pm2
+    global: yes
+    state: present
+
+- name: Verify PM2 installation
+  command: pm2 --version
+  register: pm2_version
+  changed_when: false
+
+- debug:
+    msg: "PM2 {{ pm2_version.stdout }} installed successfully"
+
+- name: Setup PM2 startup script
+  command: pm2 startup
+  register: pm2_startup
+  changed_when: "'already' not in pm2_startup.stdout"
+
+- name: Save PM2 process list
+  command: pm2 save
+  when: pm2_startup.changed

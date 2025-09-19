@@ -1,0 +1,147 @@
+// Alloy configuration for metrics and logs collection
+
+// Prometheus remote write endpoint
+prometheus.remote_write "default" {
+  endpoint {
+    url = "http://prometheus:9090/api/v1/write"
+  }
+}
+
+// Loki endpoint for logs
+loki.write "default" {
+  endpoint {
+    url = "http://loki:3100/loki/api/v1/push"
+  }
+}
+
+// Self-monitoring: collect Alloy's own metrics
+prometheus.scrape "alloy" {
+  targets = [{"__address__" = "localhost:12345"}]
+  forward_to = [prometheus.remote_write.default.receiver]
+}
+
+// Docker container discovery and metrics collection
+discovery.docker "containers" {
+  host = "unix:///var/run/docker.sock"
+  refresh_interval = "5s"
+}
+
+// Scrape metrics from discovered containers that have prometheus metrics
+prometheus.scrape "docker_containers" {
+  targets    = discovery.docker.containers.targets
+  forward_to = [prometheus.remote_write.default.receiver]
+  
+  // Only scrape containers with prometheus.scrape annotation
+  scrape_interval = "15s"
+  metrics_path    = "/metrics"
+}
+
+// Docker container logs collection
+discovery.docker "container_logs" {
+  host = "unix:///var/run/docker.sock"
+  refresh_interval = "5s"
+}
+
+// Enrich discovered docker targets with friendly labels
+discovery.relabel "container_logs_enriched" {
+  targets = discovery.docker.container_logs.targets
+
+  // Container name (trim leading "/")
+  rule {
+    action        = "replace"
+    source_labels = ["__meta_docker_container_name"]
+    regex         = "/(.*)"
+    target_label  = "container"
+    replacement   = "$1"
+  }
+
+  // Container ID
+  rule {
+    action        = "replace"
+    source_labels = ["__meta_docker_container_id"]
+    target_label  = "container_id"
+  }
+
+  // Image reference
+  rule {
+    action        = "replace"
+    source_labels = ["__meta_docker_container_image"]
+    target_label  = "image"
+  }
+
+  // Compose service name (if using docker compose)
+  rule {
+    action        = "replace"
+    source_labels = ["__meta_docker_container_label_com_docker_compose_service"]
+    target_label  = "service"
+  }
+
+  // Compose project/stack name (if using docker compose)
+  rule {
+    action        = "replace"
+    source_labels = ["__meta_docker_container_label_com_docker_compose_project"]
+    target_label  = "stack"
+  }
+}
+
+loki.source.docker "containers" {
+  host       = "unix:///var/run/docker.sock"
+  targets    = discovery.relabel.container_logs_enriched.output
+  forward_to = [loki.process.docker.receiver]
+  labels     = { job = "docker" }
+
+  // Refresh interval for log discovery
+  refresh_interval = "5s"
+
+}
+
+// Process Docker logs
+loki.process "docker" {
+  forward_to = [loki.write.default.receiver]
+
+  // Ensure at least one label on every stream
+  stage.labels {
+    values = { job = "docker" }
+  }
+
+  stage.docker {}
+  
+  // Add docker-derived labels if present
+  stage.labels {
+    values = { container = "container_name", image = "container_image" }
+  }
+}
+
+// System logs collection (if available)
+loki.source.file "system_logs" {
+  targets = [
+    {__path__ = "/var/log/*.log"},
+    {__path__ = "/var/log/syslog"},
+  ]
+  forward_to = [loki.process.system.receiver]
+}
+
+loki.process "system" {
+  forward_to = [loki.write.default.receiver]
+
+  // Ensure at least one label on every stream
+  stage.labels {
+    values = { job = "system" }
+  }
+
+  stage.regex {
+    expression = "^(?P<timestamp>\\S+\\s+\\S+\\s+\\S+)\\s+(?P<hostname>\\S+)\\s+(?P<service>\\S+).*"
+  }
+
+  stage.labels {
+    values = {
+      hostname = "hostname",
+      service  = "service",
+    }
+  }
+
+  stage.timestamp {
+    source = "timestamp"
+    format = "Jan _2 15:04:05"
+  }
+}

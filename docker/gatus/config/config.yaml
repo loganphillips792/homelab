@@ -1,0 +1,11 @@
+endpoints:
+  - name: example
+    url: https://example.org
+    interval: 30s
+    conditions:
+      - "[STATUS] == 200"
+  - name: Grafana
+    url: http://localhost:3000
+    interval: 30s
+    conditions:
+      - "[STATUS] == 200"

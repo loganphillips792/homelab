@@ -1,0 +1,72 @@
+---
+- name: "Create grafana data directory"
+  file:
+    path: "/var/lib/grafana"
+    state: directory
+    owner: "grafana"
+    group: "grafana"
+    mode: 0755
+
+- name: "Create grafana log directory"
+  file:
+    path: "/var/lib/grafana/log"
+    state: directory
+    owner: "grafana"
+    group: "grafana"
+    mode: 0755
+
+- name: "Create grafana plugins directory"
+  file:
+    path: "/var/lib/grafana/plugins"
+    state: directory
+    owner: "grafana"
+    group: "grafana"
+    mode: 0755
+
+- name: "upload grafana config"
+  template:
+    src: "{{grafana_config_template}}"
+    dest: "{{grafana_config_directory}}/grafana.ini"
+    owner: "root"
+    group: "grafana"
+    mode: 0640
+  notify: restart grafana
+
+- name: "Create grafana provisioning directories"
+  file:
+    path: "{{ item }}"
+    state: directory
+    owner: "root"
+    group: "grafana"
+    mode: 0755
+  with_items:
+    - "{{ grafana_config_directory }}/provisioning/datasources"
+    - "{{ grafana_config_directory }}/provisioning/dashboards"
+    - "/var/lib/grafana/dashboards"
+
+- name: "Provision grafana datasources"
+  template:
+    src: "provisioning/datasources/prometheus.yml"
+    dest: "{{ grafana_config_directory }}/provisioning/datasources/prometheus.yml"
+    owner: "root"
+    group: "grafana"
+    mode: 0644
+  notify: restart grafana
+
+- name: "Provision grafana dashboard providers"
+  template:
+    src: "provisioning/dashboards/default.yml"
+    dest: "{{ grafana_config_directory }}/provisioning/dashboards/default.yml"
+    owner: "root"
+    group: "grafana"
+    mode: 0644
+  notify: restart grafana
+
+- name: "Provision grafana dashboards"
+  template:
+    src: "dashboards/default.json"
+    dest: "/var/lib/grafana/dashboards/default.json"
+    owner: "root"
+    group: "grafana"
+    mode: 0644
+  notify: restart grafana

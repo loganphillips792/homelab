@@ -1,0 +1,15 @@
+[Unit]
+Description=Homepage dashboard
+After=network.target
+
+[Service]
+User={{ homepage_user }}
+WorkingDirectory={{ homepage_dir }}
+ExecStart=/usr/bin/pnpm start
+Restart=unless-stopped
+Environment="HOMEPAGE_ALLOWED_HOSTS={{ ansible_fqdn }}:3000,{{ homepage_ip }}:3000,localhost:3000,127.0.0.1:3000"
+Environment="PUID={{ homepage_user_facts.uid }}"
+Environment="PGID={{ homepage_user_facts.group }}"
+
+[Install]
+WantedBy=multi-user.target

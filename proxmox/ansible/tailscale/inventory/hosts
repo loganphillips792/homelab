@@ -1,0 +1,7 @@
+all:
+  hosts:
+    tailscale:
+      ansible_host: 10.0.0.54
+      ansible_user: root
+      ansible_ssh_private_key_file: ~/.ssh/id_rsa_terraform
+      ansible_python_interpreter: /usr/bin/python3

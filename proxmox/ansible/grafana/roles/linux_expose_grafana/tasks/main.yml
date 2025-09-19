@@ -1,0 +1,16 @@
+---
+- name: Enable ufw
+  ufw:
+    state: enabled
+
+- name: Allow SSH
+  ufw:
+    rule: allow
+    port: '22'
+    proto: tcp
+
+- name: Allow grafana http port
+  ufw:
+    rule: allow
+    port: "{{ grafana_http_port }}"
+    proto: tcp

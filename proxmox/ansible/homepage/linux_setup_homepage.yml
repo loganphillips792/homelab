@@ -1,0 +1,115 @@
+- name: Build Homepage from source
+  hosts: homepage_servers
+  become: true
+  vars:
+    homepage_dir: /opt/homepage
+    homepage_user: homepage
+    homepage_node_version: "18.x"
+    homepage_ip: 10.0.0.48
+
+  tasks:
+    - name: Update apt cache
+      apt:
+        update_cache: yes
+
+    - name: Install Node.js {{ homepage_node_version }}
+      apt:
+        name: curl
+        state: present
+    - name: Add NodeSource repo
+      shell: curl -fsSL https://deb.nodesource.com/setup_{{ homepage_node_version }} | bash -
+    - name: Install Node.js and build tools
+      apt:
+        name:
+          - nodejs
+          - build-essential
+        state: present
+
+    - name: Create homepage user
+      user:
+        name: "{{ homepage_user }}"
+        shell: /bin/bash
+        home: "/home/{{ homepage_user }}"
+        create_home: yes
+      register: homepage_user_facts
+
+    - name: Install git
+      apt:
+        name: git
+        state: present
+
+    - name: Install acl
+      apt:
+        name: acl
+        state: present
+
+    - name: Remove existing homepage directory
+      file:
+        path: "{{ homepage_dir }}"
+        state: absent
+
+    - name: Clone Homepage repo
+      git:
+        repo: https://github.com/gethomepage/homepage.git
+        dest: "{{ homepage_dir }}"
+        version: dev
+        update: yes
+        force: yes
+
+    - name: Change ownership of homepage directory
+      file:
+        path: "{{ homepage_dir }}"
+        state: directory
+        owner: "{{ homepage_user }}"
+        group: "{{ homepage_user }}"
+        recurse: yes
+
+    - name: Install pnpm globally
+      npm:
+        name: pnpm
+        global: yes
+
+    - name: Install dependencies with pnpm
+      become_user: "{{ homepage_user }}"
+      shell: |
+        cd {{ homepage_dir }}
+        pnpm install
+
+    - name: Build production bundle
+      become_user: "{{ homepage_user }}"
+      shell: |
+        cd {{ homepage_dir }}
+        pnpm build
+
+    - name: Copy local config files
+      copy:
+        src: config/
+        dest: "{{ homepage_dir }}/config/"
+        owner: "{{ homepage_user }}"
+        group: "{{ homepage_user }}"
+        mode: '0644'
+
+    - name: Create settings.yaml to allow all hosts
+      copy:
+        content: |
+          server:
+            host: 0.0.0.0
+            port: 3000
+        dest: "{{ homepage_dir }}/config/settings.yaml"
+        owner: "{{ homepage_user }}"
+        group: "{{ homepage_user }}"
+        mode: '0644'
+
+    - name: Create systemd service
+      template:
+        src: templates/homepage.service.j2
+        dest: /etc/systemd/system/homepage.service
+        owner: root
+        group: root
+        mode: '0644'
+    - name: Reload systemd and enable service
+      systemd:
+        daemon_reload: yes
+        name: homepage
+        enabled: yes
+        state: restarted

@@ -1,0 +1,24 @@
+---
+- name: Start Uptime Kuma via PM2
+  shell: |
+    cd /opt/uptime-kuma
+    pm2 start server/server.js --name uptime-kuma
+  args:
+    creates: /root/.pm2/pids/uptime-kuma-0.pid
+
+- name: Start Uptime Kuma service
+  systemd:
+    name: uptime-kuma
+    state: started
+    enabled: yes
+    daemon_reload: yes
+
+- name: Save PM2 process list
+  shell: pm2 save
+  args:
+    creates: /root/.pm2/dump.pm2
+
+- name: Configure PM2 to start on boot
+  shell: pm2 startup
+  args:
+    creates: /etc/systemd/system/pm2-root.service

@@ -1,0 +1,15 @@
+---
+- name: Create PM2 startup script
+  template:
+    src: uptime-kuma.service.j2
+    dest: /etc/systemd/system/uptime-kuma.service
+    mode: 0644
+  notify: reload systemd
+
+- name: Ensure Uptime Kuma directory exists
+  file:
+    path: /opt/uptime-kuma
+    state: directory
+    owner: root
+    group: root
+    mode: 0755

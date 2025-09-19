@@ -1,0 +1,9 @@
+---
+- name: Install and configure Tailscale
+  hosts: tailscale_servers
+  become: yes
+  vars:
+    tailscale_auth_key: "YOUR_TAILSCALE_AUTH_KEY" # Replace with your actual auth key
+  tasks:
+    - name: Include Tailscale installation tasks
+      ansible.builtin.include_tasks: tasks/main.yml

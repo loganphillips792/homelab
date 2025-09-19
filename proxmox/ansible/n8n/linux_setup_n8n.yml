@@ -1,0 +1,9 @@
+---
+- name: Setup n8n with PM2
+  hosts: n8n_servers
+  become: true
+  roles:
+    - linux_install_nodejs
+    - linux_install_pm2
+    - linux_install_n8n
+    - linux_configure_n8n

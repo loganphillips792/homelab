@@ -1,0 +1,31 @@
+---
+- name: Ensure LXC config directory exists
+  ansible.builtin.file:
+    path: /etc/pve/lxc
+    state: directory
+    mode: '0755'
+
+- name: Add Tailscale /dev/tun access to LXC config
+  ansible.builtin.blockinfile:
+    path: "/etc/pve/lxc/{{ lxc_id }}.conf"
+    block: |
+      lxc.cgroup2.devices.allow: c 10:200 rwm
+      lxc.mount.entry: /dev/net dev/net none bind,create=dir
+    create: yes
+    mode: '0644'
+  when: lxc_id is defined and proxmox_version is defined and proxmox_version | float >= 7.0
+
+- name: Add Tailscale /dev/tun access to LXC config (Proxmox 6 and earlier)
+  ansible.builtin.blockinfile:
+    path: "/etc/pve/lxc/{{ lxc_id }}.conf"
+    block: |
+      lxc.cgroup.devices.allow: c 10:200 rwm
+      lxc.mount.entry: /dev/net dev/net none bind,create=dir
+    create: yes
+    mode: '0644'
+  when: lxc_id is defined and proxmox_version is defined and proxmox_version | float < 7.0
+
+- name: Restart LXC container if running
+  ansible.builtin.command: "pct stop {{ lxc_id }} && pct start {{ lxc_id }}"
+  when: lxc_id is defined
+  ignore_errors: true # Ignore errors if container is not running or fails to stop/start

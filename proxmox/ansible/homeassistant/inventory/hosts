@@ -1,0 +1,6 @@
+[homeassistant]
+homeassistant ansible_host=homeassistant.local
+
+[homeassistant:vars]
+ansible_connection=ssh
+ansible_user=root

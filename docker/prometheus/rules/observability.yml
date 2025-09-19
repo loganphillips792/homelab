@@ -1,0 +1,97 @@
+groups:
+  - name: observability.rules
+    rules:
+      # Service availability alerts
+      - alert: ServiceDown
+        expr: up == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Service {{ $labels.job }} is down"
+          description: "Service {{ $labels.job }} on {{ $labels.instance }} has been down for more than 1 minute."
+
+      # Prometheus specific alerts
+      - alert: PrometheusTargetMissing
+        expr: up{job="prometheus"} == 0
+        for: 0m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Prometheus target missing"
+          description: "A Prometheus target has disappeared. An exporter might be crashed."
+
+      - alert: PrometheusConfigurationReloadFailure
+        expr: prometheus_config_last_reload_successful != 1
+        for: 0m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Prometheus configuration reload failure"
+          description: "Prometheus configuration reload error"
+
+      # Loki specific alerts
+      - alert: LokiRequestErrors
+        expr: |
+          (
+            rate(loki_request_duration_seconds_count{status_code=~"5.."}[1m])
+            /
+            rate(loki_request_duration_seconds_count[1m])
+          ) > 0.10
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Loki request errors"
+          description: "The {{ $labels.job }} job has seen {{ printf \"%.2f\" $value }}% errors over the past 5 minutes."
+
+      - alert: LokiRequestLatency
+        expr: |
+          histogram_quantile(0.99,
+            sum(rate(loki_request_duration_seconds_bucket[5m])) by (le)
+          ) > 1
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Loki request latency"
+          description: "The {{ $labels.job }} job has a 99th percentile latency of {{ printf \"%.2f\" $value }} seconds over the past 5 minutes."
+
+      # Alloy specific alerts
+      - alert: AlloyDown
+        expr: up{job="alloy"} == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Alloy agent is down"
+          description: "Alloy agent has been down for more than 2 minutes. Metrics and logs collection may be affected."
+
+      # General resource alerts
+      - alert: HighErrorRate
+        expr: |
+          (
+            sum(rate(prometheus_http_requests_total{code=~"5.."}[5m]))
+            /
+            sum(rate(prometheus_http_requests_total[5m]))
+          ) > 0.05
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High error rate detected"
+          description: "Error rate is above 5% for 5 minutes"
+
+      - alert: DiskSpaceUsage
+        expr: |
+          (
+            node_filesystem_avail_bytes{mountpoint="/"} * 100
+            /
+            node_filesystem_size_bytes{mountpoint="/"}
+          ) < 10
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Host out of disk space"
+          description: "Disk is almost full (< 10% left)"

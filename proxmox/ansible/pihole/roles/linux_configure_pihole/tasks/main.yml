@@ -1,0 +1,44 @@
+---
+- name: Ensure Pi-hole is running
+  service:
+    name: pihole-FTL
+    state: started
+    enabled: yes
+
+- name: Set upstream DNS servers
+  command: pihole -a setdns "1.1.1.1,1.0.0.1"
+
+- name: Configure pihole.toml
+  template:
+    src: pihole.toml.j2
+    dest: /etc/pihole/pihole.toml
+    owner: root
+    group: root
+    mode: '0644'
+
+- name: Create custom DNS list
+  template:
+    src: custom.list.j2
+    dest: /etc/pihole/hosts/custom.list
+    owner: root
+    group: root
+    mode: '0644'
+
+- name: Restart Pi-hole DNS
+  systemd:
+    name: pihole-FTL
+    state: restarted
+
+- name: Enable query logging
+  command: pihole logging on
+
+- name: Update gravity (blocklists)
+  command: pihole -g
+
+- name: Restart Pi-hole services
+  service:
+    name: "{{ item }}"
+    state: restarted
+  loop:
+    - pihole-FTL
+    # - lighttpd

@@ -1,0 +1,16 @@
+[Unit]
+Description=Uptime Kuma
+After=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/uptime-kuma
+ExecStart=/usr/bin/pm2 start server/server.js --name uptime-kuma
+ExecStop=/usr/bin/pm2 stop uptime-kuma
+ExecReload=/usr/bin/pm2 restart uptime-kuma
+Restart=always
+Environment=NODE_ENV=production
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,39 @@
+---
+- name: Install required system packages
+  apt:
+    name:
+      - git
+      - python3
+      - build-essential
+      - curl
+      - gnupg
+    state: present
+    update_cache: yes
+
+- name: Add NodeSource repository
+  shell: |
+    curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
+  args:
+    creates: /etc/apt/sources.list.d/nodesource.list
+
+- name: Install Node.js (includes npm)
+  apt:
+    name: nodejs
+    state: present
+  register: node_install
+  retries: 3
+  delay: 10
+  until: node_install is succeeded
+
+- name: Verify Node.js installation
+  command: node --version
+  register: node_version
+  changed_when: false
+
+- name: Verify npm installation
+  command: npm --version
+  register: npm_version
+  changed_when: false
+
+- debug:
+    msg: "Node.js {{ node_version.stdout }} and npm {{ npm_version.stdout }} installed successfully"

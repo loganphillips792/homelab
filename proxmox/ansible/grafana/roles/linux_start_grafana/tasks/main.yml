@@ -1,0 +1,4 @@
+- name: "ensure grafana service started"
+  service:
+    name: grafana-server
+    state: started
