@@ -1,0 +1,9 @@
+---
+- import_playbook: pihole/linux_setup_pihole.yml
+- import_playbook: grafana/linux_setup_grafana.yml
+- import_playbook: homepage/linux_setup_homepage.yml
+- import_playbook: uptime-kuma/linux_setup_uptime_kuma.yml
+- import_playbook: kafka/linux_setup_kafka.yml
+- import_playbook: n8n/linux_setup_n8n.yml
+- import_playbook: jellyfin/linux_setup_jellyfin.yml
+- import_playbook: tailscale/linux_setup_tailscale.yml

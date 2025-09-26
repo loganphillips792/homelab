@@ -1,0 +1,26 @@
+---
+- name: Create n8n ecosystem config file
+  template:
+    src: ecosystem.config.js.j2
+    dest: /etc/n8n/ecosystem.config.js
+    owner: n8n
+    group: n8n
+    mode: '0644'
+
+- name: Start n8n with PM2
+  command: pm2 start /etc/n8n/ecosystem.config.js
+  register: pm2_start
+  changed_when: "'online' not in pm2_start.stdout"
+
+- name: Save PM2 process list
+  command: pm2 save
+  when: pm2_start.changed
+
+- name: Ensure n8n is running
+  command: pm2 status
+  register: pm2_status
+  changed_when: false
+  failed_when: "'n8n' not in pm2_status.stdout"
+
+- debug:
+    msg: "n8n is running under PM2"

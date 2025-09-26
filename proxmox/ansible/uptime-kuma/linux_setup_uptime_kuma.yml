@@ -1,0 +1,10 @@
+---
+- name: Setup Uptime Kuma
+  hosts: uptime_kuma_servers
+  become: true
+  gather_facts: true
+
+  roles:
+    - linux_install_uptime_kuma
+    - linux_configure_uptime_kuma
+    - linux_start_uptime_kuma

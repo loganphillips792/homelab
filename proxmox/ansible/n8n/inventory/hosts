@@ -1,0 +1,6 @@
+[n8n]
+n8n ansible_host=10.0.0.51
+
+[n8n:vars]
+ansible_user=root
+ansible_ssh_private_key_file=~/.ssh/id_rsa_terraform

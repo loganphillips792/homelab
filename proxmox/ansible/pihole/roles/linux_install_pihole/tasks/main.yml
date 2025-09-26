@@ -1,0 +1,110 @@
+---
+- name: Install dependencies
+  apt:
+    name: ['curl', 'git']
+    state: present
+    update_cache: yes
+
+- name: Create Pi-hole directories
+  file:
+    path: /etc/pihole
+    state: directory
+    mode: '0755'
+
+- name: Create setupVars.conf
+  template:
+    src: setupVars.conf.j2
+    dest: /etc/pihole/setupVars.conf
+    mode: '0644'
+
+- name: Download Pi-hole installation script
+  get_url:
+    url: https://install.pi-hole.net
+    dest: /tmp/install-pihole.sh
+    mode: '0755'
+  register: download_result
+  failed_when: download_result.status_code != 200 or download_result.size == 0
+
+- name: Install Pi-hole
+  command: bash /tmp/install-pihole.sh --unattended
+  args:
+    creates: /usr/local/bin/pihole
+  environment:
+    PIHOLE_SKIP_OS_CHECK: "true"
+    TERM: "dumb"
+  become: true
+  register: install_result
+  changed_when: "'Installer exited at static IP message' not in install_result.stdout"
+  failed_when:
+    - install_result.rc != 0
+    - "'Installer exited at static IP message' not in install_result.stdout"
+
+- name: Clean up installer script
+  file:
+    path: /tmp/install-pihole.sh
+    state: absent
+
+- name: Verify core installation
+  block:
+    - name: Check pihole binary
+      stat:
+        path: /usr/local/bin/pihole
+      register: pihole_bin
+
+    - name: Check FTL binary
+      stat:
+        path: /usr/bin/pihole-FTL
+      register: pihole_ftl
+
+    - name: Verify core components
+      assert:
+        that:
+          - pihole_bin.stat.exists
+          - pihole_ftl.stat.exists
+        msg: "Pi-hole core components not installed properly"
+
+- name: Debug installation result
+  debug:
+    var: install_result
+
+- name: Enable and start FTL service
+  systemd:
+    name: pihole-FTL
+    enabled: yes
+    state: started
+  when: pihole_ftl.stat.exists
+
+# - name: Ensure lighttpd service is running
+#   systemd:
+#     name: lighttpd
+#     enabled: yes
+#     state: restarted
+#   when: not install_result.failed
+
+- name: Verify Pi-hole web files exist
+  stat:
+    path: /var/www/html/admin
+  register: pihole_web_files
+
+- name: Reinstall web interface if missing
+  command: pihole -a -r
+  when:
+    - not pihole_web_files.stat.exists
+    - not install_result.failed
+
+- name: Verify Pi-hole installation
+  command: pihole status
+  register: pihole_status
+  changed_when: false
+  failed_when: pihole_status.rc != 0
+  when: not install_result.failed
+
+- name: Set admin password
+  command: pihole -a -p "{{ pihole_web_password | default('admin') }}"
+  when: not install_result.failed
+
+- name: Display access information
+  debug:
+    msg: |
+      Pi-hole admin interface should be available at http://{{ ansible_host }}/admin
+      Password: {{ pihole_web_password | default('admin') }}
