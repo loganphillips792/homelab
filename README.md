@@ -78,6 +78,8 @@ Download Proxmox ISO image: https://www.proxmox.com/en/proxmox-virtual-environme
         3. pveam available
         4. pveam update
         5. pveam download local ubuntu-23.10-standard_23.10-1_amd64.tar.zst
+    5. Download Kali Linux image
+    6. Download Pop OS image
 
 
 pct status 109
