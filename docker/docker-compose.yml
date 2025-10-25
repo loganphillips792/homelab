@@ -304,8 +304,24 @@ services:
       - MY_SECRET_TOKEN=123456
 
 
+
+  test-db:
+    image: postgres:16
+    container_name: postgres_db
+    restart: always
+    environment:
+      POSTGRES_USER: testuser
+      POSTGRES_PASSWORD: testpassword
+      POSTGRES_DB: test_database
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_test_data:/var/lib/postgresql/data
+      - ./test-db-init.sql:/docker-entrypoint-initdb.d/10-test-table.sql:ro
+
   # redis:
-    
+
+
 
 volumes:
   kafka-data:
@@ -316,6 +332,7 @@ volumes:
   grafana_data:
   pihole_etc:
   uptime_kuma_data:
+  postgres_test_data:
 
 networks:
   kafka-network:

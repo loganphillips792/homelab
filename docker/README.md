@@ -109,6 +109,22 @@ in a SQLite DB under /app/data. You will have to manually import the backup file
 4. Go to `https://login.tailscale.com/admin/machines` and you should see the machine
 
 
+## Test Postgres
+
+
+
+if you have to rerun the SQL script: `docker compose -f docker/docker-compose.yml exec -T test-db psql -U testuser -d test_database -f docker-entrypoint-initdb.d/10-test-table.sql`
+
+
+`docker exec -it postgres_db psql -U testuser -d test_database -c 'SELECT * FROM "test-table";'`
+
+
+
+
+
+
+
+
 
 
 TRY GPT 5 API WIT THIS

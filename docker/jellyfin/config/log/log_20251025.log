@@ -1,0 +1,16 @@
+[2025-10-25 02:00:00.728 +00:00] [INF] [110] Emby.Server.Implementations.ScheduledTasks.TaskManager: "Extract Chapter Images" Completed after 0 minute(s) and 0 seconds
+[2025-10-25 02:00:01.164 +00:00] [INF] [107] Emby.Server.Implementations.ScheduledTasks.TaskManager: Daily trigger for "Extract Chapter Images" set to fire at 2025-10-26 02:00:00.000 +00:00, which is 23:59:58.8352531 from now.
+[2025-10-25 03:04:46.574 +00:00] [INF] [75] Emby.Server.Implementations.ScheduledTasks.Tasks.OptimizeDatabaseTask: Optimizing and vacuuming jellyfin.db...
+[2025-10-25 03:04:47.036 +00:00] [INF] [75] Jellyfin.Database.Providers.Sqlite.SqliteDatabaseProvider: jellyfin.db optimized successfully!
+[2025-10-25 03:04:47.037 +00:00] [INF] [75] Emby.Server.Implementations.ScheduledTasks.TaskManager: "Optimize database" Completed after 0 minute(s) and 0 seconds
+[2025-10-25 05:27:58.367 +00:00] [INF] [65] Emby.Server.Implementations.ScheduledTasks.TaskManager: "Generate Trickplay Images" Completed after 0 minute(s) and 0 seconds
+[2025-10-25 05:27:59.269 +00:00] [INF] [66] Emby.Server.Implementations.ScheduledTasks.TaskManager: Daily trigger for "Generate Trickplay Images" set to fire at 2025-10-26 03:00:00.000 +00:00, which is 21:32:00.7306855 from now.
+[2025-10-25 06:11:52.571 +00:00] [WRN] [17] Microsoft.AspNetCore.Server.Kestrel: As of "10/25/2025 06:11:51 +00:00", the heartbeat has been running for "00:00:03.3873628" which is longer than "00:00:01". This could be caused by thread pool starvation.
+[2025-10-25 20:15:49.283 +00:00] [INF] [128] Emby.Server.Implementations.Library.LibraryManager: Validating media library
+[2025-10-25 20:15:49.395 +00:00] [INF] [130] Emby.Server.Implementations.ScheduledTasks.TaskManager: "Media Segment Scan" Completed after 0 minute(s) and 0 seconds
+[2025-10-25 20:15:50.167 +00:00] [WRN] [128] MediaBrowser.Controller.Entities.BaseItem: Library folder "/config/data/playlists" is inaccessible or empty, skipping
+[2025-10-25 20:15:50.296 +00:00] [WRN] [128] MediaBrowser.Controller.Entities.BaseItem: Library folder "/config/data/playlists" is inaccessible or empty, skipping
+[2025-10-25 20:15:50.517 +00:00] [INF] [128] Emby.Server.Implementations.ScheduledTasks.TaskManager: "Scan Media Library" Completed after 0 minute(s) and 1 seconds
+[2025-10-25 20:16:50.226 +00:00] [INF] [132] Emby.Server.Implementations.ScheduledTasks.Tasks.OptimizeDatabaseTask: Optimizing and vacuuming jellyfin.db...
+[2025-10-25 20:16:50.670 +00:00] [INF] [132] Jellyfin.Database.Providers.Sqlite.SqliteDatabaseProvider: jellyfin.db optimized successfully!
+[2025-10-25 20:16:50.670 +00:00] [INF] [132] Emby.Server.Implementations.ScheduledTasks.TaskManager: "Optimize database" Completed after 0 minute(s) and 0 seconds
