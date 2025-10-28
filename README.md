@@ -260,6 +260,7 @@ Go to set up page: `http://localhost:8096/web/index.html#!/wizardstart.html`
 - Install redis
 - [Cloud-init not working with Kali image : r/Proxmox](https://www.reddit.com/r/Proxmox/comments/1gnbcaz/cloudinit_not_working_with_kali_image/)
 - Traefik: https://github.com/briandipalma/proxmox-services/blob/main/ansible/roles/traefik/tasks/main.yml
+- Docker: Configure devices so that I can type in grafana.homelab and be taken to grafana
 
 # Trouble Shooting
 

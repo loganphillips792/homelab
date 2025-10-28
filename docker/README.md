@@ -118,11 +118,26 @@ if you have to rerun the SQL script: `docker compose -f docker/docker-compose.ym
 
 `docker exec -it postgres_db psql -U testuser -d test_database -c 'SELECT * FROM "test-table";'`
 
+# Live-Auction
+
+- Make sure live-auction repo has the proper settings so that the image gets pushed properly during deployment:
+  - Settings > Repository Secrets
+      - DOCKERHUB_USERNAME
+      - DOCKERHUB_PASSWORD
+
+- Copy .env from live-auction
 
 
+- docker login -u dockedupstream
 
 
+docker compose up --build live-auction
 
+Test:
+```
+curl --request GET \
+  --url 'http://localhost:8000/api/auctions/?skip=0&limit=9'
+```
 
 
 

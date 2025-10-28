@@ -319,8 +319,28 @@ services:
       - postgres_test_data:/var/lib/postgresql/data
       - ./test-db-init.sql:/docker-entrypoint-initdb.d/10-test-table.sql:ro
 
+# https://github.com/loganphillips792/live-auction
+  live-auction:
+    image: dockedupstream/live-auction:deployment
+    ports:
+      - "8000:8000"
+    env_file:
+      - live-auction/.env
+    environment:
+      - OTEL_SERVICE_NAME=live-auction-backend
+      - OTEL_EXPORTER_OTLP_ENDPOINT=tempo:4317 # Removed http://
+    volumes:
+      - ./live-auction/db:/app/db
+    networks:
+      - observability
+    # depends_on: # Ensure backend starts after tempo is available
+    #   - tempo
+
+
   # redis:
 
+
+  # immich
 
 
 volumes:
