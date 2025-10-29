@@ -1,6 +1,6 @@
 
 `cd docker`
-`docker compose up --build `
+`docker compose up --build`
 `docker compose -f docker/docker-compose.yml up -d --force-recreate pihole`
 `docker compose up --build jellyfin`
 
@@ -120,18 +120,16 @@ if you have to rerun the SQL script: `docker compose -f docker/docker-compose.ym
 
 # Live-Auction
 
-- Make sure live-auction repo has the proper settings so that the image gets pushed properly during deployment:
+1. Make sure live-auction repo has the proper settings so that the image gets pushed properly during deployment:
   - Settings > Repository Secrets
       - DOCKERHUB_USERNAME
       - DOCKERHUB_PASSWORD
 
-- Copy .env from live-auction
-
-
-- docker login -u dockedupstream
-
-
-docker compose up --build live-auction
+2. Copy .env from live-auction to `docker/live-auction`
+3. docker login -u dockedupstream
+4. `docker info | username` to check
+5. Make sure you can pull the image from the private repo: `docker pull docker.io/dockedupstream/live-auction:main`
+6. `docker compose up --build live-auction`
 
 Test:
 ```

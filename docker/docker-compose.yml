@@ -321,7 +321,7 @@ services:
 
 # https://github.com/loganphillips792/live-auction
   live-auction:
-    image: dockedupstream/live-auction:deployment
+    image: dockedupstream/live-auction:main
     ports:
       - "8000:8000"
     env_file:
