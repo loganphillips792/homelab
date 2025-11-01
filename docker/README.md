@@ -87,11 +87,20 @@ localhost:8083
 
 ## PiHole
 
-http://localhost/admin/
+- Get IP address of Mac Host: `ipconfig getifaddr en0`
+- The IP address of the customs.list is of the host machine (Mac)
+- DNS of the mac has to point to the MAC itself (10.0.0.227) in my case
+- WIFI > Details > DNS set to 10.0.0.337
+  - Original DNS servers
+    - 75.75.75.75
+    - 75.75.76.76
 
 
+http://pihole.homelab/admin/
 
 - Create a single volumes directory to make it easy to back up all data ??
+
+- Now we have to have all of our devices use Pihole as their DNS server.
 
 
 ## Homepage

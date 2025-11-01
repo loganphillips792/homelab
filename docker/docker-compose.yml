@@ -136,8 +136,8 @@ services:
     ports:
       - "53:53/tcp"
       - "53:53/udp"
-      - "80:80/tcp"
-      - "443:443/tcp"
+      # - "80:80/tcp" commented out because caddy uses these
+      # - "443:443/tcp"
     environment:
       - TZ=${TZ}
       - FTLCONF_webserver_api_password=${PIHOLE_PASSWORD}
@@ -147,13 +147,11 @@ services:
     volumes:
       - ./pihole/etc-pihole:/etc/pihole
       - ./pihole/etc-dnsmasq.d:/etc/dnsmasq.d
-      
     cap_add:
       - NET_ADMIN
       - SYS_TIME
       - SYS_NICE
     restart: unless-stopped
-
 
 
   prometheus:
@@ -249,7 +247,7 @@ services:
       - ./homepage/config:/app/config # Ensure this local dir exists
       - /var/run/docker.sock:/var/run/docker.sock # Optional: for Docker integrations
     environment:
-      HOMEPAGE_ALLOWED_HOSTS: localhost:3001
+      HOMEPAGE_ALLOWED_HOSTS: localhost:3001,homepage.homelab
     restart: unless-stopped
 
   uptime-kuma:
@@ -337,6 +335,24 @@ services:
     #   - tempo
 
 
+  caddy:
+    image: caddy:latest
+    container_name: caddy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./caddy:/etc/caddy
+      - ./caddy/site:/srv
+      - caddy_data:/data
+      - caddy_config:/config
+    networks:
+      - default
+      - observability
+      - kafka-network
+
   # redis:
 
 
@@ -353,6 +369,8 @@ volumes:
   pihole_etc:
   uptime_kuma_data:
   postgres_test_data:
+  caddy_data:
+  caddy_config:
 
 networks:
   kafka-network:
