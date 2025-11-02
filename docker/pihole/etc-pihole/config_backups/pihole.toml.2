@@ -1,7 +1,7 @@
 # Pi-hole configuration file (v6.2.3)
 # Encoding: UTF-8
 # This file is managed by pihole-FTL
-# Last updated on 2025-09-06 01:16:41 UTC
+# Last updated on 2025-09-06 01:17:33 UTC
 
 [dns]
   # Array of upstream DNS servers used by Pi-hole
@@ -101,13 +101,13 @@
   # Possible values are:
   #     Array of custom DNS records each one in HOSTS form: "IP HOSTNAME"
   hosts = [
-    "10.0.0.47 grafana grafana.homelab",
-    "10.0.0.48 homepage homepage.homelab",
-    "10.0.0.49 pihole pihole.homelab",
-    "10.0.0.50 nas nas.homelab",
-    "10.0.0.1 router router.homelab",
-    "10.0.0.51 plex plex.homelab",
-    "10.0.0.52 nextcloud nextcloud.homelab"
+    "10.0.0.47 grafana.homelab",
+    "10.0.0.48 homepage.homelab",
+    "10.0.0.49 pihole.homelab",
+    "10.0.0.50 nas.homelab",
+    "10.0.0.1 router.homelab",
+    "10.0.0.51 plex.homelab",
+    "10.0.0.52 nextcloud.homelab"
   ] ### CHANGED, default = []
 
   # If set, A and AAAA queries for plain names, without dots or domain parts, are never
@@ -142,7 +142,7 @@
   #
   # Possible values are:
   #     <any valid domain>
-  domain = "homelab" ### CHANGED (env), default = "lan"
+  domain = "lan"
 
   # Should all reverse lookups for private IP ranges (i.e., 192.168.x.y, etc) which are
   # not found in /etc/hosts or the DHCP leases file be answered with "no such domain"
@@ -1204,9 +1204,8 @@
   all = false
 
 # Configuration statistics:
-# 155 total entries out of which 149 entries are default
-# --> 6 entries are modified
-# 3 entries are forced through environment:
-#   - dns.domain
+# 155 total entries out of which 150 entries are default
+# --> 5 entries are modified
+# 2 entries are forced through environment:
 #   - dns.listeningMode
 #   - misc.etc_dnsmasq_d

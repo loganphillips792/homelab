@@ -16,3 +16,77 @@
     - My Third Service:
         href: http://localhost/
         description: Homepage is 😎
+
+# Network services
+- Network:
+    - Pi-hole:
+        icon: pihole
+        href: http://pihole.homelab/admin
+        description: Network ad-blocking
+        widget:
+          type: pihole
+          url: http://pihole
+          version: 6
+          key: REPLACE_WITH_PIHOLE_PASSWORD
+
+# Observability & status
+- Observability:
+    - Grafana:
+        icon: grafana
+        href: http://grafana.homelab
+        description: Metrics and dashboards
+        widget:
+          type: grafana
+          url: http://grafana.homelab
+          username: admin
+          password: admin123
+    - Dozzle:
+        icon: dozzle
+        href: http://dozzle.homelab
+        description: Container logs
+        widget:
+          type: dozzle
+          url: http://dozzle:8080
+    - Uptime Kuma:
+        icon: uptimekuma
+        href: http://uptime-kuma.homelab
+        description: Uptime monitoring
+        widget:
+          type: uptime-kuma
+          url: http://uptime-kuma:3001
+    - Gatus:
+        icon: gatus
+        href: http://gatus.homelab
+        description: Status checks
+        widget:
+          type: gatus
+          url: http://gatus:8080
+    - Kafka UI:
+        icon: kafka
+        href: http://kafka-ui.homelab
+        description: Kafka cluster UI
+
+# Media
+- Media:
+    - Jellyfin:
+        icon: jellyfin
+        href: http://jellyfin.homelab
+        description: Media server
+        widget:
+          type: jellyfin
+          url: http://jellyfin:8096
+          key: REPLACE_WITH_JELLYFIN_API_KEY
+
+# Dashboards
+- Dashboards:
+    - Glance:
+        icon: gauge
+        href: http://glance.homelab
+        description: Personal dashboard
+
+# Automation
+- Automation:
+    - n8n:
+        icon: n8n
+        href: http://n8n.homelab
+        description: Workflow automation

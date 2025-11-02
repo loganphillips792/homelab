@@ -1,8 +1,9 @@
 
 `cd docker`
-`docker compose up --build`
+`docker compose up --build` or `docker compose up -d --build`
 `docker compose -f docker/docker-compose.yml up -d --force-recreate pihole`
 `docker compose up --build jellyfin`
+`docker compose up -d --build caddy pihole`
 
 # Services
 
@@ -96,6 +97,21 @@ localhost:8083
     - 75.75.76.76
 
 
+- Run `docker compose up -d --build --force-recreate pihole` if any changes are made (such as changing pihole.toml)
+
+
+
+- Purpose split: Pi‑hole handles DNS; Caddy handles HTTP(S) reverse proxy and TLS.
+- Ports: Pi‑hole publishes DNS on 53/tcp, 53/udp and does not expose web ports (80/443 are commented). Caddy binds 80/443 on the
+host.
+- Networking: Both containers share the default Docker network, so Caddy can reach Pi‑hole’s web UI at pihole:80 internally.
+- Proxy rule: Caddy routes http://pihole.homelab to pihole:80 and redirects / to /admin/ (see caddy/Caddyfile).
+- DNS records: Pi‑hole serves .homelab hostnames and resolves them to your host IP (e.g., 10.0.0.227) via pihole/etc-pihole/hosts/
+custom.list and 02-local.conf. Clients using Pi‑hole as DNS will resolve *.homelab to the host.
+- End‑to‑end flow: Client requests pihole.homelab → Pi‑hole DNS returns 10.0.0.227 → connection hits Caddy on :80/:443 → Caddy
+reverse‑proxies to the Pi‑hole container (pihole:80).
+
+
 http://pihole.homelab/admin/
 
 - Create a single volumes directory to make it easy to back up all data ??
@@ -104,6 +120,10 @@ http://pihole.homelab/admin/
 
 
 ## Homepage
+
+http://homepage.homela
+
+After making any changes: `docker compose up -d --build homepage`
 
 ## Uptime Kuma
 

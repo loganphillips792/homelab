@@ -1,7 +1,7 @@
-# Pi-hole configuration file (v6.3.1)
+# Pi-hole configuration file (v6.3.2)
 # Encoding: UTF-8
 # This file is managed by pihole-FTL
-# Last updated on 2025-10-28 02:46:35 UTC
+# Last updated on 2025-11-02 03:27:38 UTC
 
 [dns]
   # Upstream DNS Servers to be used by Pi-hole. If this is not set, Pi-hole will not
@@ -130,10 +130,12 @@
     "10.0.0.227 grafana.homelab",
     "10.0.0.227 homepage.homelab",
     "10.0.0.227 pihole.homelab",
-    "10.0.0.227 nas.homelab",
-    "10.0.0.227 router.homelab",
-    "10.0.0.227 plex.homelab",
-    "10.0.0.227 nextcloud.homelab"
+    "10.0.0.227 dozzle.homelab",
+    "10.0.0.227 uptime-kuma.homelab",
+    "10.0.0.227 gatus.homelab",
+    "10.0.0.227 kafka-ui.homelab",
+    "10.0.0.227 jellyfin.homelab",
+    "10.0.0.227 n8n.homelab"
   ] ### CHANGED, default = []
 
   # If set, queries for plain names, without dots or domain parts, are never forwarded to

@@ -10,3 +10,6 @@
 - search:
     provider: duckduckgo
     target: _blank
+
+
+# Service-specific widgets (like Pi-hole) go under services.yaml per-service.

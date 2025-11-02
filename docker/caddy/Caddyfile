@@ -27,11 +27,11 @@ http://kafka-ui.homelab {
 }
 
 http://gatus.homelab {
-  reverse_proxy gatus:8080
+  reverse_proxy gatus:8082
 }
 
 http://dozzle.homelab {
-  reverse_proxy dozzle:8080
+  reverse_proxy dozzle:8083
 }
 
 http://glance.homelab {
@@ -39,7 +39,7 @@ http://glance.homelab {
 }
 
 http://uptime-kuma.homelab {
-  reverse_proxy uptime-kuma:3001
+  reverse_proxy uptime-kuma:3002
 }
 
 http://jellyfin.homelab {
