@@ -17,7 +17,7 @@
 #                       WITHIN /etc/dnsmasq.d/yourname.conf                      #
 #    (make sure misc.etc_dnsmasq_d is set to true in /etc/pihole/pihole.toml)    #
 #                                                                                #
-#                      Last updated: 2025-11-02 03:27:39 UTC                     #
+#                      Last updated: 2025-11-02 17:28:50 UTC                     #
 #                              by FTL version v6.3.2                             #
 #                                                                                #
 ##################################################################################
@@ -28,9 +28,10 @@
 10.0.0.227 dozzle.homelab
 10.0.0.227 uptime-kuma.homelab
 10.0.0.227 gatus.homelab
+10.0.0.227 glance.homelab
 10.0.0.227 kafka-ui.homelab
 10.0.0.227 jellyfin.homelab
 10.0.0.227 n8n.homelab
 
 
-# There are 9 entries in this file
+# There are 10 entries in this file
