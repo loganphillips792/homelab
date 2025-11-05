@@ -1339,3 +1339,78 @@
     hostname: 'grafana.homelab'
   }
 ]
+[2025-11-04T23:06:00.485Z] error: undefined
+[2025-11-04T23:06:05.509Z] error: undefined
+[2025-11-04T23:06:15.082Z] error: undefined
+[2025-11-04T23:06:35.605Z] error: undefined
+[2025-11-04T23:06:45.634Z] error: undefined
+[2025-11-04T23:06:55.301Z] error: undefined
+[2025-11-04T23:07:00.070Z] error: undefined
+[2025-11-04T23:07:00.680Z] error: undefined
+[2025-11-04T23:07:11.759Z] error: undefined
+[2025-11-04T23:08:43.755Z] error: undefined
+[2025-11-04T23:08:47.271Z] error: undefined
+[2025-11-04T23:08:52.295Z] error: undefined
+[2025-11-04T23:08:56.482Z] error: Host validation failed for: 10.0.0.227:3001. Hint: Set the HOMEPAGE_ALLOWED_HOSTS environment variable to allow requests from this host / port.
+[2025-11-04T23:08:56.577Z] error: undefined
+[2025-11-04T23:08:56.747Z] error: Host validation failed for: 10.0.0.227:3001. Hint: Set the HOMEPAGE_ALLOWED_HOSTS environment variable to allow requests from this host / port.
+[2025-11-04T23:08:56.751Z] error: Host validation failed for: 10.0.0.227:3001. Hint: Set the HOMEPAGE_ALLOWED_HOSTS environment variable to allow requests from this host / port.
+[2025-11-04T23:08:56.759Z] error: Host validation failed for: 10.0.0.227:3001. Hint: Set the HOMEPAGE_ALLOWED_HOSTS environment variable to allow requests from this host / port.
+[2025-11-04T23:08:56.781Z] error: Host validation failed for: 10.0.0.227:3001. Hint: Set the HOMEPAGE_ALLOWED_HOSTS environment variable to allow requests from this host / port.
+[2025-11-04T23:08:56.792Z] error: Host validation failed for: 10.0.0.227:3001. Hint: Set the HOMEPAGE_ALLOWED_HOSTS environment variable to allow requests from this host / port.
+[2025-11-04T23:08:56.795Z] error: Host validation failed for: 10.0.0.227:3001. Hint: Set the HOMEPAGE_ALLOWED_HOSTS environment variable to allow requests from this host / port.
+[2025-11-04T23:08:56.799Z] error: Host validation failed for: 10.0.0.227:3001. Hint: Set the HOMEPAGE_ALLOWED_HOSTS environment variable to allow requests from this host / port.
+[2025-11-04T23:08:56.806Z] error: Host validation failed for: 10.0.0.227:3001. Hint: Set the HOMEPAGE_ALLOWED_HOSTS environment variable to allow requests from this host / port.
+[2025-11-04T23:08:56.817Z] error: Host validation failed for: 10.0.0.227:3001. Hint: Set the HOMEPAGE_ALLOWED_HOSTS environment variable to allow requests from this host / port.
+[2025-11-04T23:08:56.830Z] error: Host validation failed for: 10.0.0.227:3001. Hint: Set the HOMEPAGE_ALLOWED_HOSTS environment variable to allow requests from this host / port.
+[2025-11-04T23:08:56.839Z] error: Host validation failed for: 10.0.0.227:3001. Hint: Set the HOMEPAGE_ALLOWED_HOSTS environment variable to allow requests from this host / port.
+[2025-11-04T23:08:56.842Z] error: Host validation failed for: 10.0.0.227:3001. Hint: Set the HOMEPAGE_ALLOWED_HOSTS environment variable to allow requests from this host / port.
+[2025-11-04T23:08:56.845Z] error: Host validation failed for: 10.0.0.227:3001. Hint: Set the HOMEPAGE_ALLOWED_HOSTS environment variable to allow requests from this host / port.
+[2025-11-04T23:08:56.854Z] error: Host validation failed for: 10.0.0.227:3001. Hint: Set the HOMEPAGE_ALLOWED_HOSTS environment variable to allow requests from this host / port.
+[2025-11-04T23:08:56.860Z] error: Host validation failed for: 10.0.0.227:3001. Hint: Set the HOMEPAGE_ALLOWED_HOSTS environment variable to allow requests from this host / port.
+[2025-11-04T23:08:56.874Z] error: Host validation failed for: 10.0.0.227:3001. Hint: Set the HOMEPAGE_ALLOWED_HOSTS environment variable to allow requests from this host / port.
+[2025-11-04T23:08:56.880Z] error: Host validation failed for: 10.0.0.227:3001. Hint: Set the HOMEPAGE_ALLOWED_HOSTS environment variable to allow requests from this host / port.
+[2025-11-04T23:08:56.885Z] error: Host validation failed for: 10.0.0.227:3001. Hint: Set the HOMEPAGE_ALLOWED_HOSTS environment variable to allow requests from this host / port.
+[2025-11-04T23:09:10.079Z] error: Host validation failed for: 10.0.0.227:3001. Hint: Set the HOMEPAGE_ALLOWED_HOSTS environment variable to allow requests from this host / port.
+[2025-11-04T23:09:10.083Z] error: Host validation failed for: 10.0.0.227:3001. Hint: Set the HOMEPAGE_ALLOWED_HOSTS environment variable to allow requests from this host / port.
+[2025-11-04T23:09:13.959Z] error: Host validation failed for: 10.0.0.227:3001. Hint: Set the HOMEPAGE_ALLOWED_HOSTS environment variable to allow requests from this host / port.
+[2025-11-04T23:09:14.089Z] error: Host validation failed for: 10.0.0.227:3001. Hint: Set the HOMEPAGE_ALLOWED_HOSTS environment variable to allow requests from this host / port.
+[2025-11-04T23:09:14.098Z] error: Host validation failed for: 10.0.0.227:3001. Hint: Set the HOMEPAGE_ALLOWED_HOSTS environment variable to allow requests from this host / port.
+[2025-11-04T23:09:14.104Z] error: Host validation failed for: 10.0.0.227:3001. Hint: Set the HOMEPAGE_ALLOWED_HOSTS environment variable to allow requests from this host / port.
+[2025-11-04T23:09:14.115Z] error: Host validation failed for: 10.0.0.227:3001. Hint: Set the HOMEPAGE_ALLOWED_HOSTS environment variable to allow requests from this host / port.
+[2025-11-04T23:09:14.119Z] error: Host validation failed for: 10.0.0.227:3001. Hint: Set the HOMEPAGE_ALLOWED_HOSTS environment variable to allow requests from this host / port.
+[2025-11-04T23:09:14.120Z] error: Host validation failed for: 10.0.0.227:3001. Hint: Set the HOMEPAGE_ALLOWED_HOSTS environment variable to allow requests from this host / port.
+[2025-11-04T23:09:14.124Z] error: Host validation failed for: 10.0.0.227:3001. Hint: Set the HOMEPAGE_ALLOWED_HOSTS environment variable to allow requests from this host / port.
+[2025-11-04T23:09:14.129Z] error: Host validation failed for: 10.0.0.227:3001. Hint: Set the HOMEPAGE_ALLOWED_HOSTS environment variable to allow requests from this host / port.
+[2025-11-04T23:09:14.135Z] error: Host validation failed for: 10.0.0.227:3001. Hint: Set the HOMEPAGE_ALLOWED_HOSTS environment variable to allow requests from this host / port.
+[2025-11-04T23:09:14.141Z] error: Host validation failed for: 10.0.0.227:3001. Hint: Set the HOMEPAGE_ALLOWED_HOSTS environment variable to allow requests from this host / port.
+[2025-11-04T23:09:14.147Z] error: Host validation failed for: 10.0.0.227:3001. Hint: Set the HOMEPAGE_ALLOWED_HOSTS environment variable to allow requests from this host / port.
+[2025-11-04T23:09:14.151Z] error: Host validation failed for: 10.0.0.227:3001. Hint: Set the HOMEPAGE_ALLOWED_HOSTS environment variable to allow requests from this host / port.
+[2025-11-04T23:09:14.160Z] error: Host validation failed for: 10.0.0.227:3001. Hint: Set the HOMEPAGE_ALLOWED_HOSTS environment variable to allow requests from this host / port.
+[2025-11-04T23:09:14.165Z] error: Host validation failed for: 10.0.0.227:3001. Hint: Set the HOMEPAGE_ALLOWED_HOSTS environment variable to allow requests from this host / port.
+[2025-11-04T23:09:14.172Z] error: Host validation failed for: 10.0.0.227:3001. Hint: Set the HOMEPAGE_ALLOWED_HOSTS environment variable to allow requests from this host / port.
+[2025-11-04T23:09:14.181Z] error: Host validation failed for: 10.0.0.227:3001. Hint: Set the HOMEPAGE_ALLOWED_HOSTS environment variable to allow requests from this host / port.
+[2025-11-04T23:09:14.185Z] error: Host validation failed for: 10.0.0.227:3001. Hint: Set the HOMEPAGE_ALLOWED_HOSTS environment variable to allow requests from this host / port.
+[2025-11-04T23:09:14.191Z] error: Host validation failed for: 10.0.0.227:3001. Hint: Set the HOMEPAGE_ALLOWED_HOSTS environment variable to allow requests from this host / port.
+[2025-11-04T23:09:14.200Z] error: Host validation failed for: 10.0.0.227:3001. Hint: Set the HOMEPAGE_ALLOWED_HOSTS environment variable to allow requests from this host / port.
+[2025-11-04T23:39:12.173Z] error: Host validation failed for: 10.0.0.227:3001. Hint: Set the HOMEPAGE_ALLOWED_HOSTS environment variable to allow requests from this host / port.
+[2025-11-04T23:39:12.402Z] error: Host validation failed for: 10.0.0.227:3001. Hint: Set the HOMEPAGE_ALLOWED_HOSTS environment variable to allow requests from this host / port.
+[2025-11-04T23:39:12.410Z] error: Host validation failed for: 10.0.0.227:3001. Hint: Set the HOMEPAGE_ALLOWED_HOSTS environment variable to allow requests from this host / port.
+[2025-11-04T23:39:12.424Z] error: Host validation failed for: 10.0.0.227:3001. Hint: Set the HOMEPAGE_ALLOWED_HOSTS environment variable to allow requests from this host / port.
+[2025-11-04T23:39:12.431Z] error: Host validation failed for: 10.0.0.227:3001. Hint: Set the HOMEPAGE_ALLOWED_HOSTS environment variable to allow requests from this host / port.
+[2025-11-04T23:39:12.436Z] error: Host validation failed for: 10.0.0.227:3001. Hint: Set the HOMEPAGE_ALLOWED_HOSTS environment variable to allow requests from this host / port.
+[2025-11-04T23:39:12.439Z] error: Host validation failed for: 10.0.0.227:3001. Hint: Set the HOMEPAGE_ALLOWED_HOSTS environment variable to allow requests from this host / port.
+[2025-11-04T23:39:12.443Z] error: Host validation failed for: 10.0.0.227:3001. Hint: Set the HOMEPAGE_ALLOWED_HOSTS environment variable to allow requests from this host / port.
+[2025-11-04T23:39:12.446Z] error: Host validation failed for: 10.0.0.227:3001. Hint: Set the HOMEPAGE_ALLOWED_HOSTS environment variable to allow requests from this host / port.
+[2025-11-04T23:39:12.453Z] error: Host validation failed for: 10.0.0.227:3001. Hint: Set the HOMEPAGE_ALLOWED_HOSTS environment variable to allow requests from this host / port.
+[2025-11-04T23:39:12.461Z] error: Host validation failed for: 10.0.0.227:3001. Hint: Set the HOMEPAGE_ALLOWED_HOSTS environment variable to allow requests from this host / port.
+[2025-11-04T23:39:12.464Z] error: Host validation failed for: 10.0.0.227:3001. Hint: Set the HOMEPAGE_ALLOWED_HOSTS environment variable to allow requests from this host / port.
+[2025-11-04T23:39:12.468Z] error: Host validation failed for: 10.0.0.227:3001. Hint: Set the HOMEPAGE_ALLOWED_HOSTS environment variable to allow requests from this host / port.
+[2025-11-04T23:39:12.472Z] error: Host validation failed for: 10.0.0.227:3001. Hint: Set the HOMEPAGE_ALLOWED_HOSTS environment variable to allow requests from this host / port.
+[2025-11-04T23:39:12.476Z] error: Host validation failed for: 10.0.0.227:3001. Hint: Set the HOMEPAGE_ALLOWED_HOSTS environment variable to allow requests from this host / port.
+[2025-11-04T23:39:12.486Z] error: Host validation failed for: 10.0.0.227:3001. Hint: Set the HOMEPAGE_ALLOWED_HOSTS environment variable to allow requests from this host / port.
+[2025-11-04T23:39:12.491Z] error: Host validation failed for: 10.0.0.227:3001. Hint: Set the HOMEPAGE_ALLOWED_HOSTS environment variable to allow requests from this host / port.
+[2025-11-04T23:39:12.494Z] error: Host validation failed for: 10.0.0.227:3001. Hint: Set the HOMEPAGE_ALLOWED_HOSTS environment variable to allow requests from this host / port.
+[2025-11-04T23:39:12.500Z] error: Host validation failed for: 10.0.0.227:3001. Hint: Set the HOMEPAGE_ALLOWED_HOSTS environment variable to allow requests from this host / port.
+[2025-11-04T23:39:12.511Z] error: Host validation failed for: 10.0.0.227:3001. Hint: Set the HOMEPAGE_ALLOWED_HOSTS environment variable to allow requests from this host / port.
+[2025-11-04T23:39:16.115Z] error: Host validation failed for: 10.0.0.227:3001. Hint: Set the HOMEPAGE_ALLOWED_HOSTS environment variable to allow requests from this host / port.
