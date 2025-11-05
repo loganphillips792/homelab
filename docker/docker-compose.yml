@@ -245,6 +245,7 @@ services:
       - "3001:3000" # Grafana uses 3000 on host
     volumes:
       - ./homepage/config:/app/config # Ensure this local dir exists
+      - ~/docker-volumes/homepage-logs:/app/config/logs # don't want logs to be committed into the repo
       - /var/run/docker.sock:/var/run/docker.sock # Optional: for Docker integrations
     environment:
       HOMEPAGE_ALLOWED_HOSTS: localhost:3001,homepage.homelab
