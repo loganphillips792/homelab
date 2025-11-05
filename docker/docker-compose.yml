@@ -145,7 +145,7 @@ services:
       #- FTLCONF_dns_domain=homelab
       - FTLCONF_misc_etc_dnsmasq_d=true
     volumes:
-      - ~/pihole-config/etc-pihole:/etc/pihole
+      - ~/docker-volumes/pihole-config/etc-pihole:/etc/pihole
       - ./pihole/etc-dnsmasq.d:/etc/dnsmasq.d
     cap_add:
       - NET_ADMIN
@@ -264,8 +264,8 @@ services:
     container_name: jellyfin
     # user: "1000:1000"
     volumes:
-      - ./jellyfin/config:/config
-      - ./jellyfin/cache:/cache
+      - ~/docker-volumes/jellyfin/config:/config
+      - ~/docker-volumes/jellyfin/cache:/cache
       # Media libraries: update these with your actual host paths.
       # - type: bind
       #   source: /mnt/media

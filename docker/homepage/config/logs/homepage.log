@@ -1599,3 +1599,99 @@
   }
 ]
 [2025-11-05T01:04:50.734Z] error: undefined
+[2025-11-05T01:56:49.939Z] error: <httpProxy> Error calling http://grafana.homelab/api/alerts...
+[2025-11-05T01:56:49.944Z] error: <httpProxy> [
+  500,
+  [Error: getaddrinfo ENOTFOUND grafana.homelab] {
+    errno: -3008,
+    code: 'ENOTFOUND',
+    syscall: 'getaddrinfo',
+    hostname: 'grafana.homelab'
+  }
+]
+[2025-11-05T01:56:49.967Z] error: <httpProxy> Error calling http://grafana.homelab/api/alertmanager/grafana/api/v2/alerts...
+[2025-11-05T01:56:49.970Z] error: <httpProxy> [
+  500,
+  [Error: getaddrinfo ENOTFOUND grafana.homelab] {
+    errno: -3008,
+    code: 'ENOTFOUND',
+    syscall: 'getaddrinfo',
+    hostname: 'grafana.homelab'
+  }
+]
+[2025-11-05T01:56:49.972Z] error: <httpProxy> Error calling http://grafana.homelab/api/admin/stats...
+[2025-11-05T01:56:49.974Z] error: <httpProxy> [
+  500,
+  [Error: getaddrinfo ENOTFOUND grafana.homelab] {
+    errno: -3008,
+    code: 'ENOTFOUND',
+    syscall: 'getaddrinfo',
+    hostname: 'grafana.homelab'
+  }
+]
+[2025-11-05T01:56:50.016Z] error: undefined
+[2025-11-05T01:57:00.710Z] error: undefined
+[2025-11-05T02:01:58.145Z] error: <httpProxy> Error calling http://grafana.homelab/api/admin/stats...
+[2025-11-05T02:01:58.147Z] error: <httpProxy> [
+  500,
+  [Error: getaddrinfo ENOTFOUND grafana.homelab] {
+    errno: -3008,
+    code: 'ENOTFOUND',
+    syscall: 'getaddrinfo',
+    hostname: 'grafana.homelab'
+  }
+]
+[2025-11-05T02:01:58.149Z] error: <httpProxy> Error calling http://grafana.homelab/api/alerts...
+[2025-11-05T02:01:58.150Z] error: <httpProxy> [
+  500,
+  [Error: getaddrinfo ENOTFOUND grafana.homelab] {
+    errno: -3008,
+    code: 'ENOTFOUND',
+    syscall: 'getaddrinfo',
+    hostname: 'grafana.homelab'
+  }
+]
+[2025-11-05T02:01:58.154Z] error: <httpProxy> Error calling http://grafana.homelab/api/alertmanager/grafana/api/v2/alerts...
+[2025-11-05T02:01:58.155Z] error: <httpProxy> [
+  500,
+  [Error: getaddrinfo ENOTFOUND grafana.homelab] {
+    errno: -3008,
+    code: 'ENOTFOUND',
+    syscall: 'getaddrinfo',
+    hostname: 'grafana.homelab'
+  }
+]
+[2025-11-05T02:01:58.200Z] error: undefined
+[2025-11-05T02:02:08.634Z] error: undefined
+[2025-11-05T02:02:12.959Z] error: <httpProxy> Error calling http://grafana.homelab/api/admin/stats...
+[2025-11-05T02:02:12.960Z] error: <httpProxy> [
+  500,
+  [Error: getaddrinfo ENOTFOUND grafana.homelab] {
+    errno: -3008,
+    code: 'ENOTFOUND',
+    syscall: 'getaddrinfo',
+    hostname: 'grafana.homelab'
+  }
+]
+[2025-11-05T02:02:12.961Z] error: <httpProxy> Error calling http://grafana.homelab/api/alerts...
+[2025-11-05T02:02:12.961Z] error: <httpProxy> [
+  500,
+  [Error: getaddrinfo ENOTFOUND grafana.homelab] {
+    errno: -3008,
+    code: 'ENOTFOUND',
+    syscall: 'getaddrinfo',
+    hostname: 'grafana.homelab'
+  }
+]
+[2025-11-05T02:02:12.979Z] error: <httpProxy> Error calling http://grafana.homelab/api/alertmanager/grafana/api/v2/alerts...
+[2025-11-05T02:02:12.981Z] error: <httpProxy> [
+  500,
+  [Error: getaddrinfo ENOTFOUND grafana.homelab] {
+    errno: -3008,
+    code: 'ENOTFOUND',
+    syscall: 'getaddrinfo',
+    hostname: 'grafana.homelab'
+  }
+]
+[2025-11-05T02:02:12.988Z] error: undefined
+[2025-11-05T02:02:23.719Z] error: undefined
