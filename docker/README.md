@@ -119,6 +119,10 @@ http://pihole.homelab/admin/
 - Now we have to have all of our devices use Pihole as their DNS server.
 
 
+
+docker exec pihole tail -n 100 -f /var/log/pihole/pihole.log 
+
+
 ## Homepage
 
 http://homepage.homela

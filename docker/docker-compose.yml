@@ -145,7 +145,7 @@ services:
       #- FTLCONF_dns_domain=homelab
       - FTLCONF_misc_etc_dnsmasq_d=true
     volumes:
-      - ./pihole/etc-pihole:/etc/pihole
+      - ~/pihole-config/etc-pihole:/etc/pihole
       - ./pihole/etc-dnsmasq.d:/etc/dnsmasq.d
     cap_add:
       - NET_ADMIN
