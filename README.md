@@ -254,12 +254,12 @@ Go to set up page: `http://localhost:8096/web/index.html#!/wizardstart.html`
 2. Set DNS records in pihole.toml
 3. Laptop/phone use pihole as their DNS server (can either do it via router or change each device's DNS settings)
 4. In browser you type 'homepage.homelab'.
-5. Chrome  calls the system resolver (MacOS's mDNSResponder) to resolve the URL. The resolver looks at the network config and sees the DNS server is set to 10.0.0.27. 
+5. Chrome  calls the system resolver (MacOS's mDNSResponder) to resolve the URL. The resolver looks at the network config and sees the DNS server is set to 10.0.0.227. 
 6. Browser connects to 10.0.0.227 on HTTP port 80 (because we typed homepage.homelab)
 7. The resolver creates a DNS query and sends it to UDP port 53
 8. Since 10.0.0.227 is on your LAN, your Mac ARPs to find the MAC address for 10.0.0.227 and fires the packet on the wire
 9. If you’re doing this from the same Mac that’s running Docker, it still works: packets to 10.0.0.227 loop back into the host’s networking stack (because that IP is assigned to your Mac), then hit Docker’s port-forward
-10. Docker forwards host :53 -> Pi-hole container :53 (this is because we defined - "53:53/tcp" in the pihole ports config)
+10. Docker forwards host :53 -> Pi-hole container :53 (this is because we defined - "53:53/tcp" and "53:53/udp" in the pihole ports config)
 11. Pihole checks its local DNS and returns 10.0.0.227 as the IP address.
     - For everything else (e.g., example.com), Pi-hole forwards to its upstream resolver(s) (whatever you configured in the Pi-hole admin: Cloudflare, Quad9, your router, etc.), gets the reply, applies blocklists if relevant, and sends the answer back to your Mac
 12. On host machine (Mac), Caddy is listening on ports 80 and 443 (these ports are defined in teh caddy definition in docker-compose.yml)
