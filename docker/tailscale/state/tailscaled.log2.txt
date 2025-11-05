@@ -1,0 +1,24 @@
+{"logtail":{"client_time":"2025-11-05T02:39:24.60020443Z","proc_id":1464620547,"proc_seq":174},"metrics":"I1004I1202I1402I1802I1a60I2e5eI1c02I2601","text":"tailscaled got signal terminated; shutting down\n"}
+{"logtail":{"client_time":"2025-11-05T02:39:24.602522305Z","proc_id":1464620547,"proc_seq":175},"text":"canceling captive portal context\n"}
+{"logtail":{"client_time":"2025-11-05T02:39:24.605003139Z","proc_id":1464620547,"proc_seq":176},"text":"control: client.Shutdown ...\n"}
+{"logtail":{"client_time":"2025-11-05T02:39:24.606617347Z","proc_id":1464620547,"proc_seq":177},"text":"control: updateRoutine: exiting\n"}
+{"logtail":{"client_time":"2025-11-05T02:39:24.608022472Z","proc_id":1464620547,"proc_seq":178},"v":1,"text":"control: PollNetMap: context canceled\n"}
+{"logtail":{"client_time":"2025-11-05T02:39:24.609683389Z","proc_id":1464620547,"proc_seq":179},"text":"control: mapRoutine: exiting\n"}
+{"logtail":{"client_time":"2025-11-05T02:39:24.61696843Z","proc_id":1464620547,"proc_seq":180},"v":1,"text":"control: authRoutine: context done.\n"}
+{"logtail":{"client_time":"2025-11-05T02:39:24.618148805Z","proc_id":1464620547,"proc_seq":181},"text":"control: authRoutine: exiting\n"}
+{"logtail":{"client_time":"2025-11-05T02:39:24.62281418Z","proc_id":1464620547,"proc_seq":182},"text":"control: Client.Shutdown done.\n"}
+{"logtail":{"client_time":"2025-11-05T02:39:24.624955722Z","proc_id":1464620547,"proc_seq":183},"text":"magicsock: closing connection to derp-12 (conn-close), age 49m52s\n"}
+{"logtail":{"client_time":"2025-11-05T02:39:24.626301055Z","proc_id":1464620547,"proc_seq":184},"text":"magicsock: 0 active derp conns\n"}
+{"logtail":{"client_time":"2025-11-05T02:39:24.629782597Z","proc_id":1464620547,"proc_seq":185},"v":2,"text":"wg: Routine: receive incoming mkReceiveFunc - stopped\n"}
+{"logtail":{"client_time":"2025-11-05T02:39:24.633118097Z","proc_id":1464620547,"proc_seq":186},"text":"dns: inotify: context canceled\n"}
+{"logtail":{"client_time":"2025-11-05T02:39:24.634242639Z","proc_id":1464620547,"proc_seq":187},"v":2,"text":"wg: Routine: receive incoming mkReceiveFunc - stopped\n"}
+{"logtail":{"client_time":"2025-11-05T02:39:24.673654347Z","proc_id":1464620547,"proc_seq":188},"text":"monitor: ip rule deleted: {Family:2 DstLength:0 SrcLength:0 Tos:0 Table:254 Protocol:0 Scope:0 Type:1 Flags:0 Attributes:{Dst:<nil> Src:<nil> Gateway:<nil> OutIface:0 Priority:5210 Table:254 Mark:16711680 Pref:<nil> Expires:<nil> Metrics:<nil> Multipath:[]}}\n"}
+{"logtail":{"client_time":"2025-11-05T02:39:24.698254014Z","proc_id":1464620547,"proc_seq":189},"text":"monitor: ip rule deleted: {Family:2 DstLength:0 SrcLength:0 Tos:0 Table:253 Protocol:0 Scope:0 Type:1 Flags:0 Attributes:{Dst:<nil> Src:<nil> Gateway:<nil> OutIface:0 Priority:5230 Table:253 Mark:16711680 Pref:<nil> Expires:<nil> Metrics:<nil> Multipath:[]}}\n"}
+{"logtail":{"client_time":"2025-11-05T02:39:24.703653014Z","proc_id":1464620547,"proc_seq":190},"text":"monitor: ip rule deleted: {Family:2 DstLength:0 SrcLength:0 Tos:0 Table:0 Protocol:0 Scope:0 Type:7 Flags:0 Attributes:{Dst:<nil> Src:<nil> Gateway:<nil> OutIface:0 Priority:5250 Table:0 Mark:16711680 Pref:<nil> Expires:<nil> Metrics:<nil> Multipath:[]}}\n"}
+{"logtail":{"client_time":"2025-11-05T02:39:24.716315847Z","proc_id":1464620547,"proc_seq":191},"text":"monitor: ip rule deleted: {Family:2 DstLength:0 SrcLength:0 Tos:0 Table:52 Protocol:0 Scope:0 Type:1 Flags:0 Attributes:{Dst:<nil> Src:<nil> Gateway:<nil> OutIface:0 Priority:5270 Table:52 Mark:0 Pref:<nil> Expires:<nil> Metrics:<nil> Multipath:[]}}\n"}
+{"logtail":{"client_time":"2025-11-05T02:39:24.880089805Z","proc_id":1464620547,"proc_seq":192},"v":2,"text":"wg: Device closing\n"}
+{"logtail":{"client_time":"2025-11-05T02:39:24.884026972Z","proc_id":1464620547,"proc_seq":193},"v":1,"text":"monitor: RTM_DELROUTE: src=100.76.58.106/0, dst=100.76.58.106/32, gw=, outif=4, table=255\n"}
+{"logtail":{"client_time":"2025-11-05T02:39:24.928454972Z","proc_id":1464620547,"proc_seq":194},"v":2,"text":"wg: Routine: receive incoming receiveDERP - stopped\n"}
+{"logtail":{"client_time":"2025-11-05T02:39:24.93340143Z","proc_id":1464620547,"proc_seq":195},"v":2,"text":"wg: Device closed\n"}
+{"logtail":{"client_time":"2025-11-05T02:39:24.938473764Z","proc_id":1464620547,"proc_seq":196},"text":"flushing log.\n"}
+{"logtail":{"client_time":"2025-11-05T02:39:24.947486764Z","proc_id":1464620547,"proc_seq":197},"text":"logger closing down\n"}
