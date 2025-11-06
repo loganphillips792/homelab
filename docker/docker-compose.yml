@@ -44,8 +44,8 @@ services:
       - DB_POSTGRESDB_DATABASE=${POSTGRES_DB}
       - DB_POSTGRESDB_USER=${POSTGRES_NON_ROOT_USER}
       - DB_POSTGRESDB_PASSWORD=${POSTGRES_NON_ROOT_PASSWORD}
-    ports:
-      - 5678:5678
+    # ports: # don't need ports because caddy proxies to the container ports for us
+    #   - 5678:5678
     links:
       - postgres
     volumes:
@@ -103,8 +103,8 @@ services:
   kafka-ui:
     container_name: kafka-ui
     image: provectuslabs/kafka-ui:latest
-    ports:
-      - 8080:8080
+    # ports: # don't need ports because caddy proxies to the container ports for us
+    #   - 8080:8080
     environment:
       KAFKA_CLUSTERS_0_NAME: local-kafka
       # Use internal listener for container-to-container communication
@@ -127,8 +127,8 @@ services:
     image: amir20/dozzle:latest
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
-    ports:
-      - 8083:8080
+    # ports: # don't need ports because caddy proxies to the container ports for us
+    #   - 8083:8080
 
   pihole:
     container_name: pihole
@@ -157,8 +157,8 @@ services:
   prometheus:
     image: prom/prometheus:v2.47.2
     container_name: prometheus
-    ports:
-      - "9090:9090"
+    # ports: # don't need ports because caddy proxies to the container ports for us
+    #   - "9090:9090"
     volumes:
       - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
       - ./prometheus/rules:/etc/prometheus/rules
@@ -179,8 +179,8 @@ services:
   loki:
     image: grafana/loki:2.9.2
     container_name: loki
-    ports:
-      - "3100:3100"
+    # ports: # don't need ports because caddy proxies to the container ports for us
+    #   - "3100:3100"
     volumes:
       - ./loki/loki.yml:/etc/loki/local-config.yaml
       - loki_data:/loki
@@ -221,8 +221,8 @@ services:
   grafana:
     image: grafana/grafana:10.2.0
     container_name: grafana
-    ports:
-      - "3000:3000"
+    # ports: # don't need ports because caddy proxies to the container ports for us
+    #   - "3000:3000"
     volumes:
       - ./grafana/provisioning:/etc/grafana/provisioning
       - ./grafana/grafana.ini:/etc/grafana/grafana.ini
@@ -273,8 +273,8 @@ services:
   homepage:
     image: ghcr.io/gethomepage/homepage:latest
     container_name: homepage
-    ports:
-      - "3001:3000" # Grafana uses 3000 on host
+    # ports: # don't need ports because caddy proxies to the container ports for us
+    #   - "3001:3000" # Grafana uses 3000 on host
     volumes:
       - ./homepage/config:/app/config # Ensure this local dir exists
       - ~/docker-volumes/homepage-logs:/app/config/logs # don't want logs to be committed into the repo
@@ -286,8 +286,8 @@ services:
   uptime-kuma:
     image: louislam/uptime-kuma:1
     container_name: uptime-kuma
-    ports:
-      - "3002:3001" # 3001 is used by homepage on host
+    # ports: # don't need ports because caddy proxies to the container ports for us
+    #   - "3002:3001" # 3001 is used by homepage on host
     volumes:
       - uptime_kuma_data:/app/data
     restart: unless-stopped
@@ -306,8 +306,8 @@ services:
     image: redis/redisinsight:latest
     container_name: redisinsight
     restart: unless-stopped
-    ports:
-      - "5540:5540"
+    # ports: # don't need ports because caddy proxies to the container ports for us
+    #   - "5540:5540"
     volumes:
       - redisinsight_data:/data
     environment:
@@ -354,8 +354,8 @@ services:
     # Optional - alternative address used for autodiscovery
     environment:
       - JELLYFIN_PublishedServerUrl=http://example.com
-    ports:
-      - "8096:8096"
+    # ports: # don't need ports because caddy proxies to the container ports for us
+    #   - "8096:8096"
 
   glance:
     container_name: glance
@@ -367,8 +367,8 @@ services:
       - /etc/localtime:/etc/localtime:ro
       # Optionally, also mount docker socket if you want to use the docker containers widget
       # - /var/run/docker.sock:/var/run/docker.sock:ro
-    ports:
-      - 8084:8080
+    # ports: # don't need ports because caddy proxies to the container ports for us
+    #   - 8084:8080
     environment:
       - MY_SECRET_TOKEN=123456
 
@@ -377,8 +377,8 @@ services:
     image: pawelmalak/flame
     container_name: flame
     restart: unless-stopped
-    ports:
-      - "5005:5005"
+    # ports: # don't need ports because caddy proxies to the container ports for us
+    #   - "5005:5005"
     environment:
       - PASSWORD=${FLAME_PASSWORD}
     volumes:
@@ -404,8 +404,8 @@ services:
 # https://github.com/loganphillips792/live-auction
   live-auction:
     image: dockedupstream/live-auction:main
-    ports:
-      - "8000:8000"
+    # ports: # don't need ports because caddy proxies to the container ports for us
+    #   - "8000:8000"
     env_file:
       - live-auction/.env
     environment:
