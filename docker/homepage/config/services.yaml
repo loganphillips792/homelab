@@ -98,3 +98,9 @@
         icon: n8n
         href: http://n8n.homelab
         description: Workflow automation
+
+# Apps
+- Apps:
+    - Live Auction:
+        href: http://live-auction.homelab
+        description: Real-time auction app
