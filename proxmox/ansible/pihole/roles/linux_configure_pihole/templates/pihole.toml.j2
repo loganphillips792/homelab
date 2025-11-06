@@ -1,0 +1,9 @@
+[dns]
+hosts = [
+  {% for entry in pihole_custom_dns %}
+  "{{ entry.ip }} {{ entry.hostname }}.{{ pihole_domain }}",
+  {% endfor %}
+]
+
+[misc]
+etc_dnsmasq_d = true

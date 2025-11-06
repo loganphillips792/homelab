@@ -1,0 +1,431 @@
+version: '3.8'
+
+services:
+  tailscale:
+    image: tailscale/tailscale:latest
+    hostname: tailscale
+    environment:
+      -  TS_AUTHKEY=tskey-auth-k5gUCHV3DN11CNTRL-eQAy4NhmqggbnmQvRxyDhgyQYSng8SBe
+      # - TS_EXTRA_ARGS=--advertise-tags=tag:container
+      - TS_STATE_DIR=/var/lib/tailscale
+      - TS_USERSPACE=false
+    volumes:
+      - ./tailscale/state:/var/lib/tailscale
+    devices:
+      - /dev/net/tun:/dev/net/tun
+    cap_add:
+      - NET_ADMIN
+    restart: unless-stopped
+  postgres: # For N8N
+    image: postgres:16
+    restart: always
+    environment:
+      - POSTGRES_USER
+      - POSTGRES_PASSWORD
+      - POSTGRES_DB
+      - POSTGRES_NON_ROOT_USER
+      - POSTGRES_NON_ROOT_PASSWORD
+    volumes:
+      - db_storage:/var/lib/postgresql/data
+      - ./init-data.sh:/docker-entrypoint-initdb.d/init-data.sh
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -h localhost -U ${POSTGRES_USER} -d ${POSTGRES_DB}']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  n8n:
+    image: docker.n8n.io/n8nio/n8n
+    restart: always
+    environment:
+      - DB_TYPE=postgresdb
+      - DB_POSTGRESDB_HOST=postgres
+      - DB_POSTGRESDB_PORT=5432
+      - DB_POSTGRESDB_DATABASE=${POSTGRES_DB}
+      - DB_POSTGRESDB_USER=${POSTGRES_NON_ROOT_USER}
+      - DB_POSTGRESDB_PASSWORD=${POSTGRES_NON_ROOT_PASSWORD}
+    ports:
+      - 5678:5678
+    links:
+      - postgres
+    volumes:
+      - n8n_storage:/home/node/.n8n
+    depends_on:
+      postgres:
+        condition: service_healthy
+  kafka:
+    image: apache/kafka:4.0.0
+    container_name: kafka
+    ports:
+      - "9092:9092"
+      - "29092:29092"
+    environment:
+      # Unique ID for this broker
+      KAFKA_NODE_ID: 1
+
+      # Cluster ID (generate once: `uuidgen`)
+      KAFKA_CLUSTER_ID: "q1Sh-8BCRyKf-9pgaJ0Z2w"
+
+      # Listeners - Separate listeners for internal and external access
+      KAFKA_LISTENERS: PLAINTEXT://:29092,PLAINTEXT_HOST://:9092,CONTROLLER://:9093
+      
+      # Advertised listeners - Internal for container communication, External for localhost
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092
+
+      # Storage directories (logs = Kafka data, not app logs)
+      KAFKA_LOG_DIRS: /var/lib/kafka/data
+
+      # KRaft mode settings - Fixed controller quorum voters
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+
+      # Inter-broker listener - Use PLAINTEXT for container communication
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+
+      # Security settings for controller
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+
+      # Auto-create topics settings
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+    volumes:
+      - kafka-data:/var/lib/kafka/data
+    networks:
+      - kafka-network
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --list"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+  kafka-ui:
+    container_name: kafka-ui
+    image: provectuslabs/kafka-ui:latest
+    ports:
+      - 8080:8080
+    environment:
+      KAFKA_CLUSTERS_0_NAME: local-kafka
+      # Use internal listener for container-to-container communication
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:29092
+    depends_on:
+      kafka:
+        condition: service_healthy
+    networks:
+      - kafka-network
+  
+  gatus:
+    image: twinproduction/gatus:latest
+    ports:
+      - 8082:8080
+    volumes:
+      - ./gatus/config:/config
+
+  dozzle:
+    container_name: dozzle
+    image: amir20/dozzle:latest
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    ports:
+      - 8083:8080
+
+  pihole:
+    container_name: pihole
+    image: pihole/pihole:latest
+    ports:
+      - "53:53/tcp"
+      - "53:53/udp"
+      # - "80:80/tcp" commented out because caddy uses these
+      # - "443:443/tcp"
+    environment:
+      - TZ=${TZ}
+      - FTLCONF_webserver_api_password=${PIHOLE_PASSWORD}
+      - FTLCONF_dns_listeningMode=all
+      #- FTLCONF_dns_domain=homelab
+      - FTLCONF_misc_etc_dnsmasq_d=true
+    volumes:
+      - ~/docker-volumes/pihole-config/etc-pihole:/etc/pihole
+      - ./pihole/etc-dnsmasq.d:/etc/dnsmasq.d
+    cap_add:
+      - NET_ADMIN
+      - SYS_TIME
+      - SYS_NICE
+    restart: unless-stopped
+
+
+  prometheus:
+    image: prom/prometheus:v2.47.2
+    container_name: prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+      - ./prometheus/rules:/etc/prometheus/rules
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--storage.tsdb.retention.time=200h'
+      - '--web.enable-lifecycle'
+      - '--web.enable-admin-api'
+      - '--web.enable-remote-write-receiver'
+    networks:
+      - observability
+    restart: unless-stopped
+
+  loki:
+    image: grafana/loki:2.9.2
+    container_name: loki
+    ports:
+      - "3100:3100"
+    volumes:
+      - ./loki/loki.yml:/etc/loki/local-config.yaml
+      - loki_data:/loki
+    command: -config.file=/etc/loki/local-config.yaml
+    networks:
+      - observability
+    restart: unless-stopped
+
+
+  alloy:
+    image: grafana/alloy:v1.0.0
+    container_name: alloy
+    ports:
+      - "12345:12345"  # Alloy UI
+    user: "0"
+    volumes:
+      - ./alloy/config.alloy:/etc/alloy/config.alloy
+      - /var/log:/var/log:ro
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro
+    command:
+      - run
+      - /etc/alloy/config.alloy
+      - --server.http.listen-addr=0.0.0.0:12345
+      - --storage.path=/var/lib/alloy/data
+    environment:
+      - HOSTNAME
+    networks:
+      - observability
+    restart: unless-stopped
+    depends_on:
+      - prometheus
+      - loki
+
+  grafana:
+    image: grafana/grafana:10.2.0
+    container_name: grafana
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning
+      - ./grafana/grafana.ini:/etc/grafana/grafana.ini
+      - grafana_data:/var/lib/grafana
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin123
+      - GF_USERS_ALLOW_SIGN_UP=false
+    networks:
+      - observability
+    restart: unless-stopped
+    depends_on:
+      - prometheus
+      - loki
+
+  homepage:
+    image: ghcr.io/gethomepage/homepage:latest
+    container_name: homepage
+    ports:
+      - "3001:3000" # Grafana uses 3000 on host
+    volumes:
+      - ./homepage/config:/app/config # Ensure this local dir exists
+      - ~/docker-volumes/homepage-logs:/app/config/logs # don't want logs to be committed into the repo
+      - /var/run/docker.sock:/var/run/docker.sock # Optional: for Docker integrations
+    environment:
+      HOMEPAGE_ALLOWED_HOSTS: localhost:3001,homepage.homelab
+    restart: unless-stopped
+
+  uptime-kuma:
+    image: louislam/uptime-kuma:1
+    container_name: uptime-kuma
+    ports:
+      - "3002:3001" # 3001 is used by homepage on host
+    volumes:
+      - uptime_kuma_data:/app/data
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    container_name: redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD}
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+
+  redisinsight:
+    image: redis/redisinsight:latest
+    container_name: redisinsight
+    restart: unless-stopped
+    ports:
+      - "5540:5540"
+    volumes:
+      - redisinsight_data:/data
+    environment:
+      - RI_APP_PORT=5540
+      - RI_APP_HOST=0.0.0.0
+      - RI_ENCRYPTION_KEY=${RI_ENCRYPTION_KEY}
+      - RI_LOG_LEVEL=info
+      - RI_FILES_LOGGER=true
+      - RI_STDOUT_LOGGER=true
+      - RI_ACCEPT_TERMS_AND_CONDITIONS=true
+      - RI_DATABASE_MANAGEMENT=true
+      # Preconfigure a Redis connection (ID defaults to 0 when omitted)
+      - RI_REDIS_HOST=redis
+      - RI_REDIS_PORT=6379
+      - RI_REDIS_ALIAS=Primary Redis
+      - RI_REDIS_USERNAME=default
+      - RI_REDIS_PASSWORD=${REDIS_PASSWORD}
+      - RI_REDIS_TLS=false
+      - RI_REDIS_DB=0
+    depends_on:
+      - redis
+
+  jellyfin:
+    image: jellyfin/jellyfin
+    container_name: jellyfin
+    # user: "1000:1000"
+    volumes:
+      - ~/docker-volumes/jellyfin/config:/config
+      - ~/docker-volumes/jellyfin/cache:/cache
+      # Media libraries: update these with your actual host paths.
+      # - type: bind
+      #   source: /mnt/media
+      #   target: /media
+      # - type: bind
+      #   source: /mnt/media2
+      #   target: /media2
+      #   read_only: true
+      # Optional - extra fonts to be used during transcoding with subtitle burn-in
+      # - type: bind
+      #   source: /usr/local/share/fonts
+      #   target: /usr/local/share/fonts/custom
+      #   read_only: true
+    restart: 'unless-stopped'
+    # Optional - alternative address used for autodiscovery
+    environment:
+      - JELLYFIN_PublishedServerUrl=http://example.com
+    ports:
+      - "8096:8096"
+
+  glance:
+    container_name: glance
+    image: glanceapp/glance
+    restart: unless-stopped
+    volumes:
+      - ./glance/config:/app/config
+      - ./glance/assets:/app/assets
+      - /etc/localtime:/etc/localtime:ro
+      # Optionally, also mount docker socket if you want to use the docker containers widget
+      # - /var/run/docker.sock:/var/run/docker.sock:ro
+    ports:
+      - 8084:8080
+    environment:
+      - MY_SECRET_TOKEN=123456
+
+
+  flame:
+    image: pawelmalak/flame
+    container_name: flame
+    restart: unless-stopped
+    ports:
+      - "5005:5005"
+    environment:
+      - PASSWORD=${FLAME_PASSWORD}
+    volumes:
+      - ~/docker-volumes/flame:/app/data
+      - /var/run/docker.sock:/var/run/docker.sock
+
+
+
+  test-db:
+    image: postgres:16
+    container_name: postgres_db
+    restart: always
+    environment:
+      POSTGRES_USER: testuser
+      POSTGRES_PASSWORD: testpassword
+      POSTGRES_DB: test_database
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_test_data:/var/lib/postgresql/data
+      - ./test-db-init.sql:/docker-entrypoint-initdb.d/10-test-table.sql:ro
+
+# https://github.com/loganphillips792/live-auction
+  live-auction:
+    image: dockedupstream/live-auction:main
+    ports:
+      - "8000:8000"
+    env_file:
+      - live-auction/.env
+    environment:
+      - OTEL_SERVICE_NAME=live-auction-backend
+      - OTEL_EXPORTER_OTLP_ENDPOINT=tempo:4317 # Removed http://
+    volumes:
+      - ./live-auction/db:/app/db
+    networks:
+      - observability
+    # depends_on: # Ensure backend starts after tempo is available
+    #   - tempo
+
+
+  caddy:
+    image: caddy:latest
+    container_name: caddy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./caddy:/etc/caddy
+      - ./caddy/site:/srv
+      - caddy_data:/data
+      - caddy_config:/config
+    networks:
+      - default
+      - observability
+      - kafka-network
+
+
+  # immich
+
+
+volumes:
+  kafka-data:
+  db_storage:
+  n8n_storage:
+  prometheus_data:
+  loki_data:
+  grafana_data:
+  pihole_etc:
+  uptime_kuma_data:
+  postgres_test_data:
+  caddy_data:
+  caddy_config:
+  redis_data:
+  redisinsight_data:
+
+networks:
+  kafka-network:
+    driver: bridge
+  observability:
+    driver: bridge

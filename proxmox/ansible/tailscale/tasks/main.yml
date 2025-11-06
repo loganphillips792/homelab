@@ -1,0 +1,56 @@
+---
+- name: Add Tailscale's package signing key
+  ansible.builtin.shell:
+    cmd: curl -fsSL https://pkgs.tailscale.com/stable/ubuntu/noble.noarmor.gpg | sudo tee /usr/share/keyrings/tailscale-archive-keyring.gpg >/dev/null
+  args:
+    creates: /usr/share/keyrings/tailscale-archive-keyring.gpg
+
+- name: Add Tailscale repository
+  ansible.builtin.shell:
+    cmd: curl -fsSL https://pkgs.tailscale.com/stable/ubuntu/noble.tailscale-keyring.list | sudo tee /etc/apt/sources.list.d/tailscale.list
+  args:
+    creates: /etc/apt/sources.list.d/tailscale.list
+
+- name: Update apt package index
+  ansible.builtin.apt:
+    update_cache: yes
+
+- name: Install Tailscale
+  ansible.builtin.apt:
+    name: tailscale
+    state: present
+
+- name: Stop Tailscale service for re-configuration
+  ansible.builtin.systemd:
+    name: tailscaled
+    state: stopped
+  ignore_errors: true # Ignore if service is not running
+
+- name: Start Tailscale service in userspace networking mode
+  ansible.builtin.command: sudo /usr/sbin/tailscaled --tun=userspace-networking --state=/var/lib/tailscale/tailscaled.state --socket=/run/tailscale/tailscaled.sock
+  args:
+    creates: /run/tailscale/tailscaled.sock
+  async: 60
+  poll: 0
+  become: true
+
+- name: Wait for tailscaled to be ready
+  ansible.builtin.wait_for:
+    path: /run/tailscale/tailscaled.sock
+    state: present
+    timeout: 30
+
+- name: Connect machine to Tailscale network in unattended mode
+  ansible.builtin.command: sudo tailscale up --unattended --authkey {{ tailscale_auth_key }}
+  args:
+    creates: /var/lib/tailscale/tailscaled.state
+  when: tailscale_auth_key is defined and tailscale_auth_authkey_used is not defined
+
+- name: Get Tailscale IPv4 address
+  ansible.builtin.command: tailscale ip -4
+  register: tailscale_ipv4_address
+  changed_when: false
+
+- name: Display Tailscale IPv4 address
+  ansible.builtin.debug:
+    msg: "Tailscale IPv4 address: {{ tailscale_ipv4_address.stdout }}"

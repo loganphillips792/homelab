@@ -1,0 +1,71 @@
+{
+  # Disable public ACME since these are internal hostnames
+  auto_https off
+  debug
+}
+
+# Reverse proxy internal homelab services by hostname
+
+http://grafana.homelab {
+  reverse_proxy grafana:3000
+}
+
+http://homepage.homelab {
+  reverse_proxy homepage:3000
+}
+
+http://pihole.homelab {
+  # Redirect root to admin UI
+  handle_path / {
+    redir /admin/ 302
+  }
+  reverse_proxy pihole:80
+}
+
+http://kafka-ui.homelab {
+  reverse_proxy kafka-ui:8080
+}
+
+http://gatus.homelab {
+  reverse_proxy gatus:8080
+}
+
+http://dozzle.homelab {
+  reverse_proxy dozzle:8080
+}
+
+http://glance.homelab {
+  reverse_proxy glance:8080
+}
+
+http://uptime-kuma.homelab {
+  reverse_proxy uptime-kuma:3001
+}
+
+http://jellyfin.homelab {
+  reverse_proxy jellyfin:8096
+}
+
+http://n8n.homelab {
+  reverse_proxy n8n:5678
+}
+
+http://flame.homelab {
+  reverse_proxy flame:5005
+}
+
+http://redisinsight.homelab {
+  reverse_proxy redisinsight:5540
+}
+
+http://live-auction.homelab {
+  reverse_proxy live-auction:8000
+}
+
+http://prometheus.homelab {
+  reverse_proxy prometheus:9090
+}
+
+http://loki.homelab {
+  reverse_proxy loki:3100
+}

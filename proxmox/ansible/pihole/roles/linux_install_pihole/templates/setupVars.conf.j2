@@ -1,0 +1,32 @@
+WEBPASSWORD={{ pihole_web_password | default('admin') | hash('sha256') | hash('sha256') }}
+PIHOLE_INTERFACE=eth0
+IPV4_ADDRESS={{ ansible_default_ipv4.address }}/24
+IPV6_ADDRESS=fd00::2
+QUERY_LOGGING=true
+INSTALL_WEB_INTERFACE=true
+LIGHTTPD_ENABLED=true
+INSTALL_WEB_SERVER=true
+DNSMASQ_LISTENING=all
+PIHOLE_DNS_1=1.1.1.1
+PIHOLE_DNS_2=1.0.0.1
+PIHOLE_DNS_3=2001:4860:4860::8888
+PIHOLE_DNS_4=2001:4860:4860::8844
+DNS_FQDN_REQUIRED=true
+DNS_BOGUS_PRIV=true
+DNSSEC=false
+TEMPERATUREUNIT=C
+WEBUIBOXEDLAYOUT=traditional
+API_EXCLUDE_DOMAINS=
+API_EXCLUDE_CLIENTS=
+API_QUERY_LOG_SHOW=all
+API_PRIVACY_MODE=false
+BLOCKING_ENABLED=true
+REV_SERVER=false
+CACHE_SIZE=10000
+
+# Custom DNS entries for pihole.toml
+CUSTOM_DNS_ENTRIES={% for entry in pihole_custom_dns %}"{{ entry.ip }} {{ entry.hostname }}.{{ pihole_domain }}"{% if not loop.last %},{% endif %}{% endfor %}
+
+# Enable custom DNS entries in pihole.toml
+CUSTOM_DNS=true
+DNSMASQ_USE_CUSTOM_LIST=true

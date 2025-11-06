@@ -1,0 +1,3 @@
+---
+grafana_install_repo: "https://apt.grafana.com"
+grafana_install_gpg_key: "https://apt.grafana.com/gpg.key"

@@ -1,0 +1,11 @@
+# Proxmox API Configuration
+# Copy this file to terraform.tfvars and fill in your actual values.
+# Make sure to add terraform.tfvars to your .gitignore file.
+
+proxmox_host           = "https://10.0.0.98:8006"
+proxmox_token_id       = "your_token_id_here"      # e.g., "root@pam!tf-token"
+proxmox_token_secret   = "your_token_secret_here"
+
+# You can also override other variables from variables.tf here if needed.
+# For example:
+# node = "pve2"
