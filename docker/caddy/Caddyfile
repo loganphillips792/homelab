@@ -69,3 +69,7 @@ http://prometheus.homelab {
 http://loki.homelab {
   reverse_proxy loki:3100
 }
+
+http://umami.homelab {
+  reverse_proxy umami:3000
+}

@@ -238,6 +238,38 @@ services:
       - prometheus
       - loki
 
+  umami:
+    image: ghcr.io/umami-software/umami:postgresql-latest
+    # Do not publish host port 3000 to avoid conflict with Grafana
+    environment:
+      DATABASE_URL: postgresql://umami:umami@umami-db:5432/umami
+      DATABASE_TYPE: postgresql
+      APP_SECRET: ${UMAMI_APP_SECRET}
+    depends_on:
+      umami-db:
+        condition: service_healthy
+    init: true
+    restart: always
+    healthcheck:
+      test: ["CMD-SHELL", "curl http://localhost:3000/api/heartbeat"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  umami-db:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: umami
+      POSTGRES_USER: umami
+      POSTGRES_PASSWORD: umami
+    volumes:
+      - umami-db-data:/var/lib/postgresql/data
+    restart: always
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
   homepage:
     image: ghcr.io/gethomepage/homepage:latest
     container_name: homepage
@@ -418,6 +450,7 @@ volumes:
   grafana_data:
   pihole_etc:
   uptime_kuma_data:
+  umami-db-data:
   postgres_test_data:
   caddy_data:
   caddy_config:

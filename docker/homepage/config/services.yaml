@@ -69,6 +69,10 @@
         icon: redis
         href: http://redisinsight.homelab
         description: Redis GUI
+    - Umami:
+        icon: umami
+        href: http://umami.homelab
+        description: Web analytics
 
 # Media
 - Media:

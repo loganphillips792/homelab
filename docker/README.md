@@ -199,6 +199,11 @@ OR
 OR
 If you ever want to connect from another container in the same compose network, use the service name: `redis-cli -h redis -a your_password_here`
 
+# Umami
+
+Username: admin
+Password: umami
+
 # DNS Process Explained
 
 1. Set Wifi DNS on mac to IP address of Mac (ipconfig getifaddr en0)
