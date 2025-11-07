@@ -69,6 +69,10 @@
         icon: redis
         href: http://redisinsight.homelab
         description: Redis GUI
+    - Metabase:
+        icon: metabase
+        href: http://metabase.homelab
+        description: BI & analytics
     - Umami:
         icon: umami
         href: http://umami.homelab

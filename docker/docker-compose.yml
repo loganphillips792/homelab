@@ -33,6 +33,8 @@ services:
       interval: 5s
       timeout: 5s
       retries: 10
+    networks:
+      - main-network
 
   n8n:
     image: docker.n8n.io/n8nio/n8n
@@ -53,6 +55,8 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+    networks:
+      - main-network
   kafka:
     image: apache/kafka:4.0.0
     container_name: kafka
@@ -114,6 +118,7 @@ services:
         condition: service_healthy
     networks:
       - kafka-network
+      - main-network
   
   gatus:
     image: twinproduction/gatus:latest
@@ -121,6 +126,8 @@ services:
       - 8082:8080
     volumes:
       - ./gatus/config:/config
+    networks:
+      - main-network
 
   dozzle:
     container_name: dozzle
@@ -129,6 +136,8 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock
     # ports: # don't need ports because caddy proxies to the container ports for us
     #   - 8083:8080
+    networks:
+      - main-network
 
   pihole:
     container_name: pihole
@@ -152,6 +161,8 @@ services:
       - SYS_TIME
       - SYS_NICE
     restart: unless-stopped
+    networks:
+      - main-network
 
 
   prometheus:
@@ -173,7 +184,7 @@ services:
       - '--web.enable-admin-api'
       - '--web.enable-remote-write-receiver'
     networks:
-      - observability
+      - main-network
     restart: unless-stopped
 
   loki:
@@ -186,7 +197,7 @@ services:
       - loki_data:/loki
     command: -config.file=/etc/loki/local-config.yaml
     networks:
-      - observability
+      - main-network
     restart: unless-stopped
 
 
@@ -212,7 +223,7 @@ services:
     environment:
       - HOSTNAME
     networks:
-      - observability
+      - main-network
     restart: unless-stopped
     depends_on:
       - prometheus
@@ -232,12 +243,54 @@ services:
       - GF_SECURITY_ADMIN_PASSWORD=admin123
       - GF_USERS_ALLOW_SIGN_UP=false
     networks:
-      - observability
+      - main-network
     restart: unless-stopped
     depends_on:
       - prometheus
       - loki
 
+  metabase:
+    image: metabase/metabase:latest
+    container_name: metabase
+    hostname: metabase
+    # Do not publish host ports; Caddy will proxy internally
+    environment:
+      MB_DB_TYPE: postgres
+      MB_DB_DBNAME: metabaseappdb
+      MB_DB_PORT: 5432
+      MB_DB_USER: metabase
+      MB_DB_PASS: ${METABASE_DB_PASSWORD}
+      MB_DB_HOST: metabase-db
+    depends_on:
+      metabase-db:
+        condition: service_healthy
+    healthcheck:
+      test: curl --fail -I http://localhost:3000/api/health || exit 1
+      interval: 15s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - main-network
+
+  metabase-db:
+    image: postgres:16-alpine
+    container_name: metabase_db
+    hostname: metabase-db
+    environment:
+      POSTGRES_USER: metabase
+      POSTGRES_DB: metabaseappdb
+      POSTGRES_PASSWORD: ${METABASE_DB_PASSWORD}
+    volumes:
+      - metabase-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: always
+    networks:
+      - main-network
   umami:
     image: ghcr.io/umami-software/umami:postgresql-latest
     # Do not publish host port 3000 to avoid conflict with Grafana
@@ -255,6 +308,8 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
+    networks:
+      - main-network
 
   umami-db:
     image: postgres:15-alpine
@@ -270,6 +325,8 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
+    networks:
+      - main-network
   homepage:
     image: ghcr.io/gethomepage/homepage:latest
     container_name: homepage
@@ -282,6 +339,8 @@ services:
     environment:
       HOMEPAGE_ALLOWED_HOSTS: localhost:3001,homepage.homelab
     restart: unless-stopped
+    networks:
+      - main-network
 
   uptime-kuma:
     image: louislam/uptime-kuma:1
@@ -291,6 +350,8 @@ services:
     volumes:
       - uptime_kuma_data:/app/data
     restart: unless-stopped
+    networks:
+      - main-network # so that uptime kuma can reach out to other services
 
   redis:
     image: redis:7-alpine
@@ -301,6 +362,8 @@ services:
       - "6379:6379"
     volumes:
       - redis_data:/data
+    networks:
+      - kafka-network
 
   redisinsight:
     image: redis/redisinsight:latest
@@ -329,6 +392,8 @@ services:
       - RI_REDIS_DB=0
     depends_on:
       - redis
+    networks:
+      - main-network
 
   jellyfin:
     image: jellyfin/jellyfin
@@ -356,6 +421,8 @@ services:
       - JELLYFIN_PublishedServerUrl=http://example.com
     # ports: # don't need ports because caddy proxies to the container ports for us
     #   - "8096:8096"
+    networks:
+      - main-network
 
   glance:
     container_name: glance
@@ -371,6 +438,8 @@ services:
     #   - 8084:8080
     environment:
       - MY_SECRET_TOKEN=123456
+    networks:
+      - main-network
 
 
   flame:
@@ -384,6 +453,8 @@ services:
     volumes:
       - ~/docker-volumes/flame:/app/data
       - /var/run/docker.sock:/var/run/docker.sock
+    networks:
+      - main-network
 
 
 
@@ -414,7 +485,7 @@ services:
     volumes:
       - ./live-auction/db:/app/db
     networks:
-      - observability
+      - main-network
     # depends_on: # Ensure backend starts after tempo is available
     #   - tempo
 
@@ -434,7 +505,7 @@ services:
       - caddy_config:/config
     networks:
       - default
-      - observability
+      - main-network
       - kafka-network
 
 
@@ -450,6 +521,7 @@ volumes:
   grafana_data:
   pihole_etc:
   uptime_kuma_data:
+  metabase-db-data:
   umami-db-data:
   postgres_test_data:
   caddy_data:
@@ -460,5 +532,5 @@ volumes:
 networks:
   kafka-network:
     driver: bridge
-  observability:
+  main-network:
     driver: bridge

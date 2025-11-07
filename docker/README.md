@@ -218,7 +218,7 @@ Password: umami
 10. Docker forwards host :53 -> Pi-hole container :53 (this is because we defined - "53:53/tcp" and "53:53/udp" in the pihole ports config)
 11. Pihole checks its local DNS and returns 10.0.0.227 as the IP address.
     - For everything else (e.g., example.com), Pi-hole forwards to its upstream resolver(s) (whatever you configured in the Pi-hole admin: Cloudflare, Quad9, your router, etc.), gets the reply, applies blocklists if relevant, and sends the answer back to your Mac
-12. On host machine (Mac), Caddy is listening on ports 80 and 443 (these ports are defined in teh caddy definition in docker-compose.yml)
+12. On host machine (Mac), Caddy is listening on ports 80 and 443 (these ports are defined in the caddy definition in docker-compose.yml)
 13. Caddy looks at the HTTP Host header(homepage.homelab) and matches it and reverse-proxies the rquest to the homepage container on port 3000. The hostname is the Docker service name and since Caddy is attached to the same networks that the targets live, it can reach them on their container ports (so, you don't need to publish app ports anymore, as Caddy is the entrance to the services)
 
 # Deploying on Proxmox
