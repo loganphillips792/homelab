@@ -26,6 +26,10 @@ http://kafka-ui.homelab {
   reverse_proxy kafka-ui:8080
 }
 
+http://akhq.homelab {
+  reverse_proxy akhq:8080
+}
+
 http://gatus.homelab {
   reverse_proxy gatus:8080
 }

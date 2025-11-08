@@ -65,6 +65,10 @@
         icon: kafka
         href: http://kafka-ui.homelab
         description: Kafka cluster UI
+    - AKHQ:
+        icon: kafka
+        href: http://akhq.homelab
+        description: Kafka manager (topics, consumers, ACLs)
     - Redis Insight:
         icon: redis
         href: http://redisinsight.homelab

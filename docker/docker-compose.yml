@@ -120,6 +120,26 @@ services:
       - kafka-network
       - main-network
   
+  akhq:
+    image: tchiotludo/akhq:latest
+    container_name: akhq
+    restart: unless-stopped
+    environment:
+      AKHQ_CONFIGURATION: |
+        akhq:
+          connections:
+            homelab-kafka:
+              properties:
+                # Use existing Kafka broker from the main stack
+                bootstrap.servers: "kafka:29092"
+              # Uncomment if you later add Schema Registry
+              # schema-registry:
+              #   url: "http://schema-registry:8085"
+    # No host ports; Caddy will reverse-proxy
+    networks:
+      - main-network
+      - kafka-network
+  
   gatus:
     image: twinproduction/gatus:latest
     ports:
