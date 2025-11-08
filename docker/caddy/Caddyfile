@@ -88,3 +88,7 @@ http://ollama.homelab {
 http://ollama-webui.homelab {
   reverse_proxy ollama-webui:8080
 }
+
+http://changedetection.homelab {
+  reverse_proxy changedetection:5000
+}

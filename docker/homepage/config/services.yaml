@@ -116,6 +116,10 @@
     - Live Auction:
         href: http://live-auction.homelab
         description: Real-time auction app
+    - Changedetection.io:
+        icon: globe
+        href: http://changedetection.homelab
+        description: Website change monitoring
 
 # AI
 - AI:

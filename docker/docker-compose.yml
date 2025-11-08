@@ -415,6 +415,17 @@ services:
     networks:
       - main-network
 
+  changedetection:
+    image: dgtlmoon/changedetection.io:latest
+    container_name: changedetection
+    # ports:
+    #   - "5000:5000"  # Exposed via Caddy; internal only
+    volumes:
+      - datastore-volume:/datastore
+    restart: unless-stopped
+    networks:
+      - main-network
+
   ollama:
     image: docker.io/ollama/ollama:latest
     container_name: ollama
@@ -584,6 +595,7 @@ volumes:
   caddy_config:
   redis_data:
   redisinsight_data:
+  datastore-volume:
 
 networks:
   kafka-network:
