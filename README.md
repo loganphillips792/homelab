@@ -262,7 +262,6 @@ Go to set up page: `http://localhost:8096/web/index.html#!/wizardstart.html`
 # TODO
 
 - Install https://github.com/prometheus-pve/prometheus-pve-exporter on proxmox to get prometheus metrics of all services
-- https://github.com/grafana/alloy
 - Traefik: https://github.com/briandipalma/proxmox-services/blob/main/ansible/roles/traefik/tasks/main.yml
 - Install Homeassistant on VM
 - Access VMs from outside of network
