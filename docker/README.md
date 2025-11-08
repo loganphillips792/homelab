@@ -204,6 +204,8 @@ If you ever want to connect from another container in the same compose network, 
 Username: admin
 Password: umami
 
+# Ollama
+
 # DNS Process Explained
 
 1. Set Wifi DNS on mac to IP address of Mac (ipconfig getifaddr en0)
