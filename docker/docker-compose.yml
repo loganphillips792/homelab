@@ -415,6 +415,42 @@ services:
     networks:
       - main-network
 
+  ollama:
+    image: docker.io/ollama/ollama:latest
+    container_name: ollama
+    # ports:
+    #   - "7869:11434"  # Exposed via Caddy; internal only
+    volumes:
+      - ~/docker-volumes/ollama/ollama:/root/.ollama
+    environment:
+      - OLLAMA_KEEP_ALIVE=24h
+      - OLLAMA_HOST=0.0.0.0
+    tty: true
+    pull_policy: always
+    restart: unless-stopped
+    networks:
+      - main-network
+
+  ollama-webui:
+    image: ghcr.io/open-webui/open-webui:main
+    container_name: ollama-webui
+    # ports:
+    #   - "8080:8080"  # Exposed via Caddy; internal only
+    volumes:
+      - ~/docker-volumes/ollama/ollama-webui:/app/backend/data
+    depends_on:
+      - ollama
+    environment:
+      - OLLAMA_BASE_URLS=http://ollama:11434
+      - ENV=dev
+      - WEBUI_AUTH=False
+      - WEBUI_NAME=valiantlynx AI
+      - WEBUI_URL=http://ollama-webui.homelab
+      - WEBUI_SECRET_KEY=t0p-s3cr3t
+    restart: unless-stopped
+    networks:
+      - main-network
+
   jellyfin:
     image: jellyfin/jellyfin
     container_name: jellyfin

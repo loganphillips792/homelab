@@ -116,3 +116,14 @@
     - Live Auction:
         href: http://live-auction.homelab
         description: Real-time auction app
+
+# AI
+- AI:
+    - Open WebUI:
+        icon: openai
+        href: http://ollama-webui.homelab
+        description: Chat UI for local LLMs
+    - Ollama API:
+        icon: terminal
+        href: http://ollama.homelab
+        description: Ollama HTTP API endpoint

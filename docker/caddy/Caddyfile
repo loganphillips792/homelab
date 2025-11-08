@@ -80,3 +80,11 @@ http://metabase.homelab {
 http://umami.homelab {
   reverse_proxy umami:3000
 }
+
+http://ollama.homelab {
+  reverse_proxy ollama:11434
+}
+
+http://ollama-webui.homelab {
+  reverse_proxy ollama-webui:8080
+}
