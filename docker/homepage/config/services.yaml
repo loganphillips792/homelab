@@ -85,6 +85,10 @@
         icon: netdata
         href: http://netdata.homelab
         description: System metrics and health
+    - Beszel:
+        icon: pulse
+        href: http://beszel.homelab
+        description: Lightweight server monitoring hub
 
 # Media
 - Media:

@@ -415,6 +415,35 @@ services:
     networks:
       - main-network
 
+  beszel:
+    image: henrygd/beszel:latest
+    container_name: beszel
+    restart: unless-stopped
+    ports:
+      - "8090:8090"
+    volumes:
+      - ~/docker-volumes/beszel/beszel_data:/beszel_data
+      - ~/docker-volumes/beszel/beszel_socket:/beszel_socket
+    networks:
+      - main-network
+  # Runs on each system you want to monitor and communicates system metrics to the hub
+  beszel-agent:
+    image: henrygd/beszel-agent:latest
+    container_name: beszel-agent
+    restart: unless-stopped
+    network_mode: host
+    env_file:
+      - ./beszel/.env
+    volumes:
+      - ~/docker-volumes/beszel/beszel_agent_data:/var/lib/beszel-agent
+      - ~/docker-volumes/beszel/beszel_socket:/beszel_socket
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    environment:
+      LISTEN: /beszel_socket/beszel.sock
+      HUB_URL: http://localhost:8090
+      TOKEN: ${BESZEL_TOKEN}
+      KEY: ${BESZEL_KEY}
+
   karakeep-web:
     image: ghcr.io/karakeep-app/karakeep:${KARAKEEP_VERSION:-release}
     container_name: karakeep-web

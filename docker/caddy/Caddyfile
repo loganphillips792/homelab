@@ -104,3 +104,7 @@ http://netdata.homelab {
 http://karakeep.homelab {
   reverse_proxy karakeep-web:3000
 }
+
+http://beszel.homelab {
+  reverse_proxy beszel:8090
+}
