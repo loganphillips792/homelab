@@ -81,6 +81,10 @@
         icon: umami
         href: http://umami.homelab
         description: Web analytics
+    - Netdata:
+        icon: netdata
+        href: http://netdata.homelab
+        description: System metrics and health
 
 # Media
 - Media:

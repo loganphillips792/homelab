@@ -96,3 +96,7 @@ http://changedetection.homelab {
 http://komodo.homelab {
   reverse_proxy komodo-core:9120
 }
+
+http://netdata.homelab {
+  reverse_proxy netdata:19999
+}
