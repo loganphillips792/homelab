@@ -206,6 +206,14 @@ Password: umami
 
 # Ollama
 
+- `docker exec -it ollama ollama list`
+- `docker exec -it ollama ollama pull deepseek-r1:1.5b`
+
+# Komodo
+
+Username: admin
+Password: changeme
+
 # DNS Process Explained
 
 1. Set Wifi DNS on mac to IP address of Mac (ipconfig getifaddr en0)

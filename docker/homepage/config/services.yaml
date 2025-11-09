@@ -121,6 +121,12 @@
         href: http://changedetection.homelab
         description: Website change monitoring
 
+- DevOps:
+    - Komodo:
+        icon: server
+        href: http://komodo.homelab
+        description: Docker fleet management
+
 # AI
 - AI:
     - Open WebUI:

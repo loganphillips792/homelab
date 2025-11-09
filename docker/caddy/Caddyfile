@@ -92,3 +92,7 @@ http://ollama-webui.homelab {
 http://changedetection.homelab {
   reverse_proxy changedetection:5000
 }
+
+http://komodo.homelab {
+  reverse_proxy komodo-core:9120
+}
