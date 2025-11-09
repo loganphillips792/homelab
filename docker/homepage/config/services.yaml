@@ -100,6 +100,10 @@
           type: jellyfin
           url: http://jellyfin:8096
           key: REPLACE_WITH_JELLYFIN_API_KEY
+    - Pinchflat:
+        icon: download
+        href: http://pinchflat.homelab
+        description: YouTube/Podcast downloader
 
 # Dashboards
 - Dashboards:

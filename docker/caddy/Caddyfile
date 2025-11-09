@@ -112,3 +112,7 @@ http://beszel.homelab {
 http://paperless.homelab {
   reverse_proxy paperless-ngx-webserver:8000
 }
+
+http://pinchflat.homelab {
+  reverse_proxy pinchflat:8945
+}

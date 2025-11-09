@@ -700,6 +700,21 @@ services:
     networks:
       - main-network
 
+  pinchflat:
+    image: ghcr.io/kieraneglin/pinchflat:latest
+    platform: linux/x86_64 # to fix error: no matching manifest for linux/arm64/v8 in the manifest list entries
+    container_name: pinchflat
+    restart: unless-stopped
+    environment:
+      - TZ=${TZ}
+    # ports: # don't need ports because caddy proxies to the container ports for us
+    #   - "8945:8945"
+    volumes:
+      - ~/docker-volumes/pinchflat/config:/config
+      - ~/docker-volumes/pinchflat/downloads:/downloads
+    networks:
+      - main-network
+
   glance:
     container_name: glance
     image: glanceapp/glance
