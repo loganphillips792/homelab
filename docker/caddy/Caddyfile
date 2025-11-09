@@ -100,3 +100,7 @@ http://komodo.homelab {
 http://netdata.homelab {
   reverse_proxy netdata:19999
 }
+
+http://karakeep.homelab {
+  reverse_proxy karakeep-web:3000
+}

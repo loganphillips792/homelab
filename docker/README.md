@@ -122,6 +122,7 @@ http://pihole.homelab/admin/
 
 docker exec pihole tail -n 100 -f /var/log/pihole/pihole.log 
 
+`docker exec pihole pihole reloaddns`
 
 ## Homepage
 

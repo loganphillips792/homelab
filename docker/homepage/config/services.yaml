@@ -124,6 +124,10 @@
         icon: globe
         href: http://changedetection.homelab
         description: Website change monitoring
+    - Karakeep:
+        icon: note
+        href: http://karakeep.homelab
+        description: Knowledge base with web capture
 
 - DevOps:
     - Komodo:
