@@ -132,6 +132,10 @@
         icon: note
         href: http://karakeep.homelab
         description: Knowledge base with web capture
+    - Paperless-ngx:
+        icon: file-document
+        href: http://paperless.homelab
+        description: Document management (scan, OCR, archive)
 
 - DevOps:
     - Komodo:

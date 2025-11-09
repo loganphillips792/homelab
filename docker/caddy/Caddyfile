@@ -108,3 +108,7 @@ http://karakeep.homelab {
 http://beszel.homelab {
   reverse_proxy beszel:8090
 }
+
+http://paperless.homelab {
+  reverse_proxy paperless-ngx-webserver:8000
+}

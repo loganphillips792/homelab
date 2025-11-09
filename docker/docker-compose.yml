@@ -415,6 +415,49 @@ services:
     networks:
       - main-network
 
+  paperless-ngx-broker:
+    image: docker.io/library/redis:8
+    container_name: paperless-ngx-broker
+    restart: unless-stopped
+    volumes:
+      - paperless-ngx-redisdata:/data
+    networks:
+      - main-network
+
+  paperless-ngx-db:
+    image: docker.io/library/postgres:18
+    container_name: paperless-ngx-db
+    restart: unless-stopped
+    volumes:
+      - paperless-ngx-pgdata:/var/lib/postgresql
+    environment:
+      POSTGRES_DB: paperless
+      POSTGRES_USER: paperless
+      POSTGRES_PASSWORD: paperless
+    networks:
+      - main-network
+
+  paperless-ngx-webserver:
+    image: ghcr.io/paperless-ngx/paperless-ngx:latest
+    container_name: paperless-ngx-webserver
+    restart: unless-stopped
+    depends_on:
+      - paperless-ngx-db
+      - paperless-ngx-broker
+    # ports:
+    #   - "8000:8000"  # Exposed via Caddy; internal only
+    volumes:
+      - paperless-ngx-data:/usr/src/paperless/data
+      - paperless-ngx-media:/usr/src/paperless/media
+      - ./paperless-ngx/export:/usr/src/paperless/export
+      - ./paperless-ngx/consume:/usr/src/paperless/consume
+    env_file: ./paperless-ngx/docker-compose.env
+    environment:
+      PAPERLESS_REDIS: redis://paperless-ngx-broker:6379
+      PAPERLESS_DBHOST: paperless-ngx-db
+    networks:
+      - main-network
+
   beszel:
     image: henrygd/beszel:latest
     container_name: beszel
@@ -769,6 +812,10 @@ volumes:
   netdatacache:
   karakeep-meilisearch:
   karakeep-data:
+  paperless-ngx-data:
+  paperless-ngx-media:
+  paperless-ngx-pgdata:
+  paperless-ngx-redisdata:
 
 networks:
   kafka-network:
