@@ -1,0 +1,5 @@
+{"logtail":{"client_time":"2025-11-09T22:26:44.898719275Z","proc_id":966792623,"proc_seq":222},"v":1,"text":"monitor: RTM_DELROUTE: src=100.76.58.106/0, dst=100.76.58.106/32, gw=, outif=4, table=255\n"}
+{"logtail":{"client_time":"2025-11-09T22:26:45.794989609Z","proc_id":966792623,"proc_seq":223},"v":2,"text":"wg: Routine: receive incoming receiveDERP - stopped\n"}
+{"logtail":{"client_time":"2025-11-09T22:26:45.798020942Z","proc_id":966792623,"proc_seq":224},"v":2,"text":"wg: Device closed\n"}
+{"logtail":{"client_time":"2025-11-09T22:26:45.805139317Z","proc_id":966792623,"proc_seq":225},"text":"flushing log.\n"}
+{"logtail":{"client_time":"2025-11-09T22:26:45.806536234Z","proc_id":966792623,"proc_seq":226},"text":"logger closing down\n"}

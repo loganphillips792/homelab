@@ -5,6 +5,9 @@
 `docker compose up --build jellyfin`
 `docker compose up -d --build caddy pihole`
 
+- if you only want to start specific containers: `docker compose up -d  homepage uptime-kuma pihole caddy`
+- Then `docker logs` will only show the logs from the started containers
+
 # Services
 
 ## Kafka
@@ -231,6 +234,9 @@ Password: changeme
 11. Browser connects to 10.0.0.227 on HTTP port 80 (because we typed homepage.homelab)
 12. On host machine (Mac), Caddy is listening on ports 80 and 443 (these ports are defined in the caddy definition in docker-compose.yml)
 13. Caddy looks at the HTTP Host header(homepage.homelab) and matches it and reverse-proxies the request to the homepage container on port 3000. The hostname is the Docker service name and since Caddy is attached to the same networks that the targets live, it can reach them on their container ports (so, you don't need to publish app ports anymore, as Caddy is the entrance to the services)
+
+
+_Note:_ if all containers are running but homepage.homelab is not working, run `sudo dscacheutil -flushcache; sudo killall -HUP mDNSResponder` and then try again
 
 # Deploying on Proxmox
 

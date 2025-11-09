@@ -116,3 +116,7 @@ http://paperless.homelab {
 http://pinchflat.homelab {
   reverse_proxy pinchflat:8945
 }
+
+http://immich.homelab {
+  reverse_proxy immich-server:2283
+}

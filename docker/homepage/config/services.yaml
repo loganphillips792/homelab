@@ -104,6 +104,10 @@
         icon: download
         href: http://pinchflat.homelab
         description: YouTube/Podcast downloader
+    - Immich:
+        icon: image
+        href: http://immich.homelab
+        description: Self-hosted photo & video backup
 
 # Dashboards
 - Dashboards:
