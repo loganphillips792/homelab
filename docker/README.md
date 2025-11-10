@@ -1,12 +1,28 @@
 
+To run all services:
+```
+docker compose -f docker/docker-compose.yml up -d && docker compose --env-file "$PWD/docker/immich/docker-compose.env" -f "$PWD/docker/immich/docker-compose.yml" up -d
+```
+
 `cd docker`
 `docker compose up --build` or `docker compose up -d --build`
 `docker compose -f docker/docker-compose.yml up -d --force-recreate pihole`
 `docker compose up --build jellyfin`
 `docker compose up -d --build caddy pihole`
 
-- if you only want to start specific containers: `docker compose up -d  homepage uptime-kuma pihole caddy`
+- if you only want to start specific containers: `docker compose up -d homepage uptime-kuma pihole caddy`
 - Then `docker logs` will only show the logs from the started containers
+
+
+`docker compose -f docker/docker-compose.yml up -d`
+
+```
+docker compose -f docker/docker-compose.yml up -d caddy pihole homepage uptime-kuma \
+  && docker compose -f docker/immich/docker-compose.yml \
+    --project-directory docker/immich \
+    --env-file docker/immich/docker-compose.env \
+    up -d
+```
 
 # Services
 
@@ -244,3 +260,29 @@ _Note:_ if all containers are running but homepage.homelab is not working, run `
 2. Install Docker
 3. Set pihole records to IP of proxmox
 4. Set devices to use pihole as DNS
+
+
+
+# TODO
+
+https://docs.kitchenowl.org/latest/self-hosting/
+
+https://github.com/Dispatcharr/Dispatchar
+
+https://github.com/sysadminsmedia/homebox
+
+https://github.com/AnalogJ/scrutiny
+
+https://github.com/nextcloud/all-in-one#how-to-change-the-default-location-of-nextclouds-datadir
+
+https://github.com/ArchiveBox/ArchiveBox
+
+https://openpanel.dev/docs/self-hosting/self-hosting
+
+https://github.com/binwiederhier/ntfy
+
+https://github.com/huginn/huginn/blob/master/doc/docker/install.md
+
+https://crazymax.dev/diun/usage/command-line/
+
+https://github.com/crowdsecurity/crowdsec
