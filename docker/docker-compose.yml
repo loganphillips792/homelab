@@ -798,64 +798,7 @@ services:
       - default
       - main-network
       - kafka-network
-
-
-  # immich
-  immich-redis:
-    image: docker.io/valkey/valkey:8@sha256:81db6d39e1bba3b3ff32bd3a1b19a6d69690f94a3954ec131277b9a26b95b3aa
-    container_name: immich_redis
-    restart: always
-    healthcheck:
-      test: ["CMD-SHELL", "redis-cli ping || exit 1"]
-    networks:
-      - main-network
-
-  immich-postgres:
-    image: ghcr.io/immich-app/postgres:14-vectorchord0.4.3-pgvectors0.2.0@sha256:bcf63357191b76a916ae5eb93464d65c07511da41e3bf7a8416db519b40b1c23
-    container_name: immich_postgres
-    restart: always
-    environment:
-      POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres}
-      POSTGRES_USER: ${DB_USERNAME:-postgres}
-      POSTGRES_DB: ${DB_DATABASE_NAME:-immich}
-      POSTGRES_INITDB_ARGS: '--data-checksums'
-    volumes:
-      - ${DB_DATA_LOCATION:-./immich/postgres}:/var/lib/postgresql/data
-    shm_size: 128mb
-    networks:
-      - main-network
-
-  immich-machine-learning:
-    image: ghcr.io/immich-app/immich-machine-learning:${IMMICH_VERSION:-release}
-    container_name: immich_machine_learning
-    restart: always
-    volumes:
-      - immich-model-cache:/cache
-    env_file:
-      - ./immich/docker-compose.env
-    networks:
-      - main-network
-    healthcheck:
-      disable: false
-
-  immich-server:
-    image: ghcr.io/immich-app/immich-server:${IMMICH_VERSION:-release}
-    container_name: immich_server
-    restart: always
-    depends_on:
-      - immich-redis
-      - immich-postgres
-    # ports: # exposed via Caddy; internal only
-    #   - "2283:2283"
-    volumes:
-      - ${UPLOAD_LOCATION:-./immich/library}:/data
-      - /etc/localtime:/etc/localtime:ro
-    env_file:
-      - ./immich/docker-compose.env
-    networks:
-      - main-network
-    healthcheck:
-      disable: false
+  
 
 
 volumes:
@@ -886,7 +829,6 @@ volumes:
   paperless-ngx-media:
   paperless-ngx-pgdata:
   paperless-ngx-redisdata:
-  immich-model-cache:
 
 networks:
   kafka-network:
