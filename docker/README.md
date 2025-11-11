@@ -154,6 +154,12 @@ After making any changes: `docker compose up -d --build homepage`
 not natively. Uptime Kuma doesn’t read a static config file on start; it stores monitors
 in a SQLite DB under /app/data. You will have to manually import the backup file.
 
+- Reset Password
+  1. `docker exec -it uptime-kuma bash`
+  2. `npm run reset-password`
+
+- There is a something going on with the DNS, where some services are reported to be up, but others are reported to be down. These down services, are still acccessible by URL, but uptime-kuma reports them as down due to the errror `getaddrinfo ENOTFOUND`. To fix this, run `sudo dscacheutil -flushcache; sudo killall -HUP mDNSResponder` on the host Mac machine, and uptime-kuma should successfully report that all services are running.
+
 ## Tailscale
 
 1. Create account at https://login.tailscale.com/admin
@@ -254,6 +260,8 @@ Password: changeme
 
 _Note:_ if all containers are running but homepage.homelab is not working, run `sudo dscacheutil -flushcache; sudo killall -HUP mDNSResponder` and then try again
 
+_NOTE_: If running on Mac OS, make sure `Use kernel networking for UDP` is NOT selected in Docker Desktop _settings > Resources > Network_
+
 # Deploying on Proxmox
 
 1. Create Ubuntu VM
@@ -286,3 +294,5 @@ https://github.com/huginn/huginn/blob/master/doc/docker/install.md
 https://crazymax.dev/diun/usage/command-line/
 
 https://github.com/crowdsecurity/crowdsec
+
+- COMPOSE_KOMODO_BACKUPS_PATH=~/docker-volumes/komodo/etc/komodo/backups doesn't seem to be working correctly
