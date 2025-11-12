@@ -151,7 +151,22 @@ How to set up SSH if going from fresh install ?
     4. sudo systemctl status ssh
 9. SSH into server: logan@10.0.0.32
 10. Setup Docker
-    1. Set Up Docker's apt repository
+    1. [Set Up Docker's apt repository](https://docs.docker.com/engine/install/ubuntu/#install-using-the-repository)
+    2.
+    ```
+    sudo apt-get update && \
+    sudo apt-get install -y ca-certificates curl && \
+    sudo install -m 0755 -d /etc/apt/keyrings && \
+    sudo curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc && \
+    sudo chmod a+r /etc/apt/keyrings/docker.asc && \
+    echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] \
+    https://download.docker.com/linux/ubuntu \
+    $(. /etc/os-release && echo "${UBUNTU_CODENAME:-$VERSION_CODENAME}") stable" | \
+    sudo tee /etc/apt/sources.list.d/docker.list > /dev/null && \
+    sudo apt-get update
+    ```
+
+    
     4. Install the Docker packages: `sudo apt-get install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin`
     5. Verify that Docker is running: `sudo systemctl status docker`. If it is not running, you might have to start it manually: `sudo systemctl start docker`
     6. Run docker ps
