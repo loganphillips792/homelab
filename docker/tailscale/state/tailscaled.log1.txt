@@ -1,0 +1,9 @@
+{"logtail":{"client_time":"2025-11-12T00:38:38.328239008Z","proc_id":1009207562,"proc_seq":196},"metrics":"N40controlclient_auto_status_queuedS1408N4egauge_controlclient_map_requests_activeS1602N34controlclient_map_requestsS180cN3econtrolclient_map_requests_pollS1c04N44controlclient_map_response_messageS1ede04N48controlclient_map_response_keepaliveS3cda04N3ccontrolclient_map_response_mapS2004N1etstun_out_to_wgS221cN28tstun_out_to_wg_dropS241cN36tstun_out_to_wg_drop_filterS261aN50gauge_localbackend_current_watch_ipn_busS3400","text":"tailscaled got signal terminated; shutting down\n"}
+{"logtail":{"client_time":"2025-11-12T00:38:38.598007217Z","proc_id":1009207562,"proc_seq":197},"text":"canceling captive portal context\n"}
+{"logtail":{"client_time":"2025-11-12T00:38:38.604032342Z","proc_id":1009207562,"proc_seq":198},"text":"control: client.Shutdown ...\n"}
+{"logtail":{"client_time":"2025-11-12T00:38:38.60729555Z","proc_id":1009207562,"proc_seq":199},"v":1,"text":"control: authRoutine: context done.\n"}
+{"logtail":{"client_time":"2025-11-12T00:38:38.609164967Z","proc_id":1009207562,"proc_seq":200},"text":"control: authRoutine: exiting\n"}
+{"logtail":{"client_time":"2025-11-12T00:38:38.61031605Z","proc_id":1009207562,"proc_seq":201},"text":"control: updateRoutine: exiting\n"}
+{"logtail":{"client_time":"2025-11-12T00:38:38.667126425Z","proc_id":1009207562,"proc_seq":202},"v":1,"text":"control: PollNetMap: context canceled\n"}
+{"logtail":{"client_time":"2025-11-12T00:38:38.669616925Z","proc_id":1009207562,"proc_seq":203},"text":"control: mapRoutine: exiting\n"}
+{"logtail":{"client_time":"2025-11-12T00:38:38.674558092Z","proc_id":1009207562,"proc_seq":204},"text":"control: Client.Shutdown done.\n"}

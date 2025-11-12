@@ -264,10 +264,19 @@ _NOTE_: If running on Mac OS, make sure `Use kernel networking for UDP` is NOT s
 
 # Deploying on Proxmox
 
+- pveversion --verbose
+
+1. apt install vim
+
+- Since we don't have an enterprise subscription, we have to change the APT repositories, or apt update will fail with `The repository 'https://enterprise.proxmox.com/debian/pve bookworm InRelease' is not signed` [Read Here](https://pve.proxmox.com/pve-docs/pve-admin-guide.html#sysadmin_enterprise_repo)
+  1. Comment out the pve-enterprise line at `vi /etc/apt/sources.list.d/pve-enterprise.list`
+  2. 
+
 1. Create Ubuntu VM
 2. Install Docker
 3. Set pihole records to IP of proxmox
 4. Set devices to use pihole as DNS
+5. Create LXC for tailscale
 
 
 
@@ -296,3 +305,6 @@ https://crazymax.dev/diun/usage/command-line/
 https://github.com/crowdsecurity/crowdsec
 
 - COMPOSE_KOMODO_BACKUPS_PATH=~/docker-volumes/komodo/etc/komodo/backups doesn't seem to be working correctly
+- Tailscale
+  - [Newbie question - tailscale on proxmox host or on each (needed) container? : r/Proxmox](https://www.reddit.com/r/Proxmox/comments/1ktje1t/newbie_question_tailscale_on_proxmox_host_or_on/)
+  - [Best Way to Setup Tailscale? : r/Proxmox](https://www.reddit.com/r/Proxmox/comments/1dmrca4/best_way_to_setup_tailscale/)

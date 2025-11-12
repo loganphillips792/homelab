@@ -57,21 +57,117 @@ How to set up SSH if going from fresh install ?
 
 # Proxmox
 
-Download Proxmox ISO image: https://www.proxmox.com/en/proxmox-virtual-environment/get-started
-    1. Boot from USB
-        1. Use Balena Etcher to flask ISO image to USB Drive
-        2. Turn off computer
-        3. Insert USB
-        4. Turn on Computer
-        5. Press F7 to get into Bios
-        6. Select USB Drive as the boot device
-    2. Go through install process (Note: Have ethernet cable already plugged in)
-        1. Management Interface: enpls0
-        2. Hostname (FQDN): pve.hsd1.il.comcast.net Not Needed (https://www.reddit.com/r/Proxmox/comments/12rnq6l/a_quick_question_about_hostname_fqdn_during/)
-        3. IP Address (CIDR): 10.0.0.98/24
-        4. Gateway: 192.168.254.254 (IP of router)
-        5. DNS Server: 192.168.254.254 (IP of router)
-    3. On another computer go to https://10.0.0.98:8006/
+
+1. Download ISO image (Proxmox ISO installer): https://www.proxmox.com/en/proxmox-virtual-environment/get-started and use Balena Etcher to flash ISO image to USB Drive
+2. Boot from USB
+    1. Plug in External Display and Keyboard into mini PC
+    1. Turn off mini PC
+    2. Insert USB
+    3. Turn on mini PC
+    4. Press F7 to get into BIOS
+    5. Select USB Drive as the boot device
+3. Install Process
+    1. Install Proxmox VE (Graphical)
+    2. Accept User License Agreement
+    3. Location and Timezone selection
+        1. Country: United States
+        2. Time zone: America/Chicago
+        3. Keyboard Layout: U.S. English
+    4. Administration Password and Email Selection
+        1. Set Password
+        2. Set Email
+    5. Management Network Configuration (Leave all defaults)
+        - Management Interface: enp1s0 - (this is the ethernet connection)
+        - Hostname (FQDN) - pve.hsd1.il.comcast.net
+        - IP Address (CIDR) - 10.0.0.98 / 24
+        - Gateway - 10.0.0.1
+        - DNS Server - 75.75.75.75
+4.  Update repos to not use enterprise (https://pve.proxmox.com/wiki/Package_Repositories)
+    1. apt install vim
+    2. Comment out each line in `/etc/apt/sources.list.d/pve-enterprise.sources`
+    3. Create and Update '/etc/apt/sources.list.d/proxmox.sources'
+
+    ```
+    Types: deb
+    URIs: http://download.proxmox.com/debian/pve
+    Suites: trixie
+    Components: pve-no-subscription
+    Signed-By: /usr/share/keyrings/proxmox-archive-keyring.gpg
+    ```
+    
+    4. Edit `/etc/apt/sources.list.d/ceph.sources`
+    
+    ```
+    Types: deb
+    URIs: http://download.proxmox.com/debian/ceph-squid
+    Suites: trixie
+    Components: no-subscription
+    Signed-By: /usr/share/keyrings/proxmox-archive-keyring.gpg
+    ```
+    5. apt update
+    6. apt upgrade
+5. Go to https://10.0.0.98:8006 on another computer (connected to same wifi network)
+6. Setup Ubuntu VM for Docker
+    1. Download Ubuntu Desktop ISO
+    2. Datacenter > pve > local (pve) > ISO Images > Upload Ubuntu ISO file
+    3. Create VM
+        - General
+            - Node: PVE
+            - VM ID: 100
+            - Name: UbuntuServerForDockerServices
+        - OS
+            - Storage: Local
+            - ISO image: Ubuntu-22.04-4.desktop
+            - Guest OS:
+                - Type: Linux
+                - Version: 6.x - 2.6 Kernel
+        - System
+            - Leave all defaults
+        - Disks
+            - Disk
+                - Storage: local-lvm
+                - Disk size (GiB): 64
+        - CPU (https://10.0.0.98:8006/pve-docs/chapter-qm.html#qm_cpu)
+            - Sockets - 1
+            - Cores - 2
+        - Memory (https://10.0.0.98:8006/pve-docs/chapter-qm.html#qm_memory)
+            - Memory (MiB) - 2048
+            - Minimum Memory (MiB) - 2048
+            - Ballooning Device - Enabled
+       -  Network (https://10.0.0.98:8006/pve-docs/chapter-qm.html#qm_network_device)
+            - Default 
+7. Start VM and Install Packages
+    1. Go through GUI Install Wizard
+    2. Open terminal and run `sudo apt update && sudo apt upgrade`
+8. Setup SSH server
+    1. Set IP address for VM
+        1. Make sure qemu-guest-agent  is installed: `apt install qemu-guest-agent`
+        2. Enable guest agent in VM options
+        Restart the VM
+        3. systemctl status qemu-guest-agent
+        4. systemctl start qemu-guest-agent if its not running
+        5. Get IP Address from pve > Summary
+    2. sudo apt update
+    3. sudo apt install openssh-server
+    4. sudo systemctl status ssh
+9. SSH into server: logan@10.0.0.32
+10. Setup Docker
+    1. Set Up Docker's apt repository
+    4. Install the Docker packages: `sudo apt-get install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin`
+    5. Verify that Docker is running: `sudo systemctl status docker`. If it is not running, you might have to start it manually: `sudo systemctl start docker`
+    6. Run docker ps
+        - If you get error 'permission denied while trying to connect to the docker API at unix:///var/run/docker.sock, it is because the current user can’t access the docker engine, because the user doesn't have enough permissions to access the UNIX socket to communicate with the engine
+            - You can use sudo docker ps but a better solution is here: https://docs.docker.com/engine/install/linux-postinstall/#manage-docker-as-a-non-root-user
+                1. sudo groupadd docker
+                2. sudo usermod -aG docker $USER
+                3. Log out and log back in so that your group membership is re-evaluated
+
+
+
+
+   
+
+
     4. Install Ubunu image so that we can use it for LXE containers
         1. Open console in Proxmox host
         2. pveam update
