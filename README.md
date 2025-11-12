@@ -57,7 +57,6 @@ How to set up SSH if going from fresh install ?
 
 # Proxmox
 
-
 1. Download ISO image (Proxmox ISO installer): https://www.proxmox.com/en/proxmox-virtual-environment/get-started and use Balena Etcher to flash ISO image to USB Drive
 2. Boot from USB
     1. Plug in External Display and Keyboard into mini PC
@@ -195,6 +194,7 @@ pct exec 109 ip a
 
 journalctl -u pve-lxc@109
 
+pveversion --verbose
 
 # Terraform
 
