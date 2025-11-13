@@ -128,10 +128,10 @@ How to set up SSH if going from fresh install ?
                 - Disk size (GiB): 64
         - CPU (https://10.0.0.98:8006/pve-docs/chapter-qm.html#qm_cpu)
             - Sockets - 1
-            - Cores - 2
+            - Cores - 4
         - Memory (https://10.0.0.98:8006/pve-docs/chapter-qm.html#qm_memory)
-            - Memory (MiB) - 4096
-            - Minimum Memory (MiB) - 4096
+            - Memory (MiB) - 8192
+            - Minimum Memory (MiB) - 8192
             - Ballooning Device - Enabled
        -  Network (https://10.0.0.98:8006/pve-docs/chapter-qm.html#qm_network_device)
             - Default 
@@ -181,7 +181,7 @@ How to set up SSH if going from fresh install ?
         2. Create Docker Volumes directory: `mkdir ~/docker-volumes`
         3. `cd homelab`
         4. `git clone https://github.com/loganphillips792/homelab.git`
-        5. Update the IP Addresses in the PiHole DNS config to the IP Address of the Ubuntu VM: `sed -i 's/10\.0\.0\.227/10.0.0.32/g' docker/pihole/etc-dnsmasq.d/10-homelab.conf`
+        5. Update the IP Addresses in the PiHole DNS config to the IP Address of the Ubuntu VM: `sed -i 's/10\.0\.0\.227/10.0.0.33/g' docker/pihole/etc-dnsmasq.d/10-homelab.conf`
             - If these records are updated after the docker containers are already running, run `docker compose restart pihole` to restart pihole and apply the DNS changes
         6. Add .env file for live-auction (optional)
     7. Set up DNS (free port 53)
@@ -257,6 +257,33 @@ Backup Volume:  [Backup/Restore a dockerized PostgreSQL database - Stack Overflo
 
 
 
+
+
+- If you need to increase disk space
+    - Increase size of disk of VM through proxmox
+    - df -h
+    - lsblk
+    - sudo su
+    - parted
+    - print
+    - resizepart 3 100%
+    - print
+    - resize2fs /dev/sda3
+    - Exit
+    - apt install lvm2
+    - If you get not enough storage error, you have to clear space
+    - See what is taking up so much space 
+        - du -sh /var/* | sort -h 
+        - We see that docker takes up most of the space in /var/
+        - `docker images --format "{{.Repository}}:{{.Tag}} {{.Size}}" | sort -h -r`
+        - `sudo ctr -n moby images prune --all`
+    - sudo rm -rf /var/cache/apt/archives/*.deb
+    - sudo journalctl --vacuum-size=50M
+    - apt install lvm2
+    - resize2fs /dev/sda3
+- If at anytime there is a permission denied error during git pull process: `sudo chown -R logan:logan .` and then run `git pull` again
+
+- After making DNS changes to the pihole DNS file: `docker compose -f docker/docker-compose.yml restart pihole`
 
 
     4. Install Ubunu image so that we can use it for LXE containers
