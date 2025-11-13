@@ -108,6 +108,9 @@
         icon: immich
         href: http://immich.homelab
         description: Self-hosted photo & video backup
+    - Jotty:
+        href: http://jotty.homelab
+        description: Collaborative notes
 
 # Dashboards
 - Dashboards:

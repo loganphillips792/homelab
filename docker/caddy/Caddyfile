@@ -124,3 +124,7 @@ http://pinchflat.homelab {
 http://immich.homelab {
   reverse_proxy immich-server:2283
 }
+
+http://jotty.homelab {
+  reverse_proxy jotty:3000
+}

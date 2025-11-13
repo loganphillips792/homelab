@@ -460,8 +460,6 @@ Go to set up page: `http://localhost:8096/web/index.html#!/wizardstart.html`
             - OPen -> Add PC -> Tailscale IP of VM
 - Fix komodo errors
 - Add https://codewithcj.github.io/SparkyFitness/install/docker-compose to docker compose
-- [fccview/jotty: A simple, self-hosted app for your checklists and notes.](https://github.com/fccview/jotty)
-- [fccview/cronmaster: Cron management made easy](https://github.com/fccview/cronmaster)
 
 # Trouble Shooting
 
