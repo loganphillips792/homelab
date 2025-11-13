@@ -126,6 +126,9 @@
         icon: n8n
         href: http://n8n.homelab
         description: Workflow automation
+    - Cronmaster:
+        href: http://cronmaster.homelab
+        description: Cron job scheduling
 
 # Apps
 - Apps:
