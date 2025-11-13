@@ -130,22 +130,23 @@ How to set up SSH if going from fresh install ?
             - Sockets - 1
             - Cores - 2
         - Memory (https://10.0.0.98:8006/pve-docs/chapter-qm.html#qm_memory)
-            - Memory (MiB) - 2048
-            - Minimum Memory (MiB) - 2048
+            - Memory (MiB) - 4096
+            - Minimum Memory (MiB) - 4096
             - Ballooning Device - Enabled
        -  Network (https://10.0.0.98:8006/pve-docs/chapter-qm.html#qm_network_device)
             - Default 
 7. Start VM and Install Packages
     1. Go through GUI Install Wizard
     2. Open terminal and run `sudo apt update && sudo apt upgrade`
+    3. `sudo apt install net-tools`
 8. Setup SSH server
     1. Set IP address for VM
         1. Make sure qemu-guest-agent  is installed: `apt install qemu-guest-agent`
-        2. Enable guest agent in VM options
-        Restart the VM
-        3. systemctl status qemu-guest-agent
-        4. systemctl start qemu-guest-agent if its not running
-        5. Get IP Address from pve > Summary
+        2. Enable guest agent in VM options: pve > UbuntuServerForDockerServices > Options > Enable QEMU Guest Agent
+        3. Restart the VM
+        4. systemctl status qemu-guest-agent
+        5. systemctl start qemu-guest-agent if its not running
+        6. Get IP Address from pve > UbuntuServerForDockerServices > Summary
     2. sudo apt update
     3. sudo apt install openssh-server
     4. sudo systemctl status ssh
@@ -169,17 +170,93 @@ How to set up SSH if going from fresh install ?
     
     4. Install the Docker packages: `sudo apt-get install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin`
     5. Verify that Docker is running: `sudo systemctl status docker`. If it is not running, you might have to start it manually: `sudo systemctl start docker`
-    6. Run docker ps
+    6. Run `docker ps`
         - If you get error 'permission denied while trying to connect to the docker API at unix:///var/run/docker.sock, it is because the current user can’t access the docker engine, because the user doesn't have enough permissions to access the UNIX socket to communicate with the engine
-            - You can use sudo docker ps but a better solution is here: https://docs.docker.com/engine/install/linux-postinstall/#manage-docker-as-a-non-root-user
+            - You can use `sudo docker ps` but a better solution is here: https://docs.docker.com/engine/install/linux-postinstall/#manage-docker-as-a-non-root-user
                 1. sudo groupadd docker
                 2. sudo usermod -aG docker $USER
                 3. Log out and log back in so that your group membership is re-evaluated
+    8. Setup homelab repo
+        1. `cd ~`
+        2. Create Docker Volumes directory: `mkdir ~/docker-volumes`
+        3. `cd homelab`
+        4. `git clone https://github.com/loganphillips792/homelab.git`
+        5. Update the IP Addresses in the PiHole DNS config to the IP Address of the Ubuntu VM: `sed -i 's/10\.0\.0\.227/10.0.0.32/g' docker/pihole/etc-dnsmasq.d/10-homelab.conf`
+            - If these records are updated after the docker containers are already running, run `docker compose restart pihole` to restart pihole and apply the DNS changes
+        6. Add .env file for live-auction (optional)
+    7. Set up DNS (free port 53)
+       
+       `sudo vim /etc/netplan/01-network-manager-all.yaml`
+       
+       ```
+        # Let NetworkManager manage all devices on this system
+        network:
+        version: 2
+        ethernets:
+            ens18:
+            dhcp4: yes
+            nameservers:
+                addresses: [1.1.1.1, 9.9.9.9]
+       ```
+
+`sudo netplan apply`
+
+Now make sure /etc/resolv.conf uses what systemd-resolved generates:
+    1. sudo ln -sf /run/systemd/resolve/resolv.conf /etc/resolv.conf
+    2. sudo systemctl restart systemd-resolved
+
+Check that the file has real DNS servers, not 127.0.0.53 or ::1: cat /etc/resolv.conf
+
+Nowe we tell systemd-resolved to stop listening on 127.0.0.53/[::1], but it will still use the upstream DNS servers from netplan: `sudo sed -i 's/^#\?DNSStubListener=.*/DNSStubListener=no/' /etc/systemd/resolved.conf`
+
+Restart: `sudo systemctl restart systemd-resolved`
+
+Confirm port 53 is now free: `sudo ss -lunpt | grep :53 || echo "Port 53 is free ✅"`
+
+
+
+8. Bring up Docker containers
+    1. docker login -u dockedupstream
+    2. `docker compose -f docker/docker-compose.yml up -d && docker compose --env-file "$PWD/docker/immich/docker-compose.env" -f "$PWD/docker/immich/docker-compose.yml" up -d`
+
+9. `sudo ss -lunpt | grep :53` If you see docker-proxy, that means that PiHole has binded to port 53
+
+10. To test that the Docker containers are properly running, go to `http://10.0.0.33:8082`
+
+
+11. Switch the host to use Pi-Hole
+    1. Once Pi-Hole is up and stable, you can make the Ubuntu host itself use Pi-hole as DNS instead of public resolvers
+        `sudo vim /etc/netplan/01-network-manager-all.yaml`
+
+    ```
+    # Let NetworkManager manage all devices on this system
+    network:
+    version: 2
+    ethernets:
+        ens18:
+        dhcp4: yes
+        nameservers:
+            addresses: [10.0.0.33]
+    ```
+    2. `sudo netplan apply`
+    3. `sudo systemctl restart systemd-resolved`
+    4. `cat /etc/resolv.conf`
+
+12. Test DNS
+    1. `dig example.com`
+    2. `dig homepage.homelab`
+    3. `dig homepage.homelab @10.0.0.33`
+
+
+13. Update MacOS wifi to use Proxmox VM PIhole container as DNS. Set the DNS Server to be the IP of the Ubuntu VM. The request will automatically be sent to port 53
 
 
 
 
-   
+Backup Volume: 
+
+
+
 
 
     4. Install Ubunu image so that we can use it for LXE containers
