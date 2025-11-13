@@ -253,7 +253,7 @@ Confirm port 53 is now free: `sudo ss -lunpt | grep :53 || echo "Port 53 is free
 
 
 
-Backup Volume: 
+Backup Volume:  [Backup/Restore a dockerized PostgreSQL database - Stack Overflow](https://stackoverflow.com/questions/24718706/backup-restore-a-dockerized-postgresql-database)
 
 
 
@@ -458,6 +458,10 @@ Go to set up page: `http://localhost:8096/web/index.html#!/wizardstart.html`
         - Install remote desktop server on pop os (xrdp)
         - Install microsoft remote desktop on mac (app store)
             - OPen -> Add PC -> Tailscale IP of VM
+- Fix komodo errors
+- Add https://codewithcj.github.io/SparkyFitness/install/docker-compose to docker compose
+- [fccview/jotty: A simple, self-hosted app for your checklists and notes.](https://github.com/fccview/jotty)
+- [fccview/cronmaster: Cron management made easy](https://github.com/fccview/cronmaster)
 
 # Trouble Shooting
 
