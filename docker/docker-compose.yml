@@ -375,9 +375,9 @@ services:
       HOST_CRONTAB_USER: root
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
-      - ./cronmaster/scripts:/app/scripts
-      - ./cronmaster/data:/app/data
-      - ./cronmaster/snippets:/app/snippets
+      - ~/docker-volumes/cronmaster/scripts:/app/scripts
+      - ~/docker-volumes/cronmaster/data:/app/data
+      - ~/docker-volumes/cronmaster/snippets:/app/snippets
     pid: "host"
     privileged: true
     restart: always
