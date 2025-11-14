@@ -139,6 +139,7 @@ How to set up SSH if going from fresh install ?
     1. Go through GUI Install Wizard
     2. Open terminal and run `sudo apt update && sudo apt upgrade`
     3. `sudo apt install net-tools`
+    4. `sudo apt install htop`
 8. Setup SSH server
     1. Set IP address for VM
         1. Make sure qemu-guest-agent  is installed: `apt install qemu-guest-agent`
@@ -285,6 +286,10 @@ Backup Volume:  [Backup/Restore a dockerized PostgreSQL database - Stack Overflo
 
 - After making DNS changes to the pihole DNS file: `docker compose -f docker/docker-compose.yml restart pihole`
 
+- docker compose -f docker/docker-compose.yml up caddy pihole cronmaster -d 
+
+
+- Use `docker stats` command to see container usage
 
     4. Install Ubunu image so that we can use it for LXE containers
         1. Open console in Proxmox host
