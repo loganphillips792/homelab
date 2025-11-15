@@ -283,6 +283,8 @@ Backup N8N Volume: `ssh logan@10.0.0.33 'docker run --rm -v n8n_storage:/volume 
 
 - After making DNS changes to the pihole DNS file: `docker compose -f docker/docker-compose.yml restart pihole`
 
+- After making changes to prometheus: `docker compose -f docker/docker-compose.yml restart prometheus`
+
 - docker compose -f docker/docker-compose.yml up caddy pihole cronmaster -d 
 
 
