@@ -159,6 +159,23 @@ services:
     networks:
       - main-network
 
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:latest
+    container_name: cadvisor
+    restart: unless-stopped
+    privileged: true
+    ports: # don't need ports because caddy proxies to the container ports for us
+      - "8089:8080"
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+      - /dev/disk/:/dev/disk:ro
+      - /var/run/docker.sock:/var/run/docker.sock
+    networks:
+      - main-network
+
   pihole:
     container_name: pihole
     image: pihole/pihole:latest

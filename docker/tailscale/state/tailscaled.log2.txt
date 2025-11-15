@@ -1,0 +1,9 @@
+{"logtail":{"client_time":"2025-11-15T02:24:39.290152586Z","proc_id":265677703,"proc_seq":101},"metrics":"N40controlclient_auto_status_queuedS1c02I0602I0802I0a02I1401","text":"control: RegisterReq: got response; nodeKeyExpired=false, machineAuthorized=false; authURL=false\n"}
+{"logtail":{"client_time":"2025-11-15T02:24:39.329188503Z","proc_id":265677703,"proc_seq":102},"v":1,"text":"control: TryLogin: invalid key: API key does not exist\n"}
+{"logtail":{"client_time":"2025-11-15T02:24:39.346513628Z","proc_id":265677703,"proc_seq":103},"v":1,"text":"control: sendStatus: authRoutine-report: state:authenticating\n"}
+{"logtail":{"client_time":"2025-11-15T02:24:39.359326711Z","proc_id":265677703,"proc_seq":104},"v":1,"text":"control: authRoutine: backoff: 34 msec\n"}
+{"logtail":{"client_time":"2025-11-15T02:24:39.415977837Z","proc_id":265677703,"proc_seq":105},"text":"Received error: invalid key: API key does not exist\n"}
+{"logtail":{"client_time":"2025-11-15T02:24:39.420408545Z","proc_id":265677703,"proc_seq":106},"v":1,"text":"control: authRoutine: state:authenticating; wantLoggedIn=true\n"}
+{"logtail":{"client_time":"2025-11-15T02:24:39.421597378Z","proc_id":265677703,"proc_seq":107},"v":1,"text":"control: direct.TryLogin(flags=0)\n"}
+{"logtail":{"client_time":"2025-11-15T02:24:39.430586087Z","proc_id":265677703,"proc_seq":108},"text":"control: doLogin(regen=false, hasUrl=false)\n"}
+{"logtail":{"client_time":"2025-11-15T02:24:39.440468795Z","proc_id":265677703,"proc_seq":109},"text":"control: RegisterReq: onode= node=[P3r1Q] fup=false nks=false\n"}

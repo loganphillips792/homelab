@@ -29,6 +29,12 @@ scrape_configs:
       - targets: ['grafana:3000']
     scrape_interval: 15s
 
+  # cAdvisor metrics for per-container stats
+  - job_name: 'cadvisor'
+    static_configs:
+      - targets: ['cadvisor:8080']
+    scrape_interval: 15s
+
   # Loki metrics
   - job_name: 'loki'
     static_configs:
