@@ -287,6 +287,7 @@ Backup N8N Volume: `ssh logan@10.0.0.33 'docker run --rm -v n8n_storage:/volume 
 
 - docker compose -f docker/docker-compose.yml up caddy pihole cronmaster -d 
 
+- `docker compose -f docker/docker-compose.yml up -d cadvisor pihole caddy prometheus loki alloy grafana homepage`
 
 - Use `docker stats` command to see container usage
 
