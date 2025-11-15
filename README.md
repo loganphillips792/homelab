@@ -253,11 +253,8 @@ Confirm port 53 is now free: `sudo ss -lunpt | grep :53 || echo "Port 53 is free
 
 
 
-
-Backup Volume:  [Backup/Restore a dockerized PostgreSQL database - Stack Overflow](https://stackoverflow.com/questions/24718706/backup-restore-a-dockerized-postgresql-database)
-
-
-
+Backup N8N Database: `ssh logan@10.0.0.33 'cd ~/homelab/docker && docker compose exec -T postgres pg_dump -U changeUser n8n' > n8n-postgres-backup.sql`
+Backup N8N Volume: `ssh logan@10.0.0.33 'docker run --rm -v n8n_storage:/volume alpine sh -c "cd /volume && tar -czf - ."' > n8n-storage-backup.tar.gz`
 
 
 - If you need to increase disk space
