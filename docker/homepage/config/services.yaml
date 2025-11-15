@@ -47,6 +47,10 @@
         widget:
           type: dozzle
           url: http://dozzle:8080
+    - cAdvisor:
+        icon: cadvisor # https://dashboardicons.com/icons/cadvisor
+        href: http://cadvisor.homelab
+        description: Container resource metrics
     - Uptime Kuma:
         icon: https://cdn.jsdelivr.net/gh/selfhst/icons/svg/uptime-kuma.svg # https://selfh.st/icons/
         href: http://uptime-kuma.homelab

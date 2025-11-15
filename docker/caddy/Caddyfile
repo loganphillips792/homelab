@@ -10,6 +10,10 @@ http://grafana.homelab {
   reverse_proxy grafana:3000
 }
 
+http://cadvisor.homelab {
+  reverse_proxy cadvisor:8080
+}
+
 http://homepage.homelab {
   reverse_proxy homepage:3000
 }
