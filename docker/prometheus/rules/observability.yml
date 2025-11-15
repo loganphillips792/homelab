@@ -95,3 +95,12 @@ groups:
         annotations:
           summary: "Host out of disk space"
           description: "Disk is almost full (< 10% left)"
+     
+      - alert: HighContainerCPU
+        expr: rate(container_cpu_usage_seconds_total{image!=""}[5m]) > 0.8
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High CPU usage in container {{ $labels.name }}"
+          description: "Container {{ $labels.name }} CPU > 80% for 5m."
