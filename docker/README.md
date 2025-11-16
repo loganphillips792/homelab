@@ -253,7 +253,7 @@ All of Hoarder's data are in the DATA_DIR. If you can periodically snapshot that
 - You might see this error in the Mongo logs that will prevent the app from working: _WARNING: MongoDB 5.0+ requires a CPU with AVX support, and your current system does not appear to have that!_
   - To fix this, go to the Hardware settings of the VM, Edit the Processors and select `x86-64-v3` as the `Type`. Restart the VM
 
-
+[Backup and Restore | Komodo](https://komo.do/docs/setup/backup)
 
 # DNS Process Explained
 
