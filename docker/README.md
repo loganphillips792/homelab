@@ -259,7 +259,11 @@ All of Hoarder's data are in the DATA_DIR. If you can periodically snapshot that
 
 - If admin forgets password: https://docs.karakeep.app/FAQ/#if-you-are-an-administrator
 
+# C Advisor
 
+[Failure to get data in Prometheus on latest Docker · Issue #3749 · google/cadvisor](https://github.com/google/cadvisor/issues/3749)
+
+As a workaround, I had to turn off containerd-snapshotter and then restart docker
 
 
 # DNS Process Explained
@@ -333,3 +337,12 @@ https://github.com/crowdsecurity/crowdsec
 - https://ntfy.sh
 - Diun and connect it to Ntfy notifications
   - https://crazymax.dev/diun/notif/ntfy/
+- [dmunozv04/iSponsorBlockTV: SponsorBlock client for all YouTube TV clients.](https://github.com/dmunozv04/iSponsorBlockTV)
+- [tubearchivist/tubearchivist: Your self hosted YouTube media server](https://github.com/tubearchivist/tubearchivist)
+- [Download the Checkmk Raw 2.4.0p15 for Docker](https://checkmk.com/download?platform=docker&edition=cre&version=2.4.0p15)
+- [dohsimpson/TaskTrove: TaskTrove is a modern Todo Manager that is fully self-hostable.](https://github.com/dohsimpson/TaskTrove)
+- [calibrain/calibre-web-automated-book-downloader](https://github.com/calibrain/calibre-web-automated-book-downloader)
+- [rybbit-io/rybbit: 🐸 Rybbit - open-source and privacy-friendly alternative to Google Analytics that is 10x more intuitive.](https://github.com/rybbit-io/rybbit)
+- [schlagmichdoch/PairDrop: PairDrop: Transfer Files Cross-Platform. No Setup, No Signup.](https://github.com/schlagmichdoch/PairDrop)
+- [Ironmount - Backup automation GUI for your homeserver : r/selfhosted](https://www.reddit.com/r/selfhosted/comments/1ox8da8/ironmount_backup_automation_gui_for_your/)
+- [garethgeorge/backrest: Backrest is a web UI and orchestrator for restic backup.](https://github.com/garethgeorge/backrest)
