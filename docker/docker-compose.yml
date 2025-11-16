@@ -418,7 +418,7 @@ services:
       - main-network
 
   uptime-kuma:
-    image: louislam/uptime-kuma:1
+    image: louislam/uptime-kuma:2.0.2
     container_name: uptime-kuma
     # ports: # don't need ports because caddy proxies to the container ports for us
     #   - "3002:3001" # 3001 is used by homepage on host

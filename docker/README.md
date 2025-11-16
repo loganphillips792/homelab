@@ -24,6 +24,10 @@ docker compose -f docker/docker-compose.yml up -d caddy pihole homepage uptime-k
     up -d
 ```
 
+- Updating containers:
+  - `docker compose -f docker/docker-compose.yml pull && docker compose -f docker/docker-compose.yml up -d` it will down only the affected services and bring up new containers of those affected services.
+  - After testing to make sure everything is good, run `docker system prune`
+
 # Services
 
 ## Kafka
@@ -160,6 +164,8 @@ in a SQLite DB under /app/data. You will have to manually import the backup file
 
 - There is a something going on with the DNS, where some services are reported to be up, but others are reported to be down. These down services, are still acccessible by URL, but uptime-kuma reports them as down due to the errror `getaddrinfo ENOTFOUND`. To fix this, run `sudo dscacheutil -flushcache; sudo killall -HUP mDNSResponder` on the host Mac machine, and uptime-kuma should successfully report that all services are running.
 
+- Backup data: `ssh logan@10.0.0.33 'cd ~/homelab/docker && docker compose exec -T uptime-kuma sqlite3 /app/data/kuma.db ".backup /dev/stdout"' > uptime-kuma-backup_$(date +%F).db`
+
 ## Tailscale
 
 1. Create account at https://login.tailscale.com/admin
@@ -244,6 +250,11 @@ All of Hoarder's data are in the DATA_DIR. If you can periodically snapshot that
 
 `ssh logan@10.0.0.33 "docker run --rm -v karakeep-data:/data -v \$HOME:/backup alpine sh -c 'tar czf /backup/karakeep-backup-\$(date +%Y%m%d-%H%M%S).tar.gz -C /data .'"`
 
+- You might see this error in the Mongo logs that will prevent the app from working: _WARNING: MongoDB 5.0+ requires a CPU with AVX support, and your current system does not appear to have that!_
+  - To fix this, go to the Hardware settings of the VM, Edit the Processors and select `x86-64-v3` as the `Type`. Restart the VM
+
+
+
 # DNS Process Explained
 
 1. Set Wifi DNS on mac to IP address of Mac (ipconfig getifaddr en0)
@@ -312,3 +323,6 @@ https://github.com/crowdsecurity/crowdsec
 - Tailscale
   - [Newbie question - tailscale on proxmox host or on each (needed) container? : r/Proxmox](https://www.reddit.com/r/Proxmox/comments/1ktje1t/newbie_question_tailscale_on_proxmox_host_or_on/)
   - [Best Way to Setup Tailscale? : r/Proxmox](https://www.reddit.com/r/Proxmox/comments/1dmrca4/best_way_to_setup_tailscale/)
+- https://ntfy.sh
+- Diun and connect it to Ntfy notifications
+  - https://crazymax.dev/diun/notif/ntfy/
