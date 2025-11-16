@@ -246,16 +246,21 @@ Password: umami
 Username: admin
 Password: changeme
 
+- You might see this error in the Mongo logs that will prevent the app from working: _WARNING: MongoDB 5.0+ requires a CPU with AVX support, and your current system does not appear to have that!_
+  - To fix this, go to the Hardware settings of the VM, Edit the Processors and select `x86-64-v3` as the `Type`. Restart the VM
+
+[Backup and Restore | Komodo](https://komo.do/docs/setup/backup)
+
 # Karakeep
 
 All of Hoarder's data are in the DATA_DIR. If you can periodically snapshot that folder, that would take a full backup of hoarder. You don't need to backup meillisearch as the data there can be reconstructed.
 
 `ssh logan@10.0.0.33 "docker run --rm -v karakeep-data:/data -v \$HOME:/backup alpine sh -c 'tar czf /backup/karakeep-backup-\$(date +%Y%m%d-%H%M%S).tar.gz -C /data .'"`
 
-- You might see this error in the Mongo logs that will prevent the app from working: _WARNING: MongoDB 5.0+ requires a CPU with AVX support, and your current system does not appear to have that!_
-  - To fix this, go to the Hardware settings of the VM, Edit the Processors and select `x86-64-v3` as the `Type`. Restart the VM
+- If admin forgets password: https://docs.karakeep.app/FAQ/#if-you-are-an-administrator
 
-[Backup and Restore | Komodo](https://komo.do/docs/setup/backup)
+
+
 
 # DNS Process Explained
 
