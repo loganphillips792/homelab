@@ -240,6 +240,10 @@ Password: umami
 Username: admin
 Password: changeme
 
+All of Hoarder's data are in the DATA_DIR. If you can periodically snapshot that folder, that would take a full backup of hoarder. You don't need to backup meillisearch as the data there can be reconstructed.
+
+`ssh logan@10.0.0.33 "docker run --rm -v karakeep-data:/data -v \$HOME:/backup alpine sh -c 'tar czf /backup/karakeep-backup-\$(date +%Y%m%d-%H%M%S).tar.gz -C /data .'"`
+
 # DNS Process Explained
 
 1. Set Wifi DNS on mac to IP address of Mac (ipconfig getifaddr en0)
