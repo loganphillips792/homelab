@@ -176,6 +176,8 @@ ssh logan@10.0.0.33 '
 ' > uptime-kuma-volume_$(date +%F).tar
 ```
 
+- Restore volume: 
+
 ## Tailscale
 
 1. Create account at https://login.tailscale.com/admin
