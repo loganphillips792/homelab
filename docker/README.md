@@ -346,3 +346,5 @@ https://github.com/crowdsecurity/crowdsec
 - [schlagmichdoch/PairDrop: PairDrop: Transfer Files Cross-Platform. No Setup, No Signup.](https://github.com/schlagmichdoch/PairDrop)
 - [Ironmount - Backup automation GUI for your homeserver : r/selfhosted](https://www.reddit.com/r/selfhosted/comments/1ox8da8/ironmount_backup_automation_gui_for_your/)
 - [garethgeorge/backrest: Backrest is a web UI and orchestrator for restic backup.](https://github.com/garethgeorge/backrest)
+- https://beszel.dev/guide/common-issues#connecting-hub-and-agent-on-the-same-system-using-docker
+- https://docs.anythingllm.com/installation-docker/local-docker
