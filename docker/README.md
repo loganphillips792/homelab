@@ -164,7 +164,17 @@ in a SQLite DB under /app/data. You will have to manually import the backup file
 
 - There is a something going on with the DNS, where some services are reported to be up, but others are reported to be down. These down services, are still acccessible by URL, but uptime-kuma reports them as down due to the errror `getaddrinfo ENOTFOUND`. To fix this, run `sudo dscacheutil -flushcache; sudo killall -HUP mDNSResponder` on the host Mac machine, and uptime-kuma should successfully report that all services are running.
 
-- Backup data: `ssh logan@10.0.0.33 'cd ~/homelab/docker && docker compose exec -T uptime-kuma sqlite3 /app/data/kuma.db ".backup /dev/stdout"' > uptime-kuma-backup_$(date +%F).db`
+- Backup sql DB: `ssh logan@10.0.0.33 'cd ~/homelab/docker && docker compose exec -T uptime-kuma sqlite3 /app/data/kuma.db ".backup /dev/stdout"' > uptime-kuma-backup_$(date +%F).db`
+- Backup Docker Volume: 
+
+```
+ssh logan@10.0.0.33 '
+  docker run --rm \
+    -v uptime_kuma_data:/data \
+    alpine \
+    sh -c "cd /data && tar cf - ."
+' > uptime-kuma-volume_$(date +%F).tar
+```
 
 ## Tailscale
 
@@ -348,3 +358,5 @@ https://github.com/crowdsecurity/crowdsec
 - [garethgeorge/backrest: Backrest is a web UI and orchestrator for restic backup.](https://github.com/garethgeorge/backrest)
 - https://beszel.dev/guide/common-issues#connecting-hub-and-agent-on-the-same-system-using-docker
 - https://docs.anythingllm.com/installation-docker/local-docker
+- [lobehub/lobe-chat: 🤯 LobeHub - an open-source, modern design AI Agent Workspace. Supports multiple AI providers, Knowledge Base (file upload / RAG ), one click install MCP Marketplace and Artifacts / Thinking. One-click FREE deployment of your private AI Agent application.](https://github.com/lobehub/lobe-chat)
+- Set up tail scale  so I can access proxmox and all containers
