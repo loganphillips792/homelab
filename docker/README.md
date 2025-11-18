@@ -355,7 +355,6 @@ https://github.com/crowdsecurity/crowdsec
 - Diun and connect it to Ntfy notifications
   - https://crazymax.dev/diun/notif/ntfy/
 - [dmunozv04/iSponsorBlockTV: SponsorBlock client for all YouTube TV clients.](https://github.com/dmunozv04/iSponsorBlockTV)
-- [tubearchivist/tubearchivist: Your self hosted YouTube media server](https://github.com/tubearchivist/tubearchivist)
 - [Download the Checkmk Raw 2.4.0p15 for Docker](https://checkmk.com/download?platform=docker&edition=cre&version=2.4.0p15)
 - [dohsimpson/TaskTrove: TaskTrove is a modern Todo Manager that is fully self-hostable.](https://github.com/dohsimpson/TaskTrove)
 - [calibrain/calibre-web-automated-book-downloader](https://github.com/calibrain/calibre-web-automated-book-downloader)
@@ -367,3 +366,4 @@ https://github.com/crowdsecurity/crowdsec
 - [lobehub/lobe-chat: 🤯 LobeHub - an open-source, modern design AI Agent Workspace. Supports multiple AI providers, Knowledge Base (file upload / RAG ), one click install MCP Marketplace and Artifacts / Thinking. One-click FREE deployment of your private AI Agent application.](https://github.com/lobehub/lobe-chat)
 - Set up tail scale  so I can access proxmox and all containers
 - [guide : using the new WebUI of llama.cpp · ggml-org/llama.cpp · Discussion #16938](https://github.com/ggml-org/llama.cpp/discussions/16938)
+- [Focus - Self-Hosted Background Removal with Web UI : r/selfhosted](https://www.reddit.com/r/selfhosted/comments/1p0dcut/focus_selfhosted_background_removal_with_web_ui/)
