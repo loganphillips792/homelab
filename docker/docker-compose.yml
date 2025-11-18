@@ -856,6 +856,28 @@ services:
       - main-network
       - kafka-network
   
+  backrest:
+    image: garethgeorge/backrest:latest
+    container_name: backrest
+    hostname: backrest
+    restart: unless-stopped
+    environment:
+      - BACKREST_DATA=/data
+      - BACKREST_CONFIG=/config/config.json
+      - XDG_CACHE_HOME=/cache
+      - TMPDIR=/tmp
+      - TZ=${TZ}
+    volumes:
+      - ./backrest/data:/data
+      - ./backrest/config:/config
+      - ./backrest/cache:/cache
+      - ./backrest/tmp:/tmp
+      - ./backrest/rclone:/root/.config/rclone
+      - ${BACKREST_USERDATA:-/Users/logan/docker-volumes}:/userdata
+      - ${BACKREST_REPOS:-/Users/logan/repos}:/repos
+    networks:
+      - main-network
+  
 
 
 volumes:

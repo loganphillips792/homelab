@@ -139,6 +139,10 @@
 
 # Apps
 - Apps:
+    - Backrest:
+        icon: database
+        href: http://backrest.homelab
+        description: Encrypted backups and snapshots
     - Live Auction:
         href: http://live-auction.homelab
         description: Real-time auction app

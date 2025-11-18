@@ -1,0 +1,10 @@
+{
+  "version":  4,
+  "sync":  {
+    "identity":  {
+      "keyId":  "ecdsa.Uu6FfNUHWOtfC8EkSlBIUHJU1Sf1_nHZ3CaufBhBork",
+      "ed25519priv":  "-----BEGIN EC PRIVATE-----\nMHcCAQEEIKHU0tJc03H8JA8luaGV+x2BKU/ZQiYXyXAN3ur5XGyroAoGCCqGSM49\nAwEHoUQDQgAErW5YlJMJIzzXfu/PoBH7i+/CWHkPw8+jtavfVFD01C5B8csLOkEl\nD0ILuCR5kOEyC2IiQFDpZiUhPZi0ZZDfBg==\n-----END EC PRIVATE-----\n",
+      "ed25519pub":  "-----BEGIN EC PUBLIC-----\nMFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAErW5YlJMJIzzXfu/PoBH7i+/CWHkP\nw8+jtavfVFD01C5B8csLOkElD0ILuCR5kOEyC2IiQFDpZiUhPZi0ZZDfBg==\n-----END EC PUBLIC-----\n"
+    }
+  }
+}

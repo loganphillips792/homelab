@@ -1,0 +1,13 @@
+{
+  "modno":  1,
+  "version":  4,
+  "instance":  "my-backreset-server",
+  "auth":  {
+    "users":  [
+      {
+        "name":  "admin",
+        "passwordBcrypt":  "JDJhJDEwJGdyWVpzbWtFMGcucXVJNGxIdkdHVnVXWUk2OXIydmN4SjVVMTJOTk5TcG5DMm05djdReU42"
+      }
+    ]
+  }
+}

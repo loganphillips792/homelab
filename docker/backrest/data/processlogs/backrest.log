@@ -1,0 +1,128 @@
+{"level":"info","ts":1763497934.751984,"msg":"backrest version 1.10.1@b9181dc00d7c595c0ff1eae333c6ecdecee96b74, using log directory: /data/processlogs"}
+{"level":"info","ts":1763497934.7695782,"msg":"restic binary \"/bin/restic\" in $PATH matches required version 0.18.1, it will be used for backrest commands"}
+{"level":"info","ts":1763497934.7705913,"msg":"migrating config from version 0 to 4"}
+{"level":"fatal","ts":1763497934.7707417,"msg":"error loading config: config version 0 is invalid"}
+{"level":"info","ts":1763497935.0122297,"msg":"backrest version 1.10.1@b9181dc00d7c595c0ff1eae333c6ecdecee96b74, using log directory: /data/processlogs"}
+{"level":"info","ts":1763497935.0216465,"msg":"restic binary \"/bin/restic\" in $PATH matches required version 0.18.1, it will be used for backrest commands"}
+{"level":"info","ts":1763497935.022413,"msg":"migrating config from version 0 to 4"}
+{"level":"fatal","ts":1763497935.022496,"msg":"error loading config: config version 0 is invalid"}
+{"level":"info","ts":1763497935.3429163,"msg":"backrest version 1.10.1@b9181dc00d7c595c0ff1eae333c6ecdecee96b74, using log directory: /data/processlogs"}
+{"level":"info","ts":1763497935.3552396,"msg":"restic binary \"/bin/restic\" in $PATH matches required version 0.18.1, it will be used for backrest commands"}
+{"level":"info","ts":1763497935.3561552,"msg":"migrating config from version 0 to 4"}
+{"level":"fatal","ts":1763497935.3563104,"msg":"error loading config: config version 0 is invalid"}
+{"level":"info","ts":1763497935.8853965,"msg":"backrest version 1.10.1@b9181dc00d7c595c0ff1eae333c6ecdecee96b74, using log directory: /data/processlogs"}
+{"level":"info","ts":1763497935.8951535,"msg":"restic binary \"/bin/restic\" in $PATH matches required version 0.18.1, it will be used for backrest commands"}
+{"level":"info","ts":1763497935.8958077,"msg":"migrating config from version 0 to 4"}
+{"level":"fatal","ts":1763497935.8959262,"msg":"error loading config: config version 0 is invalid"}
+{"level":"info","ts":1763497936.8211265,"msg":"backrest version 1.10.1@b9181dc00d7c595c0ff1eae333c6ecdecee96b74, using log directory: /data/processlogs"}
+{"level":"info","ts":1763497936.8317423,"msg":"restic binary \"/bin/restic\" in $PATH matches required version 0.18.1, it will be used for backrest commands"}
+{"level":"info","ts":1763497936.8323655,"msg":"migrating config from version 0 to 4"}
+{"level":"fatal","ts":1763497936.832414,"msg":"error loading config: config version 0 is invalid"}
+{"level":"info","ts":1763497938.5374262,"msg":"backrest version 1.10.1@b9181dc00d7c595c0ff1eae333c6ecdecee96b74, using log directory: /data/processlogs"}
+{"level":"info","ts":1763497938.5466912,"msg":"restic binary \"/bin/restic\" in $PATH matches required version 0.18.1, it will be used for backrest commands"}
+{"level":"info","ts":1763497938.5473561,"msg":"migrating config from version 0 to 4"}
+{"level":"fatal","ts":1763497938.5474524,"msg":"error loading config: config version 0 is invalid"}
+{"level":"info","ts":1763497941.9036605,"msg":"backrest version 1.10.1@b9181dc00d7c595c0ff1eae333c6ecdecee96b74, using log directory: /data/processlogs"}
+{"level":"info","ts":1763497941.9163225,"msg":"restic binary \"/bin/restic\" in $PATH matches required version 0.18.1, it will be used for backrest commands"}
+{"level":"info","ts":1763497941.9173498,"msg":"migrating config from version 0 to 4"}
+{"level":"fatal","ts":1763497941.917518,"msg":"error loading config: config version 0 is invalid"}
+{"level":"info","ts":1763497948.4538927,"msg":"backrest version 1.10.1@b9181dc00d7c595c0ff1eae333c6ecdecee96b74, using log directory: /data/processlogs"}
+{"level":"info","ts":1763497948.4713914,"msg":"restic binary \"/bin/restic\" in $PATH matches required version 0.18.1, it will be used for backrest commands"}
+{"level":"info","ts":1763497948.4723902,"msg":"migrating config from version 0 to 4"}
+{"level":"fatal","ts":1763497948.4724846,"msg":"error loading config: config version 0 is invalid"}
+{"level":"info","ts":1763497961.4152749,"msg":"backrest version 1.10.1@b9181dc00d7c595c0ff1eae333c6ecdecee96b74, using log directory: /data/processlogs"}
+{"level":"info","ts":1763497961.437159,"msg":"restic binary \"/bin/restic\" in $PATH matches required version 0.18.1, it will be used for backrest commands"}
+{"level":"info","ts":1763497961.4413838,"msg":"migrating config from version 0 to 4"}
+{"level":"fatal","ts":1763497961.441563,"msg":"error loading config: config version 0 is invalid"}
+{"level":"info","ts":1763497987.1607084,"msg":"backrest version 1.10.1@b9181dc00d7c595c0ff1eae333c6ecdecee96b74, using log directory: /data/processlogs"}
+{"level":"info","ts":1763497987.1839285,"msg":"restic binary \"/bin/restic\" in $PATH matches required version 0.18.1, it will be used for backrest commands"}
+{"level":"info","ts":1763497987.1847363,"msg":"migrating config from version 0 to 4"}
+{"level":"fatal","ts":1763497987.1848366,"msg":"error loading config: config version 0 is invalid"}
+{"level":"info","ts":1763498038.531898,"msg":"backrest version 1.10.1@b9181dc00d7c595c0ff1eae333c6ecdecee96b74, using log directory: /data/processlogs"}
+{"level":"info","ts":1763498038.5567718,"msg":"restic binary \"/bin/restic\" in $PATH matches required version 0.18.1, it will be used for backrest commands"}
+{"level":"info","ts":1763498038.5578158,"msg":"migrating config from version 0 to 4"}
+{"level":"fatal","ts":1763498038.5579064,"msg":"error loading config: config version 0 is invalid"}
+{"level":"info","ts":1763498098.704231,"msg":"backrest version 1.10.1@b9181dc00d7c595c0ff1eae333c6ecdecee96b74, using log directory: /data/processlogs"}
+{"level":"info","ts":1763498098.7193012,"msg":"restic binary \"/bin/restic\" in $PATH matches required version 0.18.1, it will be used for backrest commands"}
+{"level":"info","ts":1763498098.7205353,"msg":"migrating config from version 0 to 4"}
+{"level":"fatal","ts":1763498098.7207022,"msg":"error loading config: config version 0 is invalid"}
+{"level":"info","ts":1763498158.8521395,"msg":"backrest version 1.10.1@b9181dc00d7c595c0ff1eae333c6ecdecee96b74, using log directory: /data/processlogs"}
+{"level":"info","ts":1763498158.8713462,"msg":"restic binary \"/bin/restic\" in $PATH matches required version 0.18.1, it will be used for backrest commands"}
+{"level":"info","ts":1763498158.8727715,"msg":"migrating config from version 0 to 4"}
+{"level":"fatal","ts":1763498158.8729267,"msg":"error loading config: config version 0 is invalid"}
+{"level":"info","ts":1763498219.0059683,"msg":"backrest version 1.10.1@b9181dc00d7c595c0ff1eae333c6ecdecee96b74, using log directory: /data/processlogs"}
+{"level":"info","ts":1763498219.0195413,"msg":"restic binary \"/bin/restic\" in $PATH matches required version 0.18.1, it will be used for backrest commands"}
+{"level":"info","ts":1763498219.0203588,"msg":"migrating config from version 0 to 4"}
+{"level":"fatal","ts":1763498219.0204911,"msg":"error loading config: config version 0 is invalid"}
+{"level":"info","ts":1763498279.1584733,"msg":"backrest version 1.10.1@b9181dc00d7c595c0ff1eae333c6ecdecee96b74, using log directory: /data/processlogs"}
+{"level":"info","ts":1763498279.1799796,"msg":"restic binary \"/bin/restic\" in $PATH matches required version 0.18.1, it will be used for backrest commands"}
+{"level":"warn","ts":1763498279.1809723,"msg":"ACTION REQUIRED: instance ID is empty, will be required in a future update. Please open the backrest UI to set a unique instance ID. Until fixed this warning (and related errors) will print periodically."}
+{"level":"warn","ts":1763498279.1834543,"msg":"ACTION REQUIRED: instance ID is empty, will be required in a future update. Please open the backrest UI to set a unique instance ID. Until fixed this warning (and related errors) will print periodically."}
+{"level":"info","ts":1763498279.809077,"msg":"applying oplog sqlite schema migration from storage schema 0 to 6"}
+{"level":"info","ts":1763498279.8110971,"msg":"oplog applying data migration","migration_no":0}
+{"level":"info","ts":1763498279.8115382,"msg":"oplog applying data migration","migration_no":1}
+{"level":"info","ts":1763498279.8119159,"msg":"oplog applying data migration","migration_no":2}
+{"level":"info","ts":1763498279.812226,"msg":"oplog applying data migration","migration_no":3}
+{"level":"info","ts":1763498279.812586,"msg":"oplog applying data migration","migration_no":4}
+{"level":"info","ts":1763498279.8128707,"msg":"oplog applying data migration","migration_no":5}
+{"level":"info","ts":1763498279.8195755,"msg":"scrubbing operation log for incomplete operations"}
+{"level":"info","ts":1763498279.8198102,"msg":"scrubbed operation log for incomplete operations","duration":0.000236209,"incomplete_ops":0,"incomplete_repos":0,"deleted_ops":0}
+{"level":"info","ts":1763498279.8198636,"msg":"scheduling default tasks, waiting for task queue reset."}
+{"level":"info","ts":1763498279.8199966,"msg":"reset task queue, scheduling new task set","timezone":"Etc/UTC"}
+{"level":"info","ts":1763498279.8200555,"msg":"scheduled task","task":"collect garbage","runAt":"2025-11-18T20:38:00Z"}
+{"level":"info","ts":1763498279.8200893,"msg":"orchestrator created"}
+{"level":"info","ts":1763498279.8204293,"msg":"starting orchestrator loop"}
+{"level":"info","ts":1763498279.8242054,"msg":"generating new auth secret"}
+{"level":"info","ts":1763498279.8243892,"msg":"syncmanager no known host peers declared, sync client exiting early"}
+{"level":"info","ts":1763498279.8328605,"msg":"starting web server 0.0.0.0:9898"}
+{"level":"info","ts":1763498280.8205142,"msg":"running task","task":"collect garbage","runAt":"2025-11-18T20:38:00Z"}
+{"level":"info","ts":1763498280.8211596,"msg":"collecting garbage operations","operations_removed":0,"removed_by_age":0,"removed_by_limit":0,"removed_by_snapshot_forgotten":0,"removed_by_type":{},"removed_by_unknown_peer_keyid":0}
+{"level":"info","ts":1763498280.821513,"msg":"collecting garbage logs","logs_removed":0}
+{"level":"info","ts":1763498280.8216367,"msg":"scheduled task","task":"collect garbage","runAt":"2025-11-19T20:38:00Z"}
+{"level":"info","ts":1763498441.0771127,"msg":"backrest version 1.10.1@b9181dc00d7c595c0ff1eae333c6ecdecee96b74, using log directory: /data/processlogs"}
+{"level":"info","ts":1763498441.0962982,"msg":"restic binary \"/bin/restic\" in $PATH matches required version 0.18.1, it will be used for backrest commands"}
+{"level":"warn","ts":1763498441.0972323,"msg":"ACTION REQUIRED: instance ID is empty, will be required in a future update. Please open the backrest UI to set a unique instance ID. Until fixed this warning (and related errors) will print periodically."}
+{"level":"info","ts":1763498441.7740843,"msg":"scrubbing operation log for incomplete operations"}
+{"level":"info","ts":1763498441.7743616,"msg":"scrubbed operation log for incomplete operations","duration":0.000278792,"incomplete_ops":0,"incomplete_repos":0,"deleted_ops":0}
+{"level":"info","ts":1763498441.774523,"msg":"scheduling default tasks, waiting for task queue reset."}
+{"level":"info","ts":1763498441.7747207,"msg":"reset task queue, scheduling new task set","timezone":"Etc/UTC"}
+{"level":"info","ts":1763498441.7748642,"msg":"scheduled task","task":"collect garbage","runAt":"2025-11-18T20:40:42Z"}
+{"level":"info","ts":1763498441.775001,"msg":"orchestrator created"}
+{"level":"info","ts":1763498441.7754798,"msg":"starting orchestrator loop"}
+{"level":"info","ts":1763498441.7764843,"msg":"syncmanager no known host peers declared, sync client exiting early"}
+{"level":"debug","ts":1763498441.7767692,"msg":"loading auth secret from file"}
+{"level":"info","ts":1763498441.7847471,"msg":"starting web server 0.0.0.0:9898"}
+{"level":"info","ts":1763498442.7785704,"msg":"running task","task":"collect garbage","runAt":"2025-11-18T20:40:42Z"}
+{"level":"info","ts":1763498442.780929,"msg":"collecting garbage operations","operations_removed":0,"removed_by_age":0,"removed_by_limit":0,"removed_by_snapshot_forgotten":0,"removed_by_type":{},"removed_by_unknown_peer_keyid":0}
+{"level":"info","ts":1763498442.7823322,"msg":"collecting garbage logs","logs_removed":0}
+{"level":"info","ts":1763498442.7835298,"msg":"scheduled task","task":"collect garbage","runAt":"2025-11-19T20:40:42Z"}
+{"level":"info","ts":1763499231.3397236,"msg":"scheduling default tasks, waiting for task queue reset."}
+{"level":"info","ts":1763499231.3412466,"msg":"reset task queue, scheduling new task set","timezone":"Etc/UTC"}
+{"level":"info","ts":1763499231.340029,"msg":"syncmanager applying new config, waiting for existing sync goroutines to exit"}
+{"level":"info","ts":1763499231.3418064,"msg":"syncmanager no known host peers declared, sync client exiting early"}
+{"level":"info","ts":1763499231.341392,"msg":"scheduled task","task":"collect garbage","runAt":"2025-11-18T20:53:52Z"}
+{"level":"info","ts":1763499232.3478086,"msg":"running task","task":"collect garbage","runAt":"2025-11-18T20:53:52Z"}
+{"level":"info","ts":1763499232.3593564,"msg":"collecting garbage operations","operations_removed":0,"removed_by_age":0,"removed_by_limit":0,"removed_by_snapshot_forgotten":0,"removed_by_type":{},"removed_by_unknown_peer_keyid":0}
+{"level":"info","ts":1763499232.360113,"msg":"collecting garbage logs","logs_removed":0}
+{"level":"info","ts":1763499232.3604317,"msg":"scheduled task","task":"collect garbage","runAt":"2025-11-19T20:53:52Z"}
+{"level":"debug","ts":1763499241.5902085,"msg":"login request","username":"logan"}
+{"level":"warn","ts":1763499241.5908797,"msg":"failed login attempt","error":"user not found"}
+{"level":"debug","ts":1763499243.6795485,"msg":"login request","username":"logan"}
+{"level":"warn","ts":1763499243.680269,"msg":"failed login attempt","error":"user not found"}
+{"level":"debug","ts":1763499248.4394722,"msg":"login request","username":"admin"}
+{"level":"info","ts":1763499262.1088362,"msg":"backrest version 1.10.1@b9181dc00d7c595c0ff1eae333c6ecdecee96b74, using log directory: /data/processlogs"}
+{"level":"info","ts":1763499262.1304119,"msg":"restic binary \"/bin/restic\" in $PATH matches required version 0.18.1, it will be used for backrest commands"}
+{"level":"info","ts":1763499262.790457,"msg":"scrubbing operation log for incomplete operations"}
+{"level":"info","ts":1763499262.7907321,"msg":"scrubbed operation log for incomplete operations","duration":0.000277125,"incomplete_ops":0,"incomplete_repos":0,"deleted_ops":0}
+{"level":"info","ts":1763499262.79081,"msg":"scheduling default tasks, waiting for task queue reset."}
+{"level":"info","ts":1763499262.7909012,"msg":"reset task queue, scheduling new task set","timezone":"Etc/UTC"}
+{"level":"info","ts":1763499262.7910535,"msg":"scheduled task","task":"collect garbage","runAt":"2025-11-18T20:54:23Z"}
+{"level":"info","ts":1763499262.7911265,"msg":"orchestrator created"}
+{"level":"info","ts":1763499262.7912958,"msg":"starting orchestrator loop"}
+{"level":"info","ts":1763499262.7923188,"msg":"syncmanager no known host peers declared, sync client exiting early"}
+{"level":"debug","ts":1763499262.7926555,"msg":"loading auth secret from file"}
+{"level":"info","ts":1763499262.8015265,"msg":"starting web server 0.0.0.0:9898"}
+{"level":"info","ts":1763499263.7934325,"msg":"running task","task":"collect garbage","runAt":"2025-11-18T20:54:23Z"}
+{"level":"info","ts":1763499263.796058,"msg":"collecting garbage operations","operations_removed":0,"removed_by_age":0,"removed_by_limit":0,"removed_by_snapshot_forgotten":0,"removed_by_type":{},"removed_by_unknown_peer_keyid":0}
+{"level":"info","ts":1763499263.7963345,"msg":"collecting garbage logs","logs_removed":0}
+{"level":"info","ts":1763499263.7964146,"msg":"scheduled task","task":"collect garbage","runAt":"2025-11-19T20:54:23Z"}

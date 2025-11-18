@@ -1,0 +1,20 @@
+{
+  "modno":  1,
+  "version":  4,
+  "instance":  "my-backreset-server",
+  "auth":  {
+    "users":  [
+      {
+        "name":  "admin",
+        "passwordBcrypt":  "JDJhJDEwJGdyWVpzbWtFMGcucXVJNGxIdkdHVnVXWUk2OXIydmN4SjVVMTJOTk5TcG5DMm05djdReU42"
+      }
+    ]
+  },
+  "sync":  {
+    "identity":  {
+      "keyId":  "ecdsa.Y962Em8rWn7ycNSZenosl_YuE9wxRn1qJ_Ip7P__eCQ",
+      "ed25519priv":  "-----BEGIN EC PRIVATE-----\nMHcCAQEEINbowmMsfN7AENiPF/LhGbKln+gsu4WTY+wxn1EmbD01oAoGCCqGSM49\nAwEHoUQDQgAEpKNnmmj/ZTYgXwmqihLbbiZfwy7qd32SB9hLr3Wr8rReqwMqLApr\nVJJUMnXq7Ax+j6BSgoQq7/qLdRX6zqKxzw==\n-----END EC PRIVATE-----\n",
+      "ed25519pub":  "-----BEGIN EC PUBLIC-----\nMFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEpKNnmmj/ZTYgXwmqihLbbiZfwy7q\nd32SB9hLr3Wr8rReqwMqLAprVJJUMnXq7Ax+j6BSgoQq7/qLdRX6zqKxzw==\n-----END EC PUBLIC-----\n"
+    }
+  }
+}

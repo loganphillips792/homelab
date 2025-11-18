@@ -1,0 +1,6 @@
+{
+  "$schema": "https://raw.githubusercontent.com/garethgeorge/backrest/main/resources/config.schema.json",
+  "version": 4,
+  "sources": [],
+  "destinations": []
+}

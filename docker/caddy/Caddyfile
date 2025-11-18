@@ -117,6 +117,10 @@ http://beszel.homelab {
   reverse_proxy beszel:8090
 }
 
+http://backrest.homelab {
+  reverse_proxy backrest:9898
+}
+
 http://paperless.homelab {
   reverse_proxy paperless-ngx-webserver:8000
 }

@@ -106,7 +106,8 @@ localhost:5678
 
 - Reset password
   1. `docker exec -it docker-n8n-1 sh`
-  2. 
+  2. `n8n user-management:reset`
+  3. `docker compose -f docker/docker-compose.yml restart n8n`
 
 
 ## Dozzle
