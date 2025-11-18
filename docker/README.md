@@ -362,3 +362,4 @@ https://github.com/crowdsecurity/crowdsec
 - https://docs.anythingllm.com/installation-docker/local-docker
 - [lobehub/lobe-chat: 🤯 LobeHub - an open-source, modern design AI Agent Workspace. Supports multiple AI providers, Knowledge Base (file upload / RAG ), one click install MCP Marketplace and Artifacts / Thinking. One-click FREE deployment of your private AI Agent application.](https://github.com/lobehub/lobe-chat)
 - Set up tail scale  so I can access proxmox and all containers
+- [guide : using the new WebUI of llama.cpp · ggml-org/llama.cpp · Discussion #16938](https://github.com/ggml-org/llama.cpp/discussions/16938)
