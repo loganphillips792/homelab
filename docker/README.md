@@ -104,6 +104,10 @@ localhost:3000
 
 localhost:5678
 
+- Reset password
+  1. `docker exec -it docker-n8n-1 sh`
+  2. 
+
 
 ## Dozzle
 

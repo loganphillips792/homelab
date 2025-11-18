@@ -47,6 +47,7 @@ services:
       - DB_POSTGRESDB_USER=${POSTGRES_NON_ROOT_USER}
       - DB_POSTGRESDB_PASSWORD=${POSTGRES_NON_ROOT_PASSWORD}
       - N8N_SECURE_COOKIE=False
+      - N8N_ENFORCE_SETTINGS_FILE_PERMISSIONS=true
     # ports: # don't need ports because caddy proxies to the container ports for us
     #   - 5678:5678
     links:
