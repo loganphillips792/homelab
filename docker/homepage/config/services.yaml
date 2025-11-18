@@ -108,6 +108,10 @@
         icon: https://cdn.jsdelivr.net/gh/selfhst/icons/svg/uptime-kuma.svg
         href: http://pinchflat.homelab
         description: YouTube/Podcast downloader
+    - Tube Archivist:
+        icon: youtube
+        href: http://tubearchivist.homelab
+        description: YouTube archiving and offline playback
     - Immich:
         icon: immich
         href: http://immich.homelab

@@ -125,6 +125,10 @@ http://paperless.homelab {
   reverse_proxy paperless-ngx-webserver:8000
 }
 
+http://tubearchivist.homelab {
+  reverse_proxy tubearchivist:8000
+}
+
 http://pinchflat.homelab {
   reverse_proxy pinchflat:8945
 }

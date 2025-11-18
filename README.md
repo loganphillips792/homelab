@@ -218,7 +218,7 @@ Confirm port 53 is now free: `sudo ss -lunpt | grep :53 || echo "Port 53 is free
 
 8. Bring up Docker containers
     1. docker login -u dockedupstream
-    2. `docker compose -f docker/docker-compose.yml up -d && docker compose --env-file "$PWD/docker/immich/docker-compose.env" -f "$PWD/docker/immich/docker-compose.yml" up -d`
+    2. `docker compose -f docker/docker-compose.yml up -d && docker compose --env-file "$PWD/docker/immich/docker-compose.env" -f "$PWD/docker/immich/docker-compose.yml" up -d && docker compose -f docker/tubearchivist/docker-compose.yml up -d`
 
 9. `sudo ss -lunpt | grep :53` If you see docker-proxy, that means that PiHole has binded to port 53
 
