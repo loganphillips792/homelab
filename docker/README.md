@@ -366,3 +366,5 @@ https://github.com/crowdsecurity/crowdsec
 - Set up tail scale  so I can access proxmox and all containers
 - [guide : using the new WebUI of llama.cpp · ggml-org/llama.cpp · Discussion #16938](https://github.com/ggml-org/llama.cpp/discussions/16938)
 - [Focus - Self-Hosted Background Removal with Web UI : r/selfhosted](https://www.reddit.com/r/selfhosted/comments/1p0dcut/focus_selfhosted_background_removal_with_web_ui/)
+- gitea
+- Forejo
