@@ -171,7 +171,6 @@ in a SQLite DB under /app/data. You will have to manually import the backup file
 
 - Backup sql DB: `ssh logan@10.0.0.33 'cd ~/homelab/docker && docker compose exec -T uptime-kuma sqlite3 /app/data/kuma.db ".backup /dev/stdout"' > uptime-kuma-backup_$(date +%F).db`
 - Backup Docker Volume: 
-
 ```
 ssh logan@10.0.0.33 '
   docker run --rm \
