@@ -126,3 +126,27 @@
 {"level":"info","ts":1763499263.796058,"msg":"collecting garbage operations","operations_removed":0,"removed_by_age":0,"removed_by_limit":0,"removed_by_snapshot_forgotten":0,"removed_by_type":{},"removed_by_unknown_peer_keyid":0}
 {"level":"info","ts":1763499263.7963345,"msg":"collecting garbage logs","logs_removed":0}
 {"level":"info","ts":1763499263.7964146,"msg":"scheduled task","task":"collect garbage","runAt":"2025-11-19T20:54:23Z"}
+{"level":"warn","ts":1763548222.043091,"msg":"detected a clock jump, watchdog timer is off from realtime by 4259109ms, rescheduling all tasks"}
+{"level":"info","ts":1763548222.0488784,"msg":"scheduling default tasks, waiting for task queue reset."}
+{"level":"info","ts":1763548222.0644088,"msg":"reset task queue, scheduling new task set","timezone":"Etc/UTC"}
+{"level":"info","ts":1763548222.0645602,"msg":"scheduled task","task":"collect garbage","runAt":"2025-11-19T10:30:23Z"}
+{"level":"info","ts":1763551122.3955135,"msg":"running task","task":"collect garbage","runAt":"2025-11-19T10:30:23Z"}
+{"level":"info","ts":1763551122.4149473,"msg":"collecting garbage operations","operations_removed":0,"removed_by_age":0,"removed_by_limit":0,"removed_by_snapshot_forgotten":0,"removed_by_type":{},"removed_by_unknown_peer_keyid":0}
+{"level":"info","ts":1763551122.429067,"msg":"collecting garbage logs","logs_removed":0}
+{"level":"info","ts":1763551122.4306,"msg":"scheduled task","task":"collect garbage","runAt":"2025-11-20T11:18:42Z"}
+{"level":"warn","ts":1763564708.2558618,"msg":"detected a clock jump, watchdog timer is off from realtime by 16186214ms, rescheduling all tasks"}
+{"level":"info","ts":1763564708.2595313,"msg":"scheduling default tasks, waiting for task queue reset."}
+{"level":"info","ts":1763564708.2614136,"msg":"reset task queue, scheduling new task set","timezone":"Etc/UTC"}
+{"level":"info","ts":1763564708.2615528,"msg":"scheduled task","task":"collect garbage","runAt":"2025-11-19T15:05:09Z"}
+{"level":"info","ts":1763564709.2651298,"msg":"running task","task":"collect garbage","runAt":"2025-11-19T15:05:09Z"}
+{"level":"info","ts":1763564709.2685542,"msg":"collecting garbage operations","operations_removed":0,"removed_by_age":0,"removed_by_limit":0,"removed_by_snapshot_forgotten":0,"removed_by_type":{},"removed_by_unknown_peer_keyid":0}
+{"level":"info","ts":1763564709.2695956,"msg":"collecting garbage logs","logs_removed":0}
+{"level":"info","ts":1763564709.2699614,"msg":"scheduled task","task":"collect garbage","runAt":"2025-11-20T15:05:09Z"}
+{"level":"warn","ts":1763601714.1312215,"msg":"detected a clock jump, watchdog timer is off from realtime by 5805880ms, rescheduling all tasks"}
+{"level":"info","ts":1763601714.1334834,"msg":"scheduling default tasks, waiting for task queue reset."}
+{"level":"info","ts":1763601714.1369991,"msg":"reset task queue, scheduling new task set","timezone":"Etc/UTC"}
+{"level":"info","ts":1763601714.1371417,"msg":"scheduled task","task":"collect garbage","runAt":"2025-11-20T01:21:55Z"}
+{"level":"info","ts":1763601715.1395898,"msg":"running task","task":"collect garbage","runAt":"2025-11-20T01:21:55Z"}
+{"level":"info","ts":1763601715.148399,"msg":"collecting garbage operations","operations_removed":0,"removed_by_age":0,"removed_by_limit":0,"removed_by_snapshot_forgotten":0,"removed_by_type":{},"removed_by_unknown_peer_keyid":0}
+{"level":"info","ts":1763601715.149842,"msg":"collecting garbage logs","logs_removed":0}
+{"level":"info","ts":1763601715.1502473,"msg":"scheduled task","task":"collect garbage","runAt":"2025-11-21T01:21:55Z"}

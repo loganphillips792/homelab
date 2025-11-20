@@ -368,3 +368,54 @@ https://github.com/crowdsecurity/crowdsec
 - [Focus - Self-Hosted Background Removal with Web UI : r/selfhosted](https://www.reddit.com/r/selfhosted/comments/1p0dcut/focus_selfhosted_background_removal_with_web_ui/)
 - gitea
 - Forejo
+- [mayanayza/netvisor: Automatically discover and visually document network infrastructure.](https://github.com/mayanayza/netvisor)
+
+# Setting Up VM and Docker
+
+
+# Backup strategy
+
+
+1. docker compose down first to make sure no data corruption happens
+
+script:
+
+bind mounts (if not committed with the repo) are always located at:
+
+to backup docker volumes:
+
+create a script on host machine
+
+on VM, create a directory /opt/docker-backups
+
+
+To restore:
+
+1. restoure volumes:
+
+2. restore bind mount paths
+
+
+
+cron job to do above ?
+
+
+
+
+Download Proxmox Backup Server: https://www.proxmox.com/en/downloads/proxmox-backup-server/iso
+
+Datacenter > pve > local (pve) > ISO Images > Upload ISO file
+
+Create VM with ISO image
+
+- go through graphical install process
+  - management interface - ens18
+  - Hostname (FQDN) - pbs.hsd1.il.comcast.net
+  - IP Address (CIDR) -  10.0.0.43 / 24
+  - Gateway - 10.0.0.1
+  - DNS Server - 75.75.75.75
+
+  Access the UI at https://10.0.0.43:8007/
+
+  Username - root
+  Password - password
