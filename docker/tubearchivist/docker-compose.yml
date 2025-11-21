@@ -9,7 +9,7 @@ services:
       - "8000:8000"
     volumes:
       - ./media:/youtube
-      - ./cache:/cache
+      - ~/docker-volumes/tubearchivist:/cache
     environment:
       - ES_URL=http://archivist-es:9200
       - REDIS_CON=redis://archivist-redis:6379
@@ -39,7 +39,7 @@ services:
     expose:
       - "6379"
     volumes:
-      - ./redis:/data
+      - ~/docker-volumes/tubearchivist/redis:/data
     depends_on:
       - archivist-es
     networks:

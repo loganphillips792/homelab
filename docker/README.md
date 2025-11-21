@@ -370,6 +370,7 @@ https://github.com/crowdsecurity/crowdsec
 - Forejo
 - [mayanayza/netvisor: Automatically discover and visually document network infrastructure.](https://github.com/mayanayza/netvisor)
 - https://github.com/matomo-org/docker/
+- rename `docker-volumes` directory as `docker-bind-mounts`
 
 # Setting Up VM and Docker
 
