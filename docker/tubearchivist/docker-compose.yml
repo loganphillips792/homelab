@@ -8,7 +8,7 @@ services:
     ports:
       - "8000:8000"
     volumes:
-      - ./media:/youtube
+      - ~/docker-volumes/tubearchivist/media:/youtube
       - ~/docker-volumes/tubearchivist:/cache
     environment:
       - ES_URL=http://archivist-es:9200
