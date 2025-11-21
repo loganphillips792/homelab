@@ -60,7 +60,7 @@ services:
         soft: -1
         hard: -1
     volumes:
-      - ./es:/usr/share/elasticsearch/data
+      - ~/docker-volumes/tubearchivist/es:/usr/share/elasticsearch/data
     expose:
       - "9200"
     networks:
