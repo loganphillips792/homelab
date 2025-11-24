@@ -42,6 +42,10 @@ http://gatus.homelab {
   reverse_proxy gatus:8080
 }
 
+http://excalidraw.homelab {
+  reverse_proxy excalidraw:80
+}
+
 http://dozzle.homelab {
   reverse_proxy dozzle:8080
 }

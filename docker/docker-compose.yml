@@ -681,6 +681,15 @@ services:
     networks:
       - main-network
 
+  excalidraw:
+    image: excalidraw/excalidraw:latest
+    container_name: excalidraw
+    restart: unless-stopped
+    # ports: # don't need ports because caddy proxies to the container ports for us
+    #   - "5000:80"
+    networks:
+      - main-network
+
   changedetection:
     image: dgtlmoon/changedetection.io:latest
     container_name: changedetection

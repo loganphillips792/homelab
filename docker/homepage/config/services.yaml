@@ -158,6 +158,10 @@
         icon: karakeep
         href: http://karakeep.homelab
         description: Knowledge base with web capture
+    - Excalidraw:
+        icon: https://cdn.jsdelivr.net/gh/walkxcode/dashboard-icons@master/svg/excalidraw.svg
+        href: http://excalidraw.homelab
+        description: Collaborative whiteboard
     - Paperless-ngx:
         icon: https://cdn.jsdelivr.net/gh/selfhst/icons/svg/uptime-kuma.svg
         href: http://paperless.homelab
