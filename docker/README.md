@@ -371,6 +371,7 @@ https://github.com/crowdsecurity/crowdsec
 - [mayanayza/netvisor: Automatically discover and visually document network infrastructure.](https://github.com/mayanayza/netvisor)
 - https://github.com/matomo-org/docker/
 - rename `docker-volumes` directory as `docker-bind-mounts`
+- Update homepage https://www.reddit.com/r/selfhosted/comments/1p1469e/my_homepage_dashboard_v3/
 
 # Setting Up VM and Docker
 
@@ -421,3 +422,7 @@ Create VM with ISO image
 
   Username - root
   Password - password
+
+
+  # Setting up Tailscale
+
