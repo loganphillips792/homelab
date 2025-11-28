@@ -6,15 +6,17 @@ services:
     hostname: tailscale
     environment:
       -  TS_AUTHKEY=tskey-auth-k5gUCHV3DN11CNTRL-eQAy4NhmqggbnmQvRxyDhgyQYSng8SBe
-      # - TS_EXTRA_ARGS=--advertise-tags=tag:container
+      - TS_EXTRA_ARGS=--advertise-tags=tag:container
       - TS_STATE_DIR=/var/lib/tailscale
       - TS_USERSPACE=false
+      - TS_EXTRA_ARGS=--advertise-routes=10.0.0.0/24 --accept-routes
     volumes:
       - ./tailscale/state:/var/lib/tailscale
     devices:
       - /dev/net/tun:/dev/net/tun
     cap_add:
       - NET_ADMIN
+      - SYS_MODULE
     restart: unless-stopped
   postgres: # For N8N
     image: postgres:16
