@@ -376,6 +376,47 @@ https://github.com/crowdsecurity/crowdsec
 # Setting Up VM and Docker
 
 
+
+## TailScale
+
+To access services outside of home network, we will use tailscale
+
+
+1. Create tag (Access controls)
+
+```
+"tagOwners": {
+		"tag:container": ["autogroup:admin"],
+	},
+```
+
+2. Enable Routes (Machines tab)
+    1. Click `tailscale` machine
+    2. Edit route settings
+    3. Approve 10.0.0.0/24 route
+
+3. Tailscale Admin Console > Settings > Keys
+4. Generate Auth Key
+    - Description: homelab-docker
+    - Reusable: Yes
+    - Expiration: 90 days
+    - Ephemeral: No
+    - Tags: `tag:container`
+5. Update `docker-compose.yml` with auth key
+6. `docker compose up -d tailscale`
+7. Configure "Split DNS"
+  1. DNS Tab
+  2. Scroll down to Nameservers and click `Add nameserver` > `Custom`
+  3. Enter the IP address of your VM: 10.0.0.33
+  4. Check the box `Restrict to domain`
+  5. Enter domain `homelab`
+  6. Click save
+8. Open Tailscale App on phone
+9. Sign into Tailscale account (Same account where you generated the auth key)
+10. Ensure it is set to `Active`
+11. Type `http://homepage.homelab`
+
+
 # Backup strategy
 
 
