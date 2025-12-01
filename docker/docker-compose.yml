@@ -890,10 +890,7 @@ services:
       - main-network
 
   cta-map:
-    build:
-      context: /Users/logan/repos/cta-map
-      args:
-        - VITE_JAWG_ACCESS_TOKEN=${VITE_JAWG_ACCESS_TOKEN}
+    image: dockedupstream/cta-map:latest
     container_name: cta-map
     restart: unless-stopped
     env_file:
@@ -901,7 +898,7 @@ services:
     environment:
       - PORT=8080
     volumes:
-      -  ~/docker-volumes/cta-map:/app/data:ro
+      - ~/docker-volumes/cta-map:/app/data:ro
     networks:
       - main-network
 
