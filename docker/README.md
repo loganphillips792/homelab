@@ -590,19 +590,6 @@ Backup N8N Volume: `ssh logan@10.0.0.33 'docker run --rm -v n8n_storage:/volume 
     - resize2fs /dev/sda3
 - If at anytime there is a permission denied error during git pull process: `sudo chown -R logan:logan .` and then run `git pull` again
 
-- After making DNS changes to the pihole DNS file: `docker compose -f docker/docker-compose.yml restart pihole caddy`
-
-- After making changes to prometheus: `docker compose -f docker/docker-compose.yml restart prometheus`
-
-- docker compose -f docker/docker-compose.yml up caddy pihole cronmaster -d 
-
-- `docker compose -f docker/docker-compose.yml up -d cadvisor pihole caddy prometheus loki alloy grafana homepage`
-
-- Use `docker stats` command to see container usage
-
-pveversion --verbose
-
-
 ## TailScale
 
 To access services outside of home network, we will use tailscale
@@ -641,6 +628,21 @@ To access services outside of home network, we will use tailscale
 9. Sign into Tailscale account (Same account where you generated the auth key)
 10. Ensure it is set to `Active`
 11. Type `http://homepage.homelab`
+
+## Useful Commands
+
+
+- After making DNS changes to the pihole DNS file: `docker compose -f docker/docker-compose.yml restart pihole caddy`
+
+- After making changes to prometheus: `docker compose -f docker/docker-compose.yml restart prometheus`
+
+- docker compose -f docker/docker-compose.yml up caddy pihole cronmaster -d 
+
+- `docker compose -f docker/docker-compose.yml up -d cadvisor pihole caddy prometheus loki alloy grafana homepage`
+
+- Use `docker stats` command to see container usage
+
+pveversion --verbose
 
 
 # Backup strategy
