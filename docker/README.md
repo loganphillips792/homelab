@@ -206,7 +206,7 @@ if you have to rerun the SQL script: `docker compose -f docker/docker-compose.ym
 
 `docker exec -it postgres_db psql -U testuser -d test_database -c 'SELECT * FROM "test-table";'`
 
-# Live-Auction
+## Live-Auction
 
 1. Make sure live-auction repo has the proper settings so that the image gets pushed properly during deployment:
   - Settings > Repository Secrets
@@ -225,7 +225,7 @@ curl --request GET \
   --url 'http://localhost:8000/api/auctions/?skip=0&limit=9'
 ```
 
-# Redis
+## Redis
 
 1. `docker exec -it redis redis-cli`
 2. `AUTH <password_here>`
@@ -254,17 +254,17 @@ OR
 OR
 If you ever want to connect from another container in the same compose network, use the service name: `redis-cli -h redis -a your_password_here`
 
-# Umami
+## Umami
 
 Username: admin
 Password: umami
 
-# Ollama
+## Ollama
 
 - `docker exec -it ollama ollama list`
 - `docker exec -it ollama ollama pull deepseek-r1:1.5b`
 
-# Komodo
+## Komodo
 
 Username: admin
 Password: changeme
@@ -274,7 +274,7 @@ Password: changeme
 
 [Backup and Restore | Komodo](https://komo.do/docs/setup/backup)
 
-# Karakeep
+## Karakeep
 
 All of Hoarder's data are in the DATA_DIR. If you can periodically snapshot that folder, that would take a full backup of hoarder. You don't need to backup meillisearch as the data there can be reconstructed.
 
@@ -282,7 +282,7 @@ All of Hoarder's data are in the DATA_DIR. If you can periodically snapshot that
 
 - If admin forgets password: https://docs.karakeep.app/FAQ/#if-you-are-an-administrator
 
-# C Advisor
+## C Advisor
 
 [Failure to get data in Prometheus on latest Docker · Issue #3749 · google/cadvisor](https://github.com/google/cadvisor/issues/3749)
 
@@ -310,23 +310,6 @@ As a workaround, I had to turn off containerd-snapshotter and then restart docke
 _Note:_ if all containers are running but homepage.homelab is not working, run `sudo dscacheutil -flushcache; sudo killall -HUP mDNSResponder` and then try again
 
 _NOTE_: If running on Mac OS, make sure `Use kernel networking for UDP` is NOT selected in Docker Desktop _settings > Resources > Network_
-
-# Deploying on Proxmox
-
-- pveversion --verbose
-
-1. apt install vim
-
-- Since we don't have an enterprise subscription, we have to change the APT repositories, or apt update will fail with `The repository 'https://enterprise.proxmox.com/debian/pve bookworm InRelease' is not signed` [Read Here](https://pve.proxmox.com/pve-docs/pve-admin-guide.html#sysadmin_enterprise_repo)
-  1. Comment out the pve-enterprise line at `vi /etc/apt/sources.list.d/pve-enterprise.list`
-  2. 
-
-1. Create Ubuntu VM
-2. Install Docker
-3. Set pihole records to IP of proxmox
-4. Set devices to use pihole as DNS
-5. Create LXC for tailscale
-
 
 
 # TODO
@@ -617,7 +600,7 @@ Backup N8N Volume: `ssh logan@10.0.0.33 'docker run --rm -v n8n_storage:/volume 
 
 - Use `docker stats` command to see container usage
 
-
+pveversion --verbose
 
 
 ## TailScale
