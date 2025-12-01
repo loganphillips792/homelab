@@ -144,3 +144,7 @@ http://immich.homelab {
 http://jotty.homelab {
   reverse_proxy jotty:3000
 }
+
+http://cta-map.homelab {
+  reverse_proxy cta-map:8080
+}

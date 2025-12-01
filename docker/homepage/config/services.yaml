@@ -143,6 +143,10 @@
 
 # Apps
 - Apps:
+    - CTA Map:
+        icon: mdi-subway-variant
+        href: http://cta-map.homelab
+        description: Chicago Transit Authority map
     - Backrest:
         icon: database
         href: http://backrest.homelab
