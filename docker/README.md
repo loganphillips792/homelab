@@ -695,3 +695,10 @@ Create VM with ISO image
 
   # Setting up Tailscale
 
+
+
+# Tailscale on Proxmox host
+
+[How to install Tailscale on Proxmox, not a CT or VM : r/Proxmox](https://www.reddit.com/r/Proxmox/comments/17rpsgz/how_to_install_tailscale_on_proxmox_not_a_ct_or_vm/)
+
+so we can access proxmox from outside of network
