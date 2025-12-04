@@ -692,11 +692,6 @@ Create VM with ISO image
   Username - root
   Password - password
 
-
-  # Setting up Tailscale
-
-
-
 # Tailscale on Proxmox host
 
 [How to install Tailscale on Proxmox, not a CT or VM : r/Proxmox](https://www.reddit.com/r/Proxmox/comments/17rpsgz/how_to_install_tailscale_on_proxmox_not_a_ct_or_vm/)
