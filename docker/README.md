@@ -185,9 +185,10 @@ ssh logan@10.0.0.33 '
 ## Tailscale
 
 1. Create account at https://login.tailscale.com/admin
-2. Generate auth key and add to env variable
+2. Generate auth key and add to env variable in `docker-compose.yml`
 3. `docker compose up --build tailscale`
 4. Go to `https://login.tailscale.com/admin/machines` and you should see the machine
+5. Download Tailscale onto machines and log in to add them to tail net
 
 
 To ssh into VM:
