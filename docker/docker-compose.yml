@@ -891,10 +891,6 @@ services:
 
   cta-map:
     image: dockedupstream/cta-map:latest
-    build:
-      args:
-        - VITE_JAWG_ACCESS_TOKEN=${VITE_JAWG_ACCESS_TOKEN}
-        - VITE_API_BASE_URL=${VITE_API_BASE_URL}
     container_name: cta-map
     restart: unless-stopped
     env_file:
