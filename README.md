@@ -260,6 +260,8 @@ Go to set up page: `http://localhost:8096/web/index.html#!/wizardstart.html`
             - OPen -> Add PC -> Tailscale IP of VM
 - Fix komodo errors
 - Add https://codewithcj.github.io/SparkyFitness/install/docker-compose to docker compose
+- Add mini io [MinIO is in "maintenance mode" and is no longer accepting new changes or reviewing issues : r/selfhosted](https://www.reddit.com/r/selfhosted/comments/1pd97nq/minio_is_in_maintenance_mode_and_is_no_longer/)
+- Add minIO alternative to docker compose: 
 
 # Trouble Shooting
 
