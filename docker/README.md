@@ -693,6 +693,30 @@ Create VM with ISO image
   Username - root
   Password - password
 
+  - Datastore > Add Datastore
+     - Name: backup
+     - Datastore Type: local
+     - Backing Path: /backups
+     - GC Schedule: Daily
+     - Prune Schedule: daily
+
+- To run backup job
+  - Copy Fingerprint from PBS
+  - Go to Proxmox admin
+    - Datacenter > Storage > Add Storage > Proxmox Backup Server
+      - ID: Backup-storage
+      - Server: 10.0.0.43 (IP of PBS)
+      - Username: root@pam
+      - Password: password
+      - Datastore: backup (name of the datastore you created on PBS)
+      - Fingerprint: paste the fingerprint from PBS
+      - Mark as enabled
+      - Save
+  - Go to PVE that you want to backup
+  - Backup > Backup now
+    - Storage: backup-storage
+  - `ssh root@10.0.0.43 "ls /backups/vm/"`
+
 # Tailscale on Proxmox host
 
 [How to install Tailscale on Proxmox, not a CT or VM : r/Proxmox](https://www.reddit.com/r/Proxmox/comments/17rpsgz/how_to_install_tailscale_on_proxmox_not_a_ct_or_vm/)
