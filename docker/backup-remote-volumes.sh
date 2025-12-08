@@ -9,7 +9,7 @@ ssh "$REMOTE_HOST" bash -s <<'EOF'
 set -euo pipefail
 
 HOMELAB_DIR="/home/logan/homelab"
-BACKUP_DIR="/opt/docker-backups"
+BACKUP_DIR="/home/logan/docker-backups"
 
 echo "Changing to $HOMELAB_DIR..."
 cd "$HOMELAB_DIR"
@@ -54,4 +54,3 @@ ssh "$REMOTE_HOST" "tar czf - -C \"$REMOTE_BACKUP_DIR\" ." > "$ARCHIVE_NAME"
 echo "Archive saved locally as: $ARCHIVE_NAME"
 LOCAL_SIZE=$(du -sh "$ARCHIVE_NAME" | awk '{print $1}')
 echo "Local archive size: $LOCAL_SIZE"
-

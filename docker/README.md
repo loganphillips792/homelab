@@ -648,29 +648,10 @@ pveversion --verbose
 
 # Backup strategy
 
-
-1. docker compose down first to make sure no data corruption happens
-
-script:
-
-bind mounts (if not committed with the repo) are always located at:
-
-to backup docker volumes:
-
-create a script on host machine
-
-on VM, create a directory /opt/docker-backups
+- Backup: ``
+- Restore: `./restore-docker-backup.sh`
 
 
-To restore:
-
-1. restoure volumes:
-
-2. restore bind mount paths
-
-
-
-cron job to do above ?
 
 
 
