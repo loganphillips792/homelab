@@ -11,7 +11,7 @@ services:
       - TS_USERSPACE=false
       - TS_EXTRA_ARGS=--advertise-routes=10.0.0.0/24 --accept-routes
     volumes:
-      - ./tailscale/state:/var/lib/tailscale
+      - ~/docker-volumes/tailscale/state:/var/lib/tailscale
     devices:
       - /dev/net/tun:/dev/net/tun
     cap_add:
@@ -879,7 +879,7 @@ services:
       - TMPDIR=/tmp
       - TZ=${TZ}
     volumes:
-      - ./backrest/data:/data
+      - ~/docker-volumes/backrest/data:/data
       - ./backrest/config:/config
       - ./backrest/cache:/cache
       - ./backrest/tmp:/tmp
