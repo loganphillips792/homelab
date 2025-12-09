@@ -668,7 +668,7 @@ pveversion --verbose
 
 # Backup strategy
 
-- Backup: `./docker/backup-remote-volumes.sh `
+- Backup: `./docker/backup-remote-volumes.sh`
 - Restore: `./restore-docker-backup.sh <tar-file-name>`
 
 

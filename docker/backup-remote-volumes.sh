@@ -2,7 +2,7 @@
 set -euo pipefail
 
 REMOTE_HOST="logan@10.0.0.33"
-REMOTE_BACKUP_DIR="/opt/docker-backups"
+REMOTE_BACKUP_DIR="/home/logan/docker-backups"
 
 # 1) Stop containers, back up volumes, then start containers again on the remote host
 ssh "$REMOTE_HOST" bash -s <<'EOF'
