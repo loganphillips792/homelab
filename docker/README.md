@@ -196,6 +196,9 @@ To ssh into VM:
 1. Connect machine to the tailnet
 2. `ssh ssh logan@<ip_of_vm>`
 
+### Flow
+
+
 
 
 ## Test Postgres
