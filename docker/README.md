@@ -198,7 +198,24 @@ To ssh into VM:
 
 ### Flow
 
+- Pre reqs
+  - Remote device is logged into Tailscale
+  - Remote device uses pi-hole as its DNS server (either via Tailscale's MagicDNS settings or manually configured)
+  - Accept routes must be enabled on your remote device to use the advertised 10.0.0.0/24 subnet
 
+
+1. Request http://grafana.homelab outside of home network
+2. Tailscale VPN: Encrypted tunnel to the home network. Your device gets access to 10.0.0.0/24
+3. Tailscale Container: Acts as subnet router via --advertise-routes=10.0.0.0/24 . Traffic enters your home LAN   
+4. Pi-Hole DNS: Resolves grafana.homelab → 10.0.0.227 (Your home server's IP)
+5. Caddy (Reverse Proxy): Listening on 10.0.0.227:80 Matches Host header "grafana.homelab" Routes to `grafana:3000` on `main-network`
+
+
+- Subnet router that advertises 10.0.0.0/24 to your Tailscale network, allowing remote devices to reach your
+  home LAN
+- Pihole - DNS server that resolves *.homelab domains to 10.0.0.227 (your Docker host)
+- Caddy - Reverse proxy listening on ports 80/443, routes requests based on hostname to the appropriate container
+- `main-network` connects most services; Caddy bridges default, main-network, and kafka-network
 
 
 ## Test Postgres
@@ -651,8 +668,8 @@ pveversion --verbose
 
 # Backup strategy
 
-- Backup: ``
-- Restore: `./restore-docker-backup.sh`
+- Backup: `./docker/backup-remote-volumes.sh `
+- Restore: `./restore-docker-backup.sh <tar-file-name>`
 
 
 
