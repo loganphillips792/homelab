@@ -16,6 +16,8 @@ docker compose -f docker/docker-compose.yml up -d && docker compose --env-file "
 
 `docker compose -f docker/docker-compose.yml up -d`
 
+restart specific service: `docker compose -f docker/docker-compose.yml restart live-auction`
+
 ```
 docker compose -f docker/docker-compose.yml up -d caddy pihole homepage uptime-kuma \
   && docker compose -f docker/immich/docker-compose.yml \
