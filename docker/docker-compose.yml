@@ -833,7 +833,7 @@ services:
 
 # https://github.com/loganphillips792/live-auction
   live-auction:
-    image: dockedupstream/live-auction:main
+    image: dockedupstream/live-auction:latest
     # ports: # don't need ports because caddy proxies to the container ports for us
     #   - "80:80"
     env_file:
