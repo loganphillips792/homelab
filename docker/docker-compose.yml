@@ -835,14 +835,16 @@ services:
   live-auction:
     image: dockedupstream/live-auction:main
     # ports: # don't need ports because caddy proxies to the container ports for us
-    #   - "8000:8000"
+    #   - "80:80"
     env_file:
       - live-auction/.env
     environment:
       - OTEL_SERVICE_NAME=live-auction-backend
       - OTEL_EXPORTER_OTLP_ENDPOINT=tempo:4317 # Removed http://
+      - ENABLE_PROMETHEUS=true
     volumes:
-      - ./live-auction/db:/app/db
+      - ./live-auction/db:/app/backend/db
+      - ./live-auction/logs:/app/backend/logs
     networks:
       - main-network
     # depends_on: # Ensure backend starts after tempo is available

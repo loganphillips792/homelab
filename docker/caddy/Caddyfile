@@ -75,7 +75,7 @@ http://redisinsight.homelab {
 }
 
 http://live-auction.homelab {
-  reverse_proxy live-auction:8000
+  reverse_proxy live-auction:80
 }
 
 http://prometheus.homelab {
