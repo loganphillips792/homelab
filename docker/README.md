@@ -668,6 +668,7 @@ To access services outside of home network, we will use tailscale
 
 pveversion --verbose
 
+`docker system df -v | grep -i "loki"`
 
 # Backup strategy
 
@@ -726,3 +727,11 @@ Create VM with ISO image
 [How to install Tailscale on Proxmox, not a CT or VM : r/Proxmox](https://www.reddit.com/r/Proxmox/comments/17rpsgz/how_to_install_tailscale_on_proxmox_not_a_ct_or_vm/)
 
 so we can access proxmox from outside of network
+
+## Grafana Queries
+
+# Loki Queries
+
+- `{container=~".*app.*"} | json | user_email!=""`
+- `{container=~".*app.*"} | json | user_email="adminuser@example.com"`
+- `{container=~".*app.*"} | json | message="create_item_request"`
