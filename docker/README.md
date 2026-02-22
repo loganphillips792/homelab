@@ -1,35 +1,340 @@
+# Setting Up VM and Docker
 
-To run all services:
+1. Download ISO image (Proxmox ISO installer): https://www.proxmox.com/en/proxmox-virtual-environment/get-started and use Balena Etcher to flash ISO image to USB Drive
+2. Boot from USB
+    1. Plug in External Display and Keyboard into mini PC
+    1. Turn off mini PC
+    2. Insert USB
+    3. Turn on mini PC
+    4. Press F7 to get into BIOS
+    5. Select USB Drive as the boot device
+3. Install Process
+    1. Install Proxmox VE (Graphical)
+    2. Accept User License Agreement
+    3. Location and Timezone selection
+        1. Country: United States
+        2. Time zone: America/Chicago
+        3. Keyboard Layout: U.S. English
+    4. Administration Password and Email Selection
+        1. Set Password
+        2. Set Email
+    5. Management Network Configuration (Leave all defaults)
+        - Management Interface: enp1s0 - (this is the ethernet connection)
+        - Hostname (FQDN) - pve.hsd1.il.comcast.net
+        - IP Address (CIDR) - 10.0.0.98 / 24
+        - Gateway - 10.0.0.1
+        - DNS Server - 75.75.75.75
+4.  Update repos to not use enterprise (https://pve.proxmox.com/wiki/Package_Repositories)
+    1. apt install vim
+    2. Comment out each line in `/etc/apt/sources.list.d/pve-enterprise.sources`
+    3. Create and Update '/etc/apt/sources.list.d/proxmox.sources'
+
+    ```
+    Types: deb
+    URIs: http://download.proxmox.com/debian/pve
+    Suites: trixie
+    Components: pve-no-subscription
+    Signed-By: /usr/share/keyrings/proxmox-archive-keyring.gpg
+    ```
+    
+    4. Edit `/etc/apt/sources.list.d/ceph.sources`
+    
+    ```
+    Types: deb
+    URIs: http://download.proxmox.com/debian/ceph-squid
+    Suites: trixie
+    Components: no-subscription
+    Signed-By: /usr/share/keyrings/proxmox-archive-keyring.gpg
+    ```
+    5. apt update
+    6. apt upgrade
+5. Go to https://10.0.0.98:8006 on another computer (connected to same wifi network)
+6. Setup Ubuntu VM for Docker
+    1. Download Ubuntu Desktop ISO
+    2. Datacenter > pve > local (pve) > ISO Images > Upload Ubuntu ISO file
+    3. Create VM
+        - General
+            - Node: PVE
+            - VM ID: 100
+            - Name: UbuntuServerForDockerServices
+        - OS
+            - Storage: Local
+            - ISO image: Ubuntu-22.04-4.desktop
+            - Guest OS:
+                - Type: Linux
+                - Version: 6.x - 2.6 Kernel
+        - System
+            - Leave all defaults
+        - Disks
+            - Disk
+                - Storage: local-lvm
+                - Disk size (GiB): 64
+        - CPU (https://10.0.0.98:8006/pve-docs/chapter-qm.html#qm_cpu)
+            - Sockets - 1
+            - Cores - 4
+        - Memory (https://10.0.0.98:8006/pve-docs/chapter-qm.html#qm_memory)
+            - Memory (MiB) - 8192
+            - Minimum Memory (MiB) - 8192
+            - Ballooning Device - Enabled
+       -  Network (https://10.0.0.98:8006/pve-docs/chapter-qm.html#qm_network_device)
+            - Default 
+7. Start VM and Install Packages
+    1. Go through GUI Install Wizard
+    2. Open terminal and run `sudo apt update && sudo apt upgrade`
+    3. `sudo apt install net-tools`
+    4. `sudo apt install htop`
+8. Setup SSH server
+    1. Set IP address for VM
+        1. Make sure qemu-guest-agent  is installed: `apt install qemu-guest-agent`
+        2. Enable guest agent in VM options: pve > UbuntuServerForDockerServices > Options > Enable QEMU Guest Agent
+        3. Restart the VM
+        4. `systemctl status qemu-guest-agent`
+        5. `systemctl start qemu-guest-agent` if its not running
+        6. Get IP Address from `pve > UbuntuServerForDockerServices > Summary`
+    2. `sudo apt update`
+    3. `sudo apt install openssh-server`
+    4. `sudo systemctl status ssh`
+9. SSH into server: `ssh logan@10.0.0.32`
+10. Setup Docker
+    1. [Set Up Docker's apt repository](https://docs.docker.com/engine/install/ubuntu/#install-using-the-repository)
+    2.
+    ```
+    sudo apt-get update && \
+    sudo apt-get install -y ca-certificates curl && \
+    sudo install -m 0755 -d /etc/apt/keyrings && \
+    sudo curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc && \
+    sudo chmod a+r /etc/apt/keyrings/docker.asc && \
+    echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] \
+    https://download.docker.com/linux/ubuntu \
+    $(. /etc/os-release && echo "${UBUNTU_CODENAME:-$VERSION_CODENAME}") stable" | \
+    sudo tee /etc/apt/sources.list.d/docker.list > /dev/null && \
+    sudo apt-get update
+    ```
+    3. Install the Docker packages: `sudo apt-get install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin`
+    4. Verify that Docker is running: `sudo systemctl status docker`. If it is not running, you might have to start it manually: `sudo systemctl start docker`
+    5. Run `docker ps`
+        - If you get error 'permission denied while trying to connect to the docker API at unix:///var/run/docker.sock, it is because the current user can’t access the docker engine, because the user doesn't have enough permissions to access the UNIX socket to communicate with the engine
+            - You can use `sudo docker ps` but a better solution is here: https://docs.docker.com/engine/install/linux-postinstall/#manage-docker-as-a-non-root-user
+                1. `sudo groupadd docker`
+                2. `sudo usermod -aG docker $USER`
+                3. Log out and log back in so that your group membership is re-evaluated
+    8. Setup homelab repo
+        1. `cd ~`
+        2. Create Docker Volumes directory: `mkdir ~/docker-volumes`
+        3. `cd homelab`
+        4. `git clone https://github.com/loganphillips792/homelab.git`
+        5. Update the IP Addresses in the PiHole DNS config to the IP Address of the Ubuntu VM: `sed -i 's/10\.0\.0\.227/10.0.0.33/g' docker/pihole/etc-dnsmasq.d/10-homelab.conf`
+            - If these records are updated after the docker containers are already running, run `docker compose restart pihole` to restart pihole and apply the DNS changes
+        6. Add .env file for live-auction (optional)
+    7. Set up DNS (free port 53)
+       
+       `sudo vim /etc/netplan/01-network-manager-all.yaml`
+       
+       ```
+        # Let NetworkManager manage all devices on this system
+        network:
+        version: 2
+        ethernets:
+            ens18:
+            dhcp4: yes
+            nameservers:
+                addresses: [1.1.1.1, 9.9.9.9]
+       ```
+    8. `sudo netplan apply`
+
+Now make sure /etc/resolv.conf uses what systemd-resolved generates:
+    1. `sudo ln -sf /run/systemd/resolve/resolv.conf /etc/resolv.conf`
+    2. `sudo systemctl restart systemd-resolved`
+
+Check that the file has real DNS servers, not 127.0.0.53 or ::1: cat /etc/resolv.conf
+
+Now we tell systemd-resolved to stop listening on 127.0.0.53/[::1], but it will still use the upstream DNS servers from netplan: `sudo sed -i 's/^#\?DNSStubListener=.*/DNSStubListener=no/' /etc/systemd/resolved.conf`
+
+Restart: `sudo systemctl restart systemd-resolved`
+
+Confirm port 53 is now free: `sudo ss -lunpt | grep :53 || echo "Port 53 is free ✅"`
+
+9. Bring up Docker containers
+    1. docker login -u dockedupstream
+    2. `docker compose -f docker/docker-compose.yml up -d && docker compose --env-file "$PWD/docker/immich/docker-compose.env" -f "$PWD/docker/immich/docker-compose.yml" up -d && docker compose --env-file docker/.env -f docker/tubearchivist/docker-compose.yml up -d`
+
+10. `sudo ss -lunpt | grep :53` If you see docker-proxy, that means that PiHole has binded to port 53
+
+11. To test that the Docker containers are properly running, go to `http://10.0.0.33:8082`
+
+
+12. Switch the host to use Pi-Hole
+    1. Once Pi-Hole is up and stable, you can make the Ubuntu host itself use Pi-hole as DNS instead of public resolvers
+        `sudo vim /etc/netplan/01-network-manager-all.yaml`
+
+    ```
+    # Let NetworkManager manage all devices on this system
+    network:
+    version: 2
+    ethernets:
+        ens18:
+        dhcp4: yes
+        nameservers:
+            addresses: [10.0.0.33]
+    ```
+    2. `sudo netplan apply`
+    3. `sudo systemctl restart systemd-resolved`
+    4. `cat /etc/resolv.conf`
+
+12. Test DNS
+    1. `dig example.com`
+    2. `dig homepage.homelab`
+    3. `dig homepage.homelab @10.0.0.33`
+
+
+13. Update MacOS wifi to use Proxmox VM PIhole container as DNS. Set the DNS Server to be the IP of the Ubuntu VM. The request will automatically be sent to port 53
+
+
+- If you need to increase disk space
+    - Increase size of disk of VM through proxmox
+    - df -h
+    - lsblk
+    - sudo su
+    - parted
+    - print
+    - resizepart 3 100%
+    - print
+    - resize2fs /dev/sda3
+    - Exit
+    - apt install lvm2
+    - If you get not enough storage error, you have to clear space
+    - See what is taking up so much space 
+        - du -sh /var/* | sort -h 
+        - We see that docker takes up most of the space in /var/
+        - `docker images --format "{{.Repository}}:{{.Tag}} {{.Size}}" | sort -h -r`
+        - `sudo ctr -n moby images prune --all`
+    - sudo rm -rf /var/cache/apt/archives/*.deb
+    - sudo journalctl --vacuum-size=50M
+    - apt install lvm2
+    - resize2fs /dev/sda3
+- If at anytime there is a permission denied error during git pull process: `sudo chown -R logan:logan .` and then run `git pull` again
+
+## TailScale
+
+To access services outside of home network, we will use tailscale
+
+
+1. Create tag (Access controls)
+
 ```
-docker compose -f docker/docker-compose.yml up -d && docker compose --env-file "$PWD/docker/immich/docker-compose.env" -f "$PWD/docker/immich/docker-compose.yml" up -d
+"tagOwners": {
+		"tag:container": ["autogroup:admin"],
+	},
 ```
 
-`cd docker`
-`docker compose up --build` or `docker compose up -d --build`
-`docker compose -f docker/docker-compose.yml up -d --force-recreate pihole`
-`docker compose up --build jellyfin`
-`docker compose up -d --build caddy pihole`
+2. Enable Routes (Machines tab)
+    1. Click `tailscale` machine
+    2. Edit route settings
+    3. Approve 10.0.0.0/24 route
 
-- if you only want to start specific containers: `docker compose up -d homepage uptime-kuma pihole caddy`
-- Then `docker logs` will only show the logs from the started containers
+3. Tailscale Admin Console > Settings > Keys
+4. Generate Auth Key
+    - Description: homelab-docker
+    - Reusable: Yes
+    - Expiration: 90 days
+    - Ephemeral: No
+    - Tags: `tag:container`
+5. Update `docker-compose.yml` with auth key
+6. `docker compose up -d tailscale`
+7. Configure "Split DNS"
+  1. DNS Tab
+  2. Scroll down to Nameservers and click `Add nameserver` > `Custom`
+  3. Enter the IP address of your VM: 10.0.0.33
+  4. Check the box `Restrict to domain`
+  5. Enter domain `homelab`
+  6. Click save
+8. Open Tailscale App on phone
+9. Sign into Tailscale account (Same account where you generated the auth key)
+10. Ensure it is set to `Active`
+11. Type `http://homepage.homelab`
+
+## Useful Commands
 
 
-`docker compose -f docker/docker-compose.yml up -d`
+- After making DNS changes to the pihole DNS file: `docker compose -f docker/docker-compose.yml restart pihole caddy`
 
-restart specific service: `docker compose -f docker/docker-compose.yml restart live-auction`
+- After making changes to prometheus: `docker compose -f docker/docker-compose.yml restart prometheus`
 
-`docker compose -f docker/docker-compose.yml restart caddy`
+- docker compose -f docker/docker-compose.yml up caddy pihole cronmaster -d 
+
+- `docker compose -f docker/docker-compose.yml up -d cadvisor pihole caddy prometheus loki alloy grafana homepage`
+
+- Use `docker stats` command to see container usage
+
+pveversion --verbose
+
+`docker system df -v | grep -i "loki"`
+
+# Backup strategy
+
+- Backup: `./docker/backup-remote-volumes.sh`
+- Restore: `./restore-docker-backup.sh <tar-file-name>`
+
+
+Download Proxmox Backup Server: https://www.proxmox.com/en/downloads/proxmox-backup-server/iso
+
+Datacenter > pve > local (pve) > ISO Images > Upload ISO file
+
+Create VM with ISO image
+
+- go through graphical install process
+  - management interface - ens18
+  - Hostname (FQDN) - pbs.hsd1.il.comcast.net
+  - IP Address (CIDR) -  10.0.0.43 / 24
+  - Gateway - 10.0.0.1
+  - DNS Server - 75.75.75.75
+
+  Access the UI at https://10.0.0.43:8007/
+
+  Username - root
+  Password - password
+
+  - Datastore > Add Datastore
+     - Name: backup
+     - Datastore Type: local
+     - Backing Path: /backups
+     - GC Schedule: Daily
+     - Prune Schedule: daily
+
+- To run backup job
+  - Copy Fingerprint from PBS
+  - Go to Proxmox admin
+    - Datacenter > Storage > Add Storage > Proxmox Backup Server
+      - ID: Backup-storage
+      - Server: 10.0.0.43 (IP of PBS)
+      - Username: root@pam
+      - Password: password
+      - Datastore: backup (name of the datastore you created on PBS)
+      - Fingerprint: paste the fingerprint from PBS
+      - Mark as enabled
+      - Save
+  - Go to PVE that you want to backup
+  - Backup > Backup now
+    - Storage: backup-storage
+  - `ssh root@10.0.0.43 "ls /backups/vm/"`
+
+# Commands
+
+- To pull all new versions of images and run all services:
 ```
-docker compose -f docker/docker-compose.yml up -d caddy pihole homepage uptime-kuma \
-  && docker compose -f docker/immich/docker-compose.yml \
-    --project-directory docker/immich \
-    --env-file docker/immich/docker-compose.env \
-    up -d
+docker compose -f docker/docker-compose.yml up -d --pull always && \
+docker compose --env-file "docker/immich/docker-compose.env" -f "docker/immich/docker-compose.yml" up -d --pull always
 ```
 
-- Updating containers:
-  - `docker compose -f docker/docker-compose.yml pull && docker compose -f docker/docker-compose.yml up -d` it will down only the affected services and bring up new containers of those affected services.
-  - After testing to make sure everything is good, run `docker system prune`
+- `docker compose -f docker/docker-compose.yml up -d --build caddy pihole`
+
+- `docker compose -f docker/docker-compose.yml restart caddy` - restart specific service
+
+
+
+
+Backup N8N Database: `ssh logan@10.0.0.33 'cd ~/homelab/docker && docker compose exec -T postgres pg_dump -U changeUser n8n' > n8n-postgres-backup_$(date +%F).sql`
+Backup N8N Volume: `ssh logan@10.0.0.33 'docker run --rm -v n8n_storage:/volume alpine sh -c "cd /volume && tar -czf - ."' > n8n-storage-backup.tar.gz`
 
 # Services
 
@@ -225,10 +530,9 @@ To ssh into VM:
 
 
 
-if you have to rerun the SQL script: `docker compose -f docker/docker-compose.yml exec -T test-db psql -U testuser -d test_database -f docker-entrypoint-initdb.d/10-test-table.sql`
+- `docker compose -f docker/docker-compose.yml exec -T test-db psql -U testuser -d test_database -f docker-entrypoint-initdb.d/10-test-table.sql` - if you have to rerun the SQL script
 
-
-`docker exec -it postgres_db psql -U testuser -d test_database -c 'SELECT * FROM "test-table";'`
+- `docker exec -it postgres_db psql -U testuser -d test_database -c 'SELECT * FROM "test-table";'`
 
 ## Live-Auction
 
@@ -257,7 +561,6 @@ curl --request GET \
 4. `GET foo`
 5. `KEYS *`
 6. `DEL foo`
-
 
 OR
 
@@ -387,348 +690,9 @@ https://github.com/crowdsecurity/crowdsec
 - rename `docker-volumes` directory as `docker-bind-mounts`
 - Update homepage https://www.reddit.com/r/selfhosted/comments/1p1469e/my_homepage_dashboard_v3/
 
-# Setting Up VM and Docker
 
 
-1. Download ISO image (Proxmox ISO installer): https://www.proxmox.com/en/proxmox-virtual-environment/get-started and use Balena Etcher to flash ISO image to USB Drive
-2. Boot from USB
-    1. Plug in External Display and Keyboard into mini PC
-    1. Turn off mini PC
-    2. Insert USB
-    3. Turn on mini PC
-    4. Press F7 to get into BIOS
-    5. Select USB Drive as the boot device
-3. Install Process
-    1. Install Proxmox VE (Graphical)
-    2. Accept User License Agreement
-    3. Location and Timezone selection
-        1. Country: United States
-        2. Time zone: America/Chicago
-        3. Keyboard Layout: U.S. English
-    4. Administration Password and Email Selection
-        1. Set Password
-        2. Set Email
-    5. Management Network Configuration (Leave all defaults)
-        - Management Interface: enp1s0 - (this is the ethernet connection)
-        - Hostname (FQDN) - pve.hsd1.il.comcast.net
-        - IP Address (CIDR) - 10.0.0.98 / 24
-        - Gateway - 10.0.0.1
-        - DNS Server - 75.75.75.75
-4.  Update repos to not use enterprise (https://pve.proxmox.com/wiki/Package_Repositories)
-    1. apt install vim
-    2. Comment out each line in `/etc/apt/sources.list.d/pve-enterprise.sources`
-    3. Create and Update '/etc/apt/sources.list.d/proxmox.sources'
-
-    ```
-    Types: deb
-    URIs: http://download.proxmox.com/debian/pve
-    Suites: trixie
-    Components: pve-no-subscription
-    Signed-By: /usr/share/keyrings/proxmox-archive-keyring.gpg
-    ```
-    
-    4. Edit `/etc/apt/sources.list.d/ceph.sources`
-    
-    ```
-    Types: deb
-    URIs: http://download.proxmox.com/debian/ceph-squid
-    Suites: trixie
-    Components: no-subscription
-    Signed-By: /usr/share/keyrings/proxmox-archive-keyring.gpg
-    ```
-    5. apt update
-    6. apt upgrade
-5. Go to https://10.0.0.98:8006 on another computer (connected to same wifi network)
-6. Setup Ubuntu VM for Docker
-    1. Download Ubuntu Desktop ISO
-    2. Datacenter > pve > local (pve) > ISO Images > Upload Ubuntu ISO file
-    3. Create VM
-        - General
-            - Node: PVE
-            - VM ID: 100
-            - Name: UbuntuServerForDockerServices
-        - OS
-            - Storage: Local
-            - ISO image: Ubuntu-22.04-4.desktop
-            - Guest OS:
-                - Type: Linux
-                - Version: 6.x - 2.6 Kernel
-        - System
-            - Leave all defaults
-        - Disks
-            - Disk
-                - Storage: local-lvm
-                - Disk size (GiB): 64
-        - CPU (https://10.0.0.98:8006/pve-docs/chapter-qm.html#qm_cpu)
-            - Sockets - 1
-            - Cores - 4
-        - Memory (https://10.0.0.98:8006/pve-docs/chapter-qm.html#qm_memory)
-            - Memory (MiB) - 8192
-            - Minimum Memory (MiB) - 8192
-            - Ballooning Device - Enabled
-       -  Network (https://10.0.0.98:8006/pve-docs/chapter-qm.html#qm_network_device)
-            - Default 
-7. Start VM and Install Packages
-    1. Go through GUI Install Wizard
-    2. Open terminal and run `sudo apt update && sudo apt upgrade`
-    3. `sudo apt install net-tools`
-    4. `sudo apt install htop`
-8. Setup SSH server
-    1. Set IP address for VM
-        1. Make sure qemu-guest-agent  is installed: `apt install qemu-guest-agent`
-        2. Enable guest agent in VM options: pve > UbuntuServerForDockerServices > Options > Enable QEMU Guest Agent
-        3. Restart the VM
-        4. systemctl status qemu-guest-agent
-        5. systemctl start qemu-guest-agent if its not running
-        6. Get IP Address from pve > UbuntuServerForDockerServices > Summary
-    2. sudo apt update
-    3. sudo apt install openssh-server
-    4. sudo systemctl status ssh
-9. SSH into server: logan@10.0.0.32
-10. Setup Docker
-    1. [Set Up Docker's apt repository](https://docs.docker.com/engine/install/ubuntu/#install-using-the-repository)
-    2.
-    ```
-    sudo apt-get update && \
-    sudo apt-get install -y ca-certificates curl && \
-    sudo install -m 0755 -d /etc/apt/keyrings && \
-    sudo curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc && \
-    sudo chmod a+r /etc/apt/keyrings/docker.asc && \
-    echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] \
-    https://download.docker.com/linux/ubuntu \
-    $(. /etc/os-release && echo "${UBUNTU_CODENAME:-$VERSION_CODENAME}") stable" | \
-    sudo tee /etc/apt/sources.list.d/docker.list > /dev/null && \
-    sudo apt-get update
-    ```
-
-    
-    4. Install the Docker packages: `sudo apt-get install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin`
-    5. Verify that Docker is running: `sudo systemctl status docker`. If it is not running, you might have to start it manually: `sudo systemctl start docker`
-    6. Run `docker ps`
-        - If you get error 'permission denied while trying to connect to the docker API at unix:///var/run/docker.sock, it is because the current user can’t access the docker engine, because the user doesn't have enough permissions to access the UNIX socket to communicate with the engine
-            - You can use `sudo docker ps` but a better solution is here: https://docs.docker.com/engine/install/linux-postinstall/#manage-docker-as-a-non-root-user
-                1. sudo groupadd docker
-                2. sudo usermod -aG docker $USER
-                3. Log out and log back in so that your group membership is re-evaluated
-    8. Setup homelab repo
-        1. `cd ~`
-        2. Create Docker Volumes directory: `mkdir ~/docker-volumes`
-        3. `cd homelab`
-        4. `git clone https://github.com/loganphillips792/homelab.git`
-        5. Update the IP Addresses in the PiHole DNS config to the IP Address of the Ubuntu VM: `sed -i 's/10\.0\.0\.227/10.0.0.33/g' docker/pihole/etc-dnsmasq.d/10-homelab.conf`
-            - If these records are updated after the docker containers are already running, run `docker compose restart pihole` to restart pihole and apply the DNS changes
-        6. Add .env file for live-auction (optional)
-    7. Set up DNS (free port 53)
-       
-       `sudo vim /etc/netplan/01-network-manager-all.yaml`
-       
-       ```
-        # Let NetworkManager manage all devices on this system
-        network:
-        version: 2
-        ethernets:
-            ens18:
-            dhcp4: yes
-            nameservers:
-                addresses: [1.1.1.1, 9.9.9.9]
-       ```
-
-`sudo netplan apply`
-
-Now make sure /etc/resolv.conf uses what systemd-resolved generates:
-    1. sudo ln -sf /run/systemd/resolve/resolv.conf /etc/resolv.conf
-    2. sudo systemctl restart systemd-resolved
-
-Check that the file has real DNS servers, not 127.0.0.53 or ::1: cat /etc/resolv.conf
-
-Nowe we tell systemd-resolved to stop listening on 127.0.0.53/[::1], but it will still use the upstream DNS servers from netplan: `sudo sed -i 's/^#\?DNSStubListener=.*/DNSStubListener=no/' /etc/systemd/resolved.conf`
-
-Restart: `sudo systemctl restart systemd-resolved`
-
-Confirm port 53 is now free: `sudo ss -lunpt | grep :53 || echo "Port 53 is free ✅"`
-
-
-
-8. Bring up Docker containers
-    1. docker login -u dockedupstream
-    2. `docker compose -f docker/docker-compose.yml up -d && docker compose --env-file "$PWD/docker/immich/docker-compose.env" -f "$PWD/docker/immich/docker-compose.yml" up -d && docker compose --env-file docker/.env -f docker/tubearchivist/docker-compose.yml up -d`
-
-9. `sudo ss -lunpt | grep :53` If you see docker-proxy, that means that PiHole has binded to port 53
-
-10. To test that the Docker containers are properly running, go to `http://10.0.0.33:8082`
-
-
-11. Switch the host to use Pi-Hole
-    1. Once Pi-Hole is up and stable, you can make the Ubuntu host itself use Pi-hole as DNS instead of public resolvers
-        `sudo vim /etc/netplan/01-network-manager-all.yaml`
-
-    ```
-    # Let NetworkManager manage all devices on this system
-    network:
-    version: 2
-    ethernets:
-        ens18:
-        dhcp4: yes
-        nameservers:
-            addresses: [10.0.0.33]
-    ```
-    2. `sudo netplan apply`
-    3. `sudo systemctl restart systemd-resolved`
-    4. `cat /etc/resolv.conf`
-
-12. Test DNS
-    1. `dig example.com`
-    2. `dig homepage.homelab`
-    3. `dig homepage.homelab @10.0.0.33`
-
-
-13. Update MacOS wifi to use Proxmox VM PIhole container as DNS. Set the DNS Server to be the IP of the Ubuntu VM. The request will automatically be sent to port 53
-
-
-
-Backup N8N Database: `ssh logan@10.0.0.33 'cd ~/homelab/docker && docker compose exec -T postgres pg_dump -U changeUser n8n' > n8n-postgres-backup_$(date +%F).sql`
-Backup N8N Volume: `ssh logan@10.0.0.33 'docker run --rm -v n8n_storage:/volume alpine sh -c "cd /volume && tar -czf - ."' > n8n-storage-backup.tar.gz`
-
-
-- If you need to increase disk space
-    - Increase size of disk of VM through proxmox
-    - df -h
-    - lsblk
-    - sudo su
-    - parted
-    - print
-    - resizepart 3 100%
-    - print
-    - resize2fs /dev/sda3
-    - Exit
-    - apt install lvm2
-    - If you get not enough storage error, you have to clear space
-    - See what is taking up so much space 
-        - du -sh /var/* | sort -h 
-        - We see that docker takes up most of the space in /var/
-        - `docker images --format "{{.Repository}}:{{.Tag}} {{.Size}}" | sort -h -r`
-        - `sudo ctr -n moby images prune --all`
-    - sudo rm -rf /var/cache/apt/archives/*.deb
-    - sudo journalctl --vacuum-size=50M
-    - apt install lvm2
-    - resize2fs /dev/sda3
-- If at anytime there is a permission denied error during git pull process: `sudo chown -R logan:logan .` and then run `git pull` again
-
-## TailScale
-
-To access services outside of home network, we will use tailscale
-
-
-1. Create tag (Access controls)
-
-```
-"tagOwners": {
-		"tag:container": ["autogroup:admin"],
-	},
-```
-
-2. Enable Routes (Machines tab)
-    1. Click `tailscale` machine
-    2. Edit route settings
-    3. Approve 10.0.0.0/24 route
-
-3. Tailscale Admin Console > Settings > Keys
-4. Generate Auth Key
-    - Description: homelab-docker
-    - Reusable: Yes
-    - Expiration: 90 days
-    - Ephemeral: No
-    - Tags: `tag:container`
-5. Update `docker-compose.yml` with auth key
-6. `docker compose up -d tailscale`
-7. Configure "Split DNS"
-  1. DNS Tab
-  2. Scroll down to Nameservers and click `Add nameserver` > `Custom`
-  3. Enter the IP address of your VM: 10.0.0.33
-  4. Check the box `Restrict to domain`
-  5. Enter domain `homelab`
-  6. Click save
-8. Open Tailscale App on phone
-9. Sign into Tailscale account (Same account where you generated the auth key)
-10. Ensure it is set to `Active`
-11. Type `http://homepage.homelab`
-
-## Useful Commands
-
-
-- After making DNS changes to the pihole DNS file: `docker compose -f docker/docker-compose.yml restart pihole caddy`
-
-- After making changes to prometheus: `docker compose -f docker/docker-compose.yml restart prometheus`
-
-- docker compose -f docker/docker-compose.yml up caddy pihole cronmaster -d 
-
-- `docker compose -f docker/docker-compose.yml up -d cadvisor pihole caddy prometheus loki alloy grafana homepage`
-
-- Use `docker stats` command to see container usage
-
-pveversion --verbose
-
-`docker system df -v | grep -i "loki"`
-
-# Backup strategy
-
-- Backup: `./docker/backup-remote-volumes.sh`
-- Restore: `./restore-docker-backup.sh <tar-file-name>`
-
-
-
-
-
-
-Download Proxmox Backup Server: https://www.proxmox.com/en/downloads/proxmox-backup-server/iso
-
-Datacenter > pve > local (pve) > ISO Images > Upload ISO file
-
-Create VM with ISO image
-
-- go through graphical install process
-  - management interface - ens18
-  - Hostname (FQDN) - pbs.hsd1.il.comcast.net
-  - IP Address (CIDR) -  10.0.0.43 / 24
-  - Gateway - 10.0.0.1
-  - DNS Server - 75.75.75.75
-
-  Access the UI at https://10.0.0.43:8007/
-
-  Username - root
-  Password - password
-
-  - Datastore > Add Datastore
-     - Name: backup
-     - Datastore Type: local
-     - Backing Path: /backups
-     - GC Schedule: Daily
-     - Prune Schedule: daily
-
-- To run backup job
-  - Copy Fingerprint from PBS
-  - Go to Proxmox admin
-    - Datacenter > Storage > Add Storage > Proxmox Backup Server
-      - ID: Backup-storage
-      - Server: 10.0.0.43 (IP of PBS)
-      - Username: root@pam
-      - Password: password
-      - Datastore: backup (name of the datastore you created on PBS)
-      - Fingerprint: paste the fingerprint from PBS
-      - Mark as enabled
-      - Save
-  - Go to PVE that you want to backup
-  - Backup > Backup now
-    - Storage: backup-storage
-  - `ssh root@10.0.0.43 "ls /backups/vm/"`
-
-# Tailscale on Proxmox host
-
-[How to install Tailscale on Proxmox, not a CT or VM : r/Proxmox](https://www.reddit.com/r/Proxmox/comments/17rpsgz/how_to_install_tailscale_on_proxmox_not_a_ct_or_vm/)
-
-so we can access proxmox from outside of network
-
-## Grafana Queries
+# Grafana Queries
 
 # Loki Queries
 
