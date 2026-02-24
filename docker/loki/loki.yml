@@ -26,9 +26,9 @@ query_range:
 schema_config:
   configs:
     - from: 2020-10-24
-      store: boltdb-shipper
+      store: tsdb
       object_store: filesystem
-      schema: v11
+      schema: v13
       index:
         prefix: index_
         period: 24h
@@ -59,7 +59,7 @@ limits_config:
 # By default the compactor.retention-enabled flag is not set, so the logs sent to Loki live forever
 compactor:
   working_directory: /loki/compactor
-  shared_store: filesystem
+  delete_request_store: filesystem
   compaction_interval: 10m
   retention_enabled: true
   retention_delete_delay: 2h

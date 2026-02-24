@@ -229,8 +229,9 @@ services:
     restart: unless-stopped
 
   loki:
-    image: grafana/loki:2.9.2
+    image: grafana/loki:3.6.0
     container_name: loki
+    user: "0"
     # ports: # don't need ports because caddy proxies to the container ports for us
     #   - "3100:3100"
     volumes:
