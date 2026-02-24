@@ -318,6 +318,35 @@ Create VM with ISO image
     - Storage: backup-storage
   - `ssh root@10.0.0.43 "ls /backups/vm/"`
 
+# Deploying
+
+1. On the machine you want to access services from, set DNS servers (in this order):
+   - `10.0.0.32`
+   - `75.75.75.75`
+   - `1.1.1.1`
+
+2. SSH into the server: `ssh logan@10.0.0.32`
+
+3. Pull latest changes:
+```
+git stash
+git pull
+git stash pop
+```
+
+4. Deploy all services:
+```
+docker compose -f docker/docker-compose.yml up -d --pull always && \
+docker compose --env-file "docker/immich/docker-compose.env" -f "docker/immich/docker-compose.yml" up -d --pull always
+```
+
+5. Flush DNS cache on your local machine (macOS):
+```
+sudo dscacheutil -flushcache && sudo killall -HUP mDNSResponder
+```
+
+6. Access `http://grafana.homelab` to verify services are running
+
 # Commands
 
 - To pull all new versions of images and run all services:
