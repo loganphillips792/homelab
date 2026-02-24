@@ -326,11 +326,11 @@ docker compose -f docker/docker-compose.yml up -d --pull always && \
 docker compose --env-file "docker/immich/docker-compose.env" -f "docker/immich/docker-compose.yml" up -d --pull always
 ```
 
-- `docker compose -f docker/docker-compose.yml up -d --build caddy pihole`
+- Run specific services: `docker compose -f docker/docker-compose.yml up -d --build caddy pihole`
 
 - `docker compose -f docker/docker-compose.yml restart caddy` - restart specific service
 
-
+- `docker compose -f docker/docker-compose.yml up -d --force-recreate loki grafana alloy n8n`
 
 
 Backup N8N Database: `ssh logan@10.0.0.33 'cd ~/homelab/docker && docker compose exec -T postgres pg_dump -U changeUser n8n' > n8n-postgres-backup_$(date +%F).sql`
