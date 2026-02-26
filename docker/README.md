@@ -718,6 +718,7 @@ https://github.com/crowdsecurity/crowdsec
 - https://github.com/matomo-org/docker/
 - rename `docker-volumes` directory as `docker-bind-mounts`
 - Update homepage https://www.reddit.com/r/selfhosted/comments/1p1469e/my_homepage_dashboard_v3/
+- https://signoz.io/docs/install/docker/
 
 
 
