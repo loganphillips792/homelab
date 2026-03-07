@@ -692,7 +692,7 @@ https://crazymax.dev/diun/usage/command-line/
 
 https://github.com/crowdsecurity/crowdsec
 
-open claw
+https://nanoclaw.dev
 
 - COMPOSE_KOMODO_BACKUPS_PATH=~/docker-volumes/komodo/etc/komodo/backups doesn't seem to be working correctly
 - Tailscale
