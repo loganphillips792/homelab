@@ -694,6 +694,8 @@ https://github.com/crowdsecurity/crowdsec
 
 https://nanoclaw.dev
 
+https://github.com/paperclipai/paperclip
+
 - COMPOSE_KOMODO_BACKUPS_PATH=~/docker-volumes/komodo/etc/komodo/backups doesn't seem to be working correctly
 - Tailscale
   - [Newbie question - tailscale on proxmox host or on each (needed) container? : r/Proxmox](https://www.reddit.com/r/Proxmox/comments/1ktje1t/newbie_question_tailscale_on_proxmox_host_or_on/)
