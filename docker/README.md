@@ -692,9 +692,10 @@ https://crazymax.dev/diun/usage/command-line/
 
 https://github.com/crowdsecurity/crowdsec
 
-https://nanoclaw.dev
+https://github.com/HKUDS/nanobot
 https://ollama.com/library/qwen3.5
 ollama launch claude --model qwen3.5
+https://www.reddit.com/r/LocalLLaMA/comments/1ra89sb/comment/o8rluon/?utm_source=share&utm_medium=web3x&utm_name=web3xcss&utm_term=1&utm_content=share_button
 
 
 https://github.com/paperclipai/paperclip
