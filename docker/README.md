@@ -693,6 +693,9 @@ https://crazymax.dev/diun/usage/command-line/
 https://github.com/crowdsecurity/crowdsec
 
 https://nanoclaw.dev
+https://ollama.com/library/qwen3.5
+ollama launch claude --model qwen3.5
+
 
 https://github.com/paperclipai/paperclip
 
