@@ -340,6 +340,8 @@ docker compose -f docker/docker-compose.yml up -d --pull always && \
 docker compose --env-file "docker/immich/docker-compose.env" -f "docker/immich/docker-compose.yml" up -d --pull always
 ```
 
+or just services that need to be restarted: `docker compose restart alloy prometheus grafana`
+
 5. Flush DNS cache on your local machine (macOS):
 ```
 sudo dscacheutil -flushcache && sudo killall -HUP mDNSResponder
