@@ -85,6 +85,119 @@
       ],
       "title": "Containers",
       "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 0
+      },
+      "id": 2,
+      "options": {
+        "footer": {
+          "enablePagination": true,
+          "show": false
+        },
+        "showHeader": true,
+        "sortBy": [
+          {
+            "desc": false,
+            "displayName": "name"
+          }
+        ]
+      },
+      "pluginVersion": "10.2.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "rate(container_cpu_usage_seconds_total{image!=\"\"}[5m]) > 0",
+          "format": "table",
+          "instant": true,
+          "refId": "A"
+        }
+      ],
+      "title": "Running Containers",
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true,
+              "Value": true,
+              "__name__": true,
+              "cpu": true,
+              "id": true,
+              "instance": true,
+              "job": true,
+              "container_label_com_docker_compose_config_hash": true,
+              "container_label_com_docker_compose_container_number": true,
+              "container_label_com_docker_compose_image": true,
+              "container_label_com_docker_compose_oneoff": true,
+              "container_label_com_docker_compose_project": true,
+              "container_label_com_docker_compose_project_config_files": true,
+              "container_label_com_docker_compose_project_working_dir": true,
+              "container_label_com_docker_compose_replace": true,
+              "container_label_com_docker_compose_service": true,
+              "container_label_com_docker_compose_version": true,
+              "container_label_org_opencontainers_image_created": true,
+              "container_label_org_opencontainers_image_description": true,
+              "container_label_org_opencontainers_image_licenses": true,
+              "container_label_org_opencontainers_image_revision": true,
+              "container_label_org_opencontainers_image_source": true,
+              "container_label_org_opencontainers_image_title": true,
+              "container_label_org_opencontainers_image_url": true,
+              "container_label_org_opencontainers_image_version": true
+            },
+            "indexByName": {},
+            "renameByName": {
+              "name": "Container",
+              "image": "Image"
+            }
+          }
+        },
+        {
+          "id": "groupBy",
+          "options": {
+            "fields": {
+              "Container": {
+                "aggregations": [],
+                "operation": "groupby"
+              },
+              "Image": {
+                "aggregations": [],
+                "operation": "groupby"
+              }
+            }
+          }
+        }
+      ],
+      "type": "table"
     }
   ],
   "refresh": "",
