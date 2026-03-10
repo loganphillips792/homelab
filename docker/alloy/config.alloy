@@ -20,18 +20,10 @@ prometheus.scrape "alloy" {
   forward_to = [prometheus.remote_write.default.receiver]
 }
 
-// Docker container discovery and metrics collection
-discovery.docker "containers" {
-  host = "unix:///var/run/docker.sock"
-  refresh_interval = "5s"
-}
-
-// Scrape metrics from discovered containers that have prometheus metrics
-prometheus.scrape "docker_containers" {
-  targets    = discovery.docker.containers.targets
-  forward_to = [prometheus.remote_write.default.receiver]
-  
-  // Only scrape containers with prometheus.scrape annotation
+// Scrape cAdvisor for container metrics
+prometheus.scrape "cadvisor" {
+  targets         = [{"__address__" = "cadvisor:8080"}]
+  forward_to      = [prometheus.remote_write.default.receiver]
   scrape_interval = "15s"
   metrics_path    = "/metrics"
 }
