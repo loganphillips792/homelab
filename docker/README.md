@@ -270,6 +270,11 @@ pveversion --verbose
 
 `docker system df -v | grep -i "loki"`
 
+
+`ssh logan@10.0.0.32 "cd /home/logan/homelab/docker && docker compose pull ollama && docker compose up -d ollama"`
+
+
+
 # Backup strategy
 
 - Backup: `./docker/backup-remote-volumes.sh`
@@ -621,6 +626,7 @@ Password: umami
 
 - `docker exec -it ollama ollama list`
 - `docker exec -it ollama ollama pull deepseek-r1:1.5b`
+- `ssh -t logan@10.0.0.32 docker exec -it ollama ollama pull qwen3.5`
 
 ## Komodo
 
