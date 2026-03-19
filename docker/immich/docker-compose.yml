@@ -7,7 +7,7 @@ services:
     container_name: immich-server
     restart: always
     depends_on:
-      - redis
+      - immich-redis
       - database
     # ports: # Exposed via Caddy on shared network; no host ports
     #   - "2283:2283"
@@ -33,7 +33,7 @@ services:
     networks:
       - main-network
 
-  redis:
+  immich-redis:
     image: docker.io/valkey/valkey:8@sha256:81db6d39e1bba3b3ff32bd3a1b19a6d69690f94a3954ec131277b9a26b95b3aa
     restart: always
     healthcheck:
@@ -57,12 +57,3 @@ services:
 
 volumes:
   model-cache:
-
-networks:
-  # Attach to the shared network created by the main stack so Caddy can reach immich-server
-  main-network:
-    # Use the actual network name created by the main compose project.
-    # When you run the main stack from the `docker/` folder, Compose creates
-    # a network named `docker_main-network` (project name `docker` + network key).
-    external: true
-    name: docker_main-network

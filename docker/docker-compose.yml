@@ -6,10 +6,9 @@ services:
     hostname: tailscale
     environment:
       - TS_AUTHKEY=xxxx
-      - TS_EXTRA_ARGS=--advertise-tags=tag:container
       - TS_STATE_DIR=/var/lib/tailscale
       - TS_USERSPACE=false
-      - TS_EXTRA_ARGS=--advertise-routes=10.0.0.0/24 --accept-routes
+      - TS_EXTRA_ARGS=--advertise-tags=tag:container --advertise-routes=10.0.0.0/24 --accept-routes
     volumes:
       - ~/docker-volumes/tailscale/state:/var/lib/tailscale
     devices:
