@@ -247,6 +247,39 @@ Go to set up page: `http://localhost:8096/web/index.html#!/wizardstart.html`
 
 `ssh root@10.0.0.54 -i ~/.ssh/id_rsa_terraform "sudo systemctl status tailscaled.service"`
 
+## Tailscale in Docker
+
+The Tailscale container runs as a subnet router, advertising the `10.0.0.0/24` LAN so devices on your tailnet can reach homelab services.
+
+### Setup
+
+1. **Define tags in ACL policy** — In the [Tailscale ACL editor](https://login.tailscale.com/admin/acls/file), add the `tag:container` tag:
+```json
+"tagOwners": {
+  "tag:container": ["autogroup:admin"]
+}
+```
+
+2. **Generate an auth key** — Go to [Tailscale Admin > Settings > Keys](https://login.tailscale.com/admin/settings/keys), click **Generate auth key**, check **Reusable**, and select the `tag:container` tag. Copy the key and set it as `TS_AUTHKEY` in the compose file or `.env`.
+
+3. **Approve subnet routes** — After the container starts, go to the [Machines page](https://login.tailscale.com/admin/machines), click the node, and approve the `10.0.0.0/24` subnet route.
+
+### Accessing `*.homelab` domains from your phone
+
+To resolve `*.homelab` DNS names (e.g., `homepage.homelab`) from a mobile device over Tailscale:
+
+1. Go to [Tailscale DNS settings](https://login.tailscale.com/admin/dns)
+2. Add a **custom nameserver** pointing to your Pi-hole's LAN IP (e.g., `10.0.0.54`)
+3. **Restrict** it to the `homelab` domain
+
+This tells Tailscale to route `*.homelab` DNS queries through Pi-hole, which resolves them to the correct LAN IP where Caddy handles the request.
+
+### Troubleshooting
+
+* **`invalid key: API key does not exist`** — The auth key is expired or deleted. Generate a new one.
+* **`context canceled` during login** — Usually caused by an invalid auth key or the container restart-looping. Check `docker logs` for the underlying error.
+* **Duplicate `TS_EXTRA_ARGS`** — Docker only keeps the last value of a duplicate environment variable. Merge all flags into a single `TS_EXTRA_ARGS` line.
+
 # TODO
 
 - Install https://github.com/prometheus-pve/prometheus-pve-exporter on proxmox to get prometheus metrics of all services
@@ -289,3 +322,34 @@ Host key verification failed.
 2. `ssh-keyscan -H 10.0.0.54 >> ~/.ssh/known_hosts` 
 3. Runrun command
 
+
+
+## Lost IPv4 Address on VM
+
+---
+
+### **Problem statement:**
+
+The Proxmox VM unexpectedly lost its assigned IPv4 address (`10.0.0.32`), causing it to become inaccessible over the local network. Running `ip link show` revealed that the primary network interface (`ens18`) was active and "UP," but lacked an IP. The only visible addresses were a link-local IPv6 address (`fe80::...`) and several internal Docker bridge IPs (starting with `172.19.x.x`), which are used for container communication rather than external access.
+
+### **Solution**
+
+The issue was caused by a **DHCP lease expiration**. The VM’s background networking service failed to automatically renew its "permission" to use the `10.0.0.32` address from the router. By manually invoking the DHCP client, the VM was forced to send a fresh request to the router, which successfully reassigned the original IP address to the `ens18` interface.
+
+---
+
+### **Steps to fix it:**
+
+* **Step 1: Identify the primary interface** Run `ip link show` or `ip addr` to identify which interface is the "real" virtual network card. Look for `ens*` or `eth*` naming — Proxmox VMs typically name hardware-attached NICs `ensXX` (where the number maps to the PCI slot in Proxmox, e.g. `ens18` = PCI slot 18) or `eth0` on older kernels. These represent the virtual NIC that Proxmox "plugged in" to the VM. In this instance, it was identified as `ens18`.
+* **Step 2: Check for physical/virtual link** Verify that the interface shows `<BROADCAST,MULTICAST,UP,LOWER_UP>`, which confirms that Proxmox has successfully "plugged in" the virtual network cable to the VM.
+* **Step 3: Force a DHCP renewal** Execute the following command to manually request an IP from the router:
+```bash
+sudo dhclient -v ens18
+
+```
+
+* **Step 4: Verify the restoration** Confirm the IP has returned by checking the interface details:
+```bash
+ip addr show ens18
+
+```

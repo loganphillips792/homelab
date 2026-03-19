@@ -65,8 +65,3 @@ services:
       - "9200"
     networks:
       - main-network
-
-networks:
-  main-network:
-    external: true
-    name: docker_main-network

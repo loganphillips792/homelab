@@ -156,7 +156,7 @@ Confirm port 53 is now free: `sudo ss -lunpt | grep :53 || echo "Port 53 is free
 
 9. Bring up Docker containers
     1. docker login -u dockedupstream
-    2. `docker compose -f docker/docker-compose.yml up -d && docker compose --env-file "$PWD/docker/immich/docker-compose.env" -f "$PWD/docker/immich/docker-compose.yml" up -d && docker compose --env-file docker/.env -f docker/tubearchivist/docker-compose.yml up -d`
+    2. `docker compose -f docker/compose.all.yml up -d`
 
 10. `sudo ss -lunpt | grep :53` If you see docker-proxy, that means that PiHole has binded to port 53
 
@@ -270,6 +270,11 @@ pveversion --verbose
 
 `docker system df -v | grep -i "loki"`
 
+
+`ssh logan@10.0.0.32 "cd /home/logan/homelab/docker && docker compose pull ollama && docker compose up -d ollama"`
+
+
+
 # Backup strategy
 
 - Backup: `./docker/backup-remote-volumes.sh`
@@ -336,9 +341,10 @@ git stash pop
 
 4. Deploy all services:
 ```
-docker compose -f docker/docker-compose.yml up -d --pull always && \
-docker compose --env-file "docker/immich/docker-compose.env" -f "docker/immich/docker-compose.yml" up -d --pull always
+docker compose -f docker/compose.all.yml up -d --pull always
 ```
+
+or just services that need to be restarted: `docker compose restart alloy prometheus grafana`
 
 5. Flush DNS cache on your local machine (macOS):
 ```
@@ -351,8 +357,7 @@ sudo dscacheutil -flushcache && sudo killall -HUP mDNSResponder
 
 - To pull all new versions of images and run all services:
 ```
-docker compose -f docker/docker-compose.yml up -d --pull always && \
-docker compose --env-file "docker/immich/docker-compose.env" -f "docker/immich/docker-compose.yml" up -d --pull always
+docker compose -f docker/compose.all.yml up -d --pull always
 ```
 
 - Run specific services: `docker compose -f docker/docker-compose.yml up -d --build caddy pihole`
@@ -455,7 +460,7 @@ localhost:8083
 
 - Get IP address of Mac Host: `ipconfig getifaddr en0`
 - The IP address of the customs.list is of the host machine (Mac)
-- DNS of the mac has to point to the MAC itself (10.0.0.227) in my case
+- DNS of the mac has to point to the MAC itself (10.0.0.32) in my case
 - WIFI > Details > DNS set to 10.0.0.337
   - Original DNS servers
     - 75.75.75.75
@@ -471,9 +476,9 @@ localhost:8083
 host.
 - Networking: Both containers share the default Docker network, so Caddy can reach Pi‑hole’s web UI at pihole:80 internally.
 - Proxy rule: Caddy routes http://pihole.homelab to pihole:80 and redirects / to /admin/ (see caddy/Caddyfile).
-- DNS records: Pi‑hole serves .homelab hostnames and resolves them to your host IP (e.g., 10.0.0.227) via pihole/etc-pihole/hosts/
+- DNS records: Pi‑hole serves .homelab hostnames and resolves them to your host IP (e.g., 10.0.0.32) via pihole/etc-pihole/hosts/
 custom.list and 02-local.conf. Clients using Pi‑hole as DNS will resolve *.homelab to the host.
-- End‑to‑end flow: Client requests pihole.homelab → Pi‑hole DNS returns 10.0.0.227 → connection hits Caddy on :80/:443 → Caddy
+- End‑to‑end flow: Client requests pihole.homelab → Pi‑hole DNS returns 10.0.0.32 → connection hits Caddy on :80/:443 → Caddy
 reverse‑proxies to the Pi‑hole container (pihole:80).
 
 
@@ -521,6 +526,8 @@ ssh logan@10.0.0.33 '
 
 ## Tailscale
 
+**Note:** When updating the auth token (or any env var), use `docker compose up -d tailscale`, not `docker compose restart tailscale`. `restart` reuses the existing container config and won't pick up the new value. `up -d` recreates the container with the updated config.
+
 1. Create account at https://login.tailscale.com/admin
 2. Generate auth key and add to env variable in `docker-compose.yml`
 3. `docker compose up --build tailscale`
@@ -544,13 +551,13 @@ To ssh into VM:
 1. Request http://grafana.homelab outside of home network
 2. Tailscale VPN: Encrypted tunnel to the home network. Your device gets access to 10.0.0.0/24
 3. Tailscale Container: Acts as subnet router via --advertise-routes=10.0.0.0/24 . Traffic enters your home LAN   
-4. Pi-Hole DNS: Resolves grafana.homelab → 10.0.0.227 (Your home server's IP)
-5. Caddy (Reverse Proxy): Listening on 10.0.0.227:80 Matches Host header "grafana.homelab" Routes to `grafana:3000` on `main-network`
+4. Pi-Hole DNS: Resolves grafana.homelab → 10.0.0.32 (Your home server's IP)
+5. Caddy (Reverse Proxy): Listening on 10.0.0.32:80 Matches Host header "grafana.homelab" Routes to `grafana:3000` on `main-network`
 
 
 - Subnet router that advertises 10.0.0.0/24 to your Tailscale network, allowing remote devices to reach your
   home LAN
-- Pihole - DNS server that resolves *.homelab domains to 10.0.0.227 (your Docker host)
+- Pihole - DNS server that resolves *.homelab domains to 10.0.0.32 (your Docker host)
 - Caddy - Reverse proxy listening on ports 80/443, routes requests based on hostname to the appropriate container
 - `main-network` connects most services; Caddy bridges default, main-network, and kafka-network
 
@@ -619,6 +626,7 @@ Password: umami
 
 - `docker exec -it ollama ollama list`
 - `docker exec -it ollama ollama pull deepseek-r1:1.5b`
+- `ssh -t logan@10.0.0.32 docker exec -it ollama ollama pull qwen3.5`
 
 ## Komodo
 
@@ -651,14 +659,14 @@ As a workaround, I had to turn off containerd-snapshotter and then restart docke
 2. Set DNS records in 10-homelab.conf
 3. Laptop/phone use pihole as their DNS server (can either do it via router or change each device's DNS settings)
 4. In browser you type 'homepage.homelab'.
-5. Chrome  calls the system resolver (MacOS's mDNSResponder) to resolve the URL. The resolver looks at the network config and sees the DNS server is set to 10.0.0.227. 
-6. The resolver creates a DNS query and sends it to UDP port 53 (10.0.0.227)
-7. Since 10.0.0.227 is on your LAN, your Mac ARPs to find the MAC address for 10.0.0.227 and fires the packet on the wire
-8. If you’re doing this from the same Mac that’s running Docker, it still works: packets to 10.0.0.227 loop back into the host’s networking stack (because that IP is assigned to your Mac), then hit Docker’s port-forward
+5. Chrome  calls the system resolver (MacOS's mDNSResponder) to resolve the URL. The resolver looks at the network config and sees the DNS server is set to 10.0.0.32. 
+6. The resolver creates a DNS query and sends it to UDP port 53 (10.0.0.32)
+7. Since 10.0.0.32 is on your LAN, your Mac ARPs to find the MAC address for 10.0.0.32 and fires the packet on the wire
+8. If you’re doing this from the same Mac that’s running Docker, it still works: packets to 10.0.0.32 loop back into the host’s networking stack (because that IP is assigned to your Mac), then hit Docker’s port-forward
 9. Docker forwards host :53 -> Pi-hole container :53 (this is because we defined - "53:53/tcp" and "53:53/udp" in the pihole ports config)
-10. Pihole checks its local DNS and returns 10.0.0.227 as the IP address for homepage.homelab.
+10. Pihole checks its local DNS and returns 10.0.0.32 as the IP address for homepage.homelab.
     - For everything else (e.g., example.com), Pi-hole forwards to its upstream resolver(s) (whatever you configured in the Pi-hole admin: Cloudflare, Quad9, your router, etc.), gets the reply, applies blocklists if relevant, and sends the answer back to your Mac
-11. Browser connects to 10.0.0.227 on HTTP port 80 (because we typed homepage.homelab)
+11. Browser connects to 10.0.0.32 on HTTP port 80 (because we typed homepage.homelab)
 12. On host machine (Mac), Caddy is listening on ports 80 and 443 (these ports are defined in the caddy definition in docker-compose.yml)
 13. Caddy looks at the HTTP Host header(homepage.homelab) and matches it and reverse-proxies the request to the homepage container on port 3000. The hostname is the Docker service name and since Caddy is attached to the same networks that the targets live, it can reach them on their container ports (so, you don't need to publish app ports anymore, as Caddy is the entrance to the services)
 
