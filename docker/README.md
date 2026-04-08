@@ -730,6 +730,7 @@ open claw
 - Update homepage https://www.reddit.com/r/selfhosted/comments/1p1469e/my_homepage_dashboard_v3/
 - https://signoz.io/docs/install/docker/
 - [First steps - Trivy](https://trivy.dev/docs/latest/getting-started/)
+- https://github.com/HKUDS/nanobot
 
 
 
