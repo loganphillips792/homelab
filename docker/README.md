@@ -652,6 +652,19 @@ All of Hoarder's data are in the DATA_DIR. If you can periodically snapshot that
 
 As a workaround, I had to turn off containerd-snapshotter and then restart docker
 
+## Matomo
+
+Start it: `docker compose -f compose.all.yml up -d matomo` (Compose pulls in `matomo-db` and `matomo-cron` via `depends_on`).
+
+Open the web UI at http://localhost:8080 and walk through the setup wizard. Database details on the install screen:
+
+- Database server: `matomo-db`
+- Username: `matomo`
+- Password: value of `MATOMO_DB_PASSWORD` in `docker/.env`
+- Database name: `matomo`
+
+After install, go to Administration → System → General settings and uncheck _Archive reports when viewed from the browser_ — the `matomo-cron` container runs `core:archive` every 5 minutes.
+
 
 # DNS Process Explained
 
@@ -725,7 +738,6 @@ open claw
 - gitea
 - Forejo
 - [mayanayza/netvisor: Automatically discover and visually document network infrastructure.](https://github.com/mayanayza/netvisor)
-- https://github.com/matomo-org/docker/
 - rename `docker-volumes` directory as `docker-bind-mounts`
 - Update homepage https://www.reddit.com/r/selfhosted/comments/1p1469e/my_homepage_dashboard_v3/
 - https://signoz.io/docs/install/docker/

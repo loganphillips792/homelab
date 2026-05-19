@@ -1,0 +1,56 @@
+version: "3.8"
+
+services:
+  matomo-db:
+    image: mariadb:latest
+    container_name: matomo-db
+    restart: unless-stopped
+    environment:
+      - MYSQL_ROOT_PASSWORD=${MATOMO_DB_ROOT_PASSWORD}
+      - MYSQL_DATABASE=matomo
+      - MYSQL_USER=matomo
+      - MYSQL_PASSWORD=${MATOMO_DB_PASSWORD}
+    volumes:
+      - ~/docker-volumes/matomo/db:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks:
+      - main-network
+
+  matomo:
+    image: matomo:latest
+    container_name: matomo-app
+    restart: unless-stopped
+    ports:
+      - "8080:80"
+    environment:
+      - MATOMO_DATABASE_HOST=matomo-db
+      - MATOMO_DATABASE_USERNAME=matomo
+      - MATOMO_DATABASE_PASSWORD=${MATOMO_DB_PASSWORD}
+      - MATOMO_DATABASE_DBNAME=matomo
+    volumes:
+      - ~/docker-volumes/matomo/app:/var/www/html
+    depends_on:
+      matomo-db:
+        condition: service_healthy
+    networks:
+      - main-network
+
+  matomo-cron:
+    image: matomo:latest
+    container_name: matomo-cron
+    restart: unless-stopped
+    volumes:
+      - ~/docker-volumes/matomo/app:/var/www/html
+    entrypoint: >
+      /bin/sh -c "while true; do
+      php /var/www/html/console core:archive;
+      sleep 300;
+      done"
+    depends_on:
+      - matomo
+    networks:
+      - main-network
