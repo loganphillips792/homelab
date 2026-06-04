@@ -3,3 +3,4 @@ include:
   - immich/docker-compose.yml
   - tubearchivist/docker-compose.yml
   - matomo/docker-compose.yml
+  - hermes-agent/docker-compose.yml

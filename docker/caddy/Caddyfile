@@ -148,3 +148,7 @@ http://jotty.homelab {
 http://cta-map.homelab {
   reverse_proxy cta-map:8080
 }
+
+http://hermes.homelab {
+  reverse_proxy hermes:9119
+}
