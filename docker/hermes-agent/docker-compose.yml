@@ -1,0 +1,25 @@
+version: "3.8"
+
+services:
+  hermes-agent:
+    image: nousresearch/hermes-agent:latest
+    container_name: hermes
+    restart: unless-stopped
+    command: gateway run
+    ports:
+      - "9119:9119"   # dashboard (also proxied by Caddy at hermes.homelab)
+    volumes:
+      - ~/docker-volumes/hermes-agent:/opt/data
+    environment:
+      - HERMES_DASHBOARD=1
+      # Dashboard binds 0.0.0.0:9119 inside the container (default) so Caddy can reach it.
+      - HERMES_DASHBOARD_BASIC_AUTH_USERNAME=${HERMES_DASHBOARD_USER}
+      - HERMES_DASHBOARD_BASIC_AUTH_PASSWORD=${HERMES_DASHBOARD_PASSWORD}
+      - HERMES_DASHBOARD_BASIC_AUTH_SECRET=${HERMES_DASHBOARD_SECRET}
+      # Model provider key(s) — forwarded from docker/.env
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      # Optional chat-platform tokens (uncomment as needed):
+      # - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+    # shm_size: 1g   # uncomment if browser/Playwright tools are used
+    networks:
+      - main-network

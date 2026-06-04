@@ -665,6 +665,26 @@ Open the web UI at http://localhost:8080 and walk through the setup wizard. Data
 
 After install, go to Administration → System → General settings and uncheck _Archive reports when viewed from the browser_ — the `matomo-cron` container runs `core:archive` every 5 minutes.
 
+## Hermes Agent
+
+[Hermes Agent](https://hermes-agent.nousresearch.com/docs/user-guide/docker) (Nous Research) runs as a long-lived gateway plus a web dashboard. A single container hosts the supervised gateway and dashboard via its s6 supervisor.
+
+Start it: `docker compose -f compose.all.yml up -d hermes-agent`. All state lives in `~/docker-volumes/hermes-agent` (mounted at `/opt/data`).
+
+Set these in `docker/.env` before first start:
+
+- `ANTHROPIC_API_KEY` — model provider key (forwarded via the compose `environment:` block)
+- `HERMES_DASHBOARD_USER` / `HERMES_DASHBOARD_PASSWORD` — basic-auth login for the dashboard (it exposes API keys, so don't run it unauthenticated)
+- `HERMES_DASHBOARD_SECRET` — restart-stable session secret (`openssl rand -hex 32`)
+
+The dashboard is reached at http://hermes.homelab (Caddy → `hermes:9119`). No host ports are published.
+
+First-boot notes:
+
+- The first start seeds `~/docker-volumes/hermes-agent` with a default `config.yaml`, `SOUL.md`, and `.env`. Since we skip the interactive `hermes setup` wizard, edit `config.yaml` so `model.provider`/`model.model` match the forwarded key (Anthropic), and configure any chat platform there.
+- The container drops to UID 10000. If logs show "Permission denied" on the data dir, set `PUID`/`PGID` to the host owner or `chmod -R 755 ~/docker-volumes/hermes-agent`.
+- Check status: `docker exec hermes hermes status` (reports `Manager: s6 (container supervisor)`).
+
 
 # DNS Process Explained
 
@@ -743,6 +763,7 @@ open claw
 - https://signoz.io/docs/install/docker/
 - [First steps - Trivy](https://trivy.dev/docs/latest/getting-started/)
 - https://github.com/HKUDS/nanobot
+- https://github.com/paperclipai/paperclip 
 
 
 
