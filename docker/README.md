@@ -686,6 +686,33 @@ First-boot notes:
 - Check status: `docker exec hermes hermes status` (reports `Manager: s6 (container supervisor)`).
 
 
+## ArchiveBox
+
+[ArchiveBox](https://github.com/ArchiveBox/ArchiveBox) is a self-hosted web archive — it snapshots any URL to HTML/PDF/screenshot/WARC so it survives link rot. All state lives in `~/docker-volumes/archivebox` (mounted at `/data`).
+
+Host port `8010` is published (host `8000` is already taken by Tube Archivist); normally you reach it at http://archivebox.homelab (Caddy → `archivebox:8000`).
+
+First-run setup (creates the admin user, run once):
+
+```
+docker compose -f compose.all.yml run archivebox init
+```
+
+Or uncomment `ADMIN_USERNAME`/`ADMIN_PASSWORD` in `archivebox/docker-compose.yml` to auto-create one on first boot. Then start it: `docker compose -f compose.all.yml up -d archivebox`.
+
+Add URLs from the CLI (or paste them in the Web UI):
+
+```
+docker compose -f compose.all.yml run archivebox add 'https://example.com'
+docker compose -f compose.all.yml run -T archivebox add < ~/bookmarks.txt
+```
+
+Notes:
+
+- `SERVER_SECURITY_MODE=safe-onedomain-nojsreplay` is used because the internal `.homelab` setup has no wildcard DNS — ArchiveBox's default `safe-subdomains` mode serves each snapshot on its own subdomain.
+- The upstream compose's optional addons (Cloudflare Tunnel, Traefik, noVNC, WireGuard, ChangeDetection) are intentionally dropped — Caddy + Pi-hole already handle ingress and DNS.
+
+
 # DNS Process Explained
 
 1. Set Wifi DNS on mac to IP address of Mac (ipconfig getifaddr en0)

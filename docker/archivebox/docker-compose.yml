@@ -1,0 +1,38 @@
+version: "3.8"
+
+# ArchiveBox — self-hosted web archive (snapshots pages to HTML/PDF/screenshot/WARC).
+# https://github.com/ArchiveBox/ArchiveBox/wiki/Docker#docker-compose
+#
+# First-run setup (creates the admin user, run once):
+#   docker compose -f compose.all.yml run archivebox init
+#   # or set ADMIN_USERNAME / ADMIN_PASSWORD below to auto-create on first boot
+# Then bring it up and open http://archivebox.homelab (proxied by Caddy).
+#
+# Add URLs:
+#   docker compose -f compose.all.yml run archivebox add 'https://example.com'
+#   docker compose -f compose.all.yml run -T archivebox add < ~/bookmarks.txt
+#
+# Addons in the upstream compose (Cloudflare Tunnel, Traefik, noVNC, WireGuard,
+# ChangeDetection) are intentionally omitted — ingress is handled by Caddy and the
+# host already runs Pi-hole for *.homelab DNS.
+
+services:
+  archivebox:
+    image: archivebox/archivebox:dev
+    container_name: archivebox
+    restart: unless-stopped
+    ports:
+      - "8010:8000"   # host 8010 — tubearchivist already uses 8000 (also proxied by Caddy at archivebox.homelab)
+    volumes:
+      - ~/docker-volumes/archivebox:/data
+    environment:
+      # - ADMIN_USERNAME=admin            # uncomment to auto-create an admin on first run
+      # - ADMIN_PASSWORD=${ARCHIVEBOX_ADMIN_PASSWORD}
+      - BASE_URL=http://archivebox.homelab
+      # single-domain mode: no wildcard DNS needed for internal .homelab hostnames
+      - SERVER_SECURITY_MODE=safe-onedomain-nojsreplay
+      - PUBLIC_ADD_VIEW=False             # set True to let anyone submit URLs to archive
+      - TZ=${TZ}
+    shm_size: "1gb"                       # Chrome runs more efficiently with a larger shared-memory pool
+    networks:
+      - main-network

@@ -152,3 +152,7 @@ http://cta-map.homelab {
 http://hermes.homelab {
   reverse_proxy hermes:9119
 }
+
+http://archivebox.homelab {
+  reverse_proxy archivebox:8000
+}

@@ -170,6 +170,10 @@
         icon: https://cdn.jsdelivr.net/gh/selfhst/icons/svg/uptime-kuma.svg
         href: http://paperless.homelab
         description: Document management (scan, OCR, archive)
+    - ArchiveBox:
+        icon: archivebox
+        href: http://archivebox.homelab
+        description: Self-hosted web page archive
 
 - DevOps:
     - Komodo:
