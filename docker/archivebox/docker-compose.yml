@@ -1,5 +1,3 @@
-version: "3.8"
-
 # ArchiveBox — self-hosted web archive (snapshots pages to HTML/PDF/screenshot/WARC).
 # https://github.com/ArchiveBox/ArchiveBox/wiki/Docker#docker-compose
 #
