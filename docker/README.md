@@ -692,13 +692,13 @@ First-boot notes:
 
 Host port `8010` is published (host `8000` is already taken by Tube Archivist); normally you reach it at http://archivebox.homelab (Caddy → `archivebox:8000`).
 
-First-run setup (creates the admin user, run once):
+The admin user is auto-created on first boot from the compose `environment:` block — username `admin`, password from `ARCHIVEBOX_ADMIN_PASSWORD` in `docker/.env` (defaults to `changeme` — change it before exposing this anywhere). Just start it:
 
 ```
-docker compose -f compose.all.yml run archivebox init
+docker compose -f compose.all.yml up -d archivebox
 ```
 
-Or uncomment `ADMIN_USERNAME`/`ADMIN_PASSWORD` in `archivebox/docker-compose.yml` to auto-create one on first boot. Then start it: `docker compose -f compose.all.yml up -d archivebox`.
+To create or reset a user manually instead: `docker compose -f compose.all.yml run archivebox manage createsuperuser`.
 
 Add URLs from the CLI (or paste them in the Web UI):
 

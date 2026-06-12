@@ -24,8 +24,8 @@ services:
     volumes:
       - ~/docker-volumes/archivebox:/data
     environment:
-      # - ADMIN_USERNAME=admin            # uncomment to auto-create an admin on first run
-      # - ADMIN_PASSWORD=${ARCHIVEBOX_ADMIN_PASSWORD}
+      - ADMIN_USERNAME=admin              # auto-creates the admin user on first run
+      - ADMIN_PASSWORD=${ARCHIVEBOX_ADMIN_PASSWORD}   # set in docker/.env
       - BASE_URL=http://archivebox.homelab
       # single-domain mode: no wildcard DNS needed for internal .homelab hostnames
       - SERVER_SECURITY_MODE=safe-onedomain-nojsreplay
