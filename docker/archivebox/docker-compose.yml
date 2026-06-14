@@ -26,9 +26,20 @@ services:
     environment:
       - ADMIN_USERNAME=admin              # auto-creates the admin user on first run
       - ADMIN_PASSWORD=${ARCHIVEBOX_ADMIN_PASSWORD}   # set in docker/.env
-      - BASE_URL=http://archivebox.homelab
-      # single-domain mode: no wildcard DNS needed for internal .homelab hostnames
-      - SERVER_SECURITY_MODE=safe-onedomain-nojsreplay
+      # subdomain mode: serves admin./web./api./snap-*.<base> on separate origins, so
+      # archived content is isolated from the admin session (kills the shared-origin
+      # warning banner) and full JS replay works. ArchiveBox routes every subdomain on
+      # its single listener by Host header, so the base host just needs wildcard DNS.
+      - SERVER_SECURITY_MODE=safe-subdomains-fullreplay
+      #
+      # BASE_URL — the base host the admin./web./api./snap-*. subdomains hang off of.
+      # LOCAL (this Mac): macOS auto-resolves *.localhost -> 127.0.0.1, so point it at
+      #   the published port and open http://archivebox.localhost:8010 — no Caddy needed.
+      # HOMELAB host: comment the line below and uncomment the archivebox.homelab one,
+      #   which needs the *.archivebox.homelab wildcard in Pi-hole dnsmasq + the wildcard
+      #   Caddy site block (both already committed).
+      - BASE_URL=http://archivebox.localhost:8010
+      # - BASE_URL=http://archivebox.homelab
       - PUBLIC_ADD_VIEW=False             # set True to let anyone submit URLs to archive
       - TZ=${TZ}
     shm_size: "1gb"                       # Chrome runs more efficiently with a larger shared-memory pool
