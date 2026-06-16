@@ -690,6 +690,13 @@ First-boot notes:
 
 [ArchiveBox](https://github.com/ArchiveBox/ArchiveBox) is a self-hosted web archive — it snapshots any URL to HTML/PDF/screenshot/WARC so it survives link rot. All state lives in `~/docker-volumes/archivebox` (mounted at `/data`).
 
+Files are saved to `~/docker-volumes/archivebox` on the host (line 25), which is mounted into the container at `/data`.
+
+That `/data` directory is where ArchiveBox keeps everything: the SQLite index DB, config, and the `archive/` subfolder containing per-snapshot output (HTML, PDF, screenshot, WARC, etc.). So concretely:
+
+- Snapshots/captures: `~/docker-volumes/archivebox/archive/<timestamp>/`
+- Index DB: `~/docker-volumes/archivebox/index.sqlite3`
+
 Host port `8010` is published (host `8000` is already taken by Tube Archivist); normally you reach it at http://archivebox.homelab (Caddy → `archivebox:8000`).
 
 The admin user is auto-created on first boot from the compose `environment:` block — username `admin`, password from `ARCHIVEBOX_ADMIN_PASSWORD` in `docker/.env` (defaults to `changeme` — change it before exposing this anywhere). Just start it:
