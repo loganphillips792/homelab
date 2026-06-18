@@ -686,6 +686,40 @@ First-boot notes:
 - Check status: `docker exec hermes hermes status` (reports `Manager: s6 (container supervisor)`).
 
 
+## ArchiveBox
+
+[ArchiveBox](https://github.com/ArchiveBox/ArchiveBox) is a self-hosted web archive — it snapshots any URL to HTML/PDF/screenshot/WARC so it survives link rot. All state lives in `~/docker-volumes/archivebox` (mounted at `/data`).
+
+Files are saved to `~/docker-volumes/archivebox` on the host (line 25), which is mounted into the container at `/data`.
+
+That `/data` directory is where ArchiveBox keeps everything: the SQLite index DB, config, and the `archive/` subfolder containing per-snapshot output (HTML, PDF, screenshot, WARC, etc.). So concretely:
+
+- Snapshots/captures: `~/docker-volumes/archivebox/archive/<timestamp>/`
+- Index DB: `~/docker-volumes/archivebox/index.sqlite3`
+
+Host port `8010` is published (host `8000` is already taken by Tube Archivist); normally you reach it at http://archivebox.homelab (Caddy → `archivebox:8000`).
+
+The admin user is auto-created on first boot from the compose `environment:` block — username `admin`, password from `ARCHIVEBOX_ADMIN_PASSWORD` in `docker/.env` (defaults to `changeme` — change it before exposing this anywhere). Just start it:
+
+```
+docker compose -f compose.all.yml up -d archivebox
+```
+
+To create or reset a user manually instead: `docker compose -f compose.all.yml run archivebox manage createsuperuser`.
+
+Add URLs from the CLI (or paste them in the Web UI):
+
+```
+docker compose -f compose.all.yml run archivebox add 'https://example.com'
+docker compose -f compose.all.yml run -T archivebox add < ~/bookmarks.txt
+```
+
+Notes:
+
+- `SERVER_SECURITY_MODE=safe-onedomain-nojsreplay` is used because the internal `.homelab` setup has no wildcard DNS — ArchiveBox's default `safe-subdomains` mode serves each snapshot on its own subdomain.
+- The upstream compose's optional addons (Cloudflare Tunnel, Traefik, noVNC, WireGuard, ChangeDetection) are intentionally dropped — Caddy + Pi-hole already handle ingress and DNS.
+
+
 # DNS Process Explained
 
 1. Set Wifi DNS on mac to IP address of Mac (ipconfig getifaddr en0)
@@ -734,6 +768,11 @@ https://crazymax.dev/diun/usage/command-line/
 https://github.com/crowdsecurity/crowdsec
 
 open claw
+
+https://www.reddit.com/r/selfhosted/comments/1u4dwms/comment/orcoeac/?utm_source=share&utm_medium=web3x&utm_name=web3xcss&utm_term=1&utm_content=share_button
+
+
+[20 apps i actually run on my home server and which ones are worth it : r/selfhosted](https://www.reddit.com/r/selfhosted/comments/1u4dwms/comment/orcoeac/?utm_source=share&utm_medium=web3x&utm_name=web3xcss&utm_term=1)
 
 - COMPOSE_KOMODO_BACKUPS_PATH=~/docker-volumes/komodo/etc/komodo/backups doesn't seem to be working correctly
 - Tailscale
