@@ -791,6 +791,34 @@ Notes:
 - The upstream compose's optional addons (Cloudflare Tunnel, Traefik, noVNC, WireGuard, ChangeDetection) are intentionally dropped — Caddy + Pi-hole already handle ingress and DNS.
 
 
+## Penpot
+
+[Penpot](https://penpot.app) is an open-source design & prototyping tool. It runs as a stack of services (`penpot-frontend`, `penpot-backend`, `penpot-exporter`, `penpot-mcp`, plus its own `penpot-postgres`, `penpot-valkey`, and a `penpot-mailcatch` SMTP catcher) defined in `penpot/docker-compose.yml`. The internal services sit on a dedicated `penpot` network; only `penpot-frontend` also joins `main-network` so Caddy can proxy it.
+
+Set `PENPOT_SECRET_KEY` in `docker/.env` before first start (it's the master key sessions and invites derive from — changing it later invalidates them). Generate one with:
+
+```
+python3 -c "import secrets; print(secrets.token_urlsafe(64))"
+```
+
+Start just the Penpot stack:
+
+```
+docker compose -f compose.all.yml up -d penpot-frontend penpot-backend penpot-exporter penpot-mcp penpot-postgres penpot-valkey penpot-mailcatch
+```
+
+(Starting `penpot-frontend` alone pulls in most of the stack via `depends_on`, but not `penpot-mailcatch` — list them all to bring up SMTP too.)
+
+Reach the UI at http://localhost:9001. Sent emails (invites, etc.) land in the mailcatcher at http://localhost:1080.
+
+> **TODO — `PENPOT_PUBLIC_URI` is temporarily set to `http://localhost:9001`.** Unlike the other services, the Penpot frontend bakes this absolute URL into every API/asset call, so it only works at the URL it's set to. It's currently `localhost` so direct access works without DNS. To serve it at http://penpot.homelab (Caddy → `penpot-frontend:8080`) like the rest of the stack, add a `penpot.homelab` record to Pi-hole, then change `PENPOT_PUBLIC_URI` in `docker/.env` to `http://penpot.homelab` and recreate the containers. The single `.env` value is shared by both `penpot-frontend` and `penpot-backend`, so it only needs changing in one place.
+
+Notes:
+
+- `PENPOT_FLAGS` ships with `disable-email-verification` and `disable-secure-session-cookies` for easy LAN use. Drop both before exposing Penpot to the internet.
+- The upstream compose's optional Traefik service is dropped — Caddy already handles ingress.
+
+
 # DNS Process Explained
 
 1. Set Wifi DNS on mac to IP address of Mac (ipconfig getifaddr en0)
@@ -932,6 +960,8 @@ The tables below cover the Docker Compose + Caddy stack (`docker/`). Network URL
 | cta-map | N/A | http://cta-map.homelab | N/A |
 | hermes | http://localhost:9119 | http://hermes.homelab | admin / changeMe |
 | archivebox | http://localhost:8010 | http://archivebox.homelab | admin / changeme |
+| penpot | http://localhost:9001 | http://penpot.homelab | set on first run (registration) |
+| penpot-mailcatch | http://localhost:1080 | N/A (no Caddy block) | N/A |
 | matomo | http://localhost:8080 | N/A (no Caddy block) | set on first run; DB pass changeMe |
 | alloy | http://localhost:12345 | N/A (no Caddy block) | N/A |
 
@@ -962,4 +992,9 @@ No web UI; listed for completeness.
 | archivist-es (elasticsearch) | N/A | N/A | elastic / changeMe |
 | archivist-redis | N/A | N/A | N/A |
 | beszel-agent | N/A | N/A | N/A |
+| penpot-backend | N/A | N/A | uses PENPOT_SECRET_KEY |
+| penpot-exporter | N/A | N/A | N/A |
+| penpot-mcp | N/A | N/A | N/A |
+| penpot-postgres | N/A | N/A | penpot / penpot |
+| penpot-valkey | N/A | N/A | N/A |
 | tailscale | N/A | N/A | N/A |

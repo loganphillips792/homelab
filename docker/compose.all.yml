@@ -5,3 +5,5 @@ include:
   - matomo/docker-compose.yml
   - hermes-agent/docker-compose.yml
   - archivebox/docker-compose.yml
+  - path: penpot/docker-compose.yml
+    env_file: penpot/.env
