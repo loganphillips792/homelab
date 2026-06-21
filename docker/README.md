@@ -52,7 +52,7 @@
 6. Setup Ubuntu VM for Docker
     1. Download Ubuntu Desktop ISO
     2. Datacenter > pve > local (pve) > ISO Images > Upload Ubuntu ISO file
-    3. Create VM
+    3. Create VM (check Advanced)
         - General
             - Node: PVE
             - VM ID: 100
@@ -68,13 +68,13 @@
         - Disks
             - Disk
                 - Storage: local-lvm
-                - Disk size (GiB): 64
+                - Disk size (GiB): 256
         - CPU (https://10.0.0.98:8006/pve-docs/chapter-qm.html#qm_cpu)
             - Sockets - 1
-            - Cores - 4
+            - Cores - 8
         - Memory (https://10.0.0.98:8006/pve-docs/chapter-qm.html#qm_memory)
-            - Memory (MiB) - 8192
-            - Minimum Memory (MiB) - 8192
+            - Memory (MiB) - 32768
+            - Minimum Memory (MiB) - 32768
             - Ballooning Device - Enabled
        -  Network (https://10.0.0.98:8006/pve-docs/chapter-qm.html#qm_network_device)
             - Default 
@@ -123,9 +123,12 @@
         2. Create Docker Volumes directory: `mkdir ~/docker-volumes`
         3. `cd homelab`
         4. `git clone https://github.com/loganphillips792/homelab.git`
-        5. Update the IP Addresses in the PiHole DNS config to the IP Address of the Ubuntu VM: `sed -i 's/10\.0\.0\.227/10.0.0.33/g' docker/pihole/etc-dnsmasq.d/10-homelab.conf`
+        5. Update the IP Addresses in the PiHole DNS config to the IP Address of the Ubuntu VM: `sed -i 's/10\.0\.0\.32/10.0.0.214/g' docker/pihole/etc-dnsmasq.d/10-homelab.conf`
             - If these records are updated after the docker containers are already running, run `docker compose restart pihole` to restart pihole and apply the DNS changes
         6. Add .env file for live-auction (optional)
+
+    5. `sudo apt install vim`
+
     7. Set up DNS (free port 53)
        
        `sudo vim /etc/netplan/01-network-manager-all.yaml`
@@ -133,11 +136,11 @@
        ```
         # Let NetworkManager manage all devices on this system
         network:
-        version: 2
-        ethernets:
+          version: 2
+          ethernets:
             ens18:
-            dhcp4: yes
-            nameservers:
+              dhcp4: yes
+              nameservers:
                 addresses: [1.1.1.1, 9.9.9.9]
        ```
     8. `sudo netplan apply`
@@ -170,11 +173,11 @@ Confirm port 53 is now free: `sudo ss -lunpt | grep :53 || echo "Port 53 is free
     ```
     # Let NetworkManager manage all devices on this system
     network:
-    version: 2
-    ethernets:
+      version: 2
+      ethernets:
         ens18:
-        dhcp4: yes
-        nameservers:
+          dhcp4: yes
+          nameservers:
             addresses: [10.0.0.33]
     ```
     2. `sudo netplan apply`
@@ -511,6 +514,8 @@ in a SQLite DB under /app/data. You will have to manually import the backup file
 
 - There is a something going on with the DNS, where some services are reported to be up, but others are reported to be down. These down services, are still acccessible by URL, but uptime-kuma reports them as down due to the errror `getaddrinfo ENOTFOUND`. To fix this, run `sudo dscacheutil -flushcache; sudo killall -HUP mDNSResponder` on the host Mac machine, and uptime-kuma should successfully report that all services are running.
 
+### Backup / Restore
+
 - Backup sql DB: `ssh logan@10.0.0.33 'cd ~/homelab/docker && docker compose exec -T uptime-kuma sqlite3 /app/data/kuma.db ".backup /dev/stdout"' > uptime-kuma-backup_$(date +%F).db`
 - Backup Docker Volume: 
 ```
@@ -523,6 +528,72 @@ ssh logan@10.0.0.33 '
 ```
 
 - Restore volume: 
+
+#### Full backup (works for MariaDB)
+
+Stop first so MariaDB isn't mid-write — this gives a consistent snapshot:
+
+```
+cd ~/repos/homelab/docker
+docker compose stop uptime-kuma
+docker run --rm \
+  -v docker_uptime_kuma_data:/data \
+  -v ~/backups:/backup \
+  alpine tar czf /backup/uptime-kuma-$(date +%F).tar.gz -C /data .
+docker compose start uptime-kuma
+```
+
+Restore:
+
+```
+docker compose stop uptime-kuma
+docker run --rm \
+  -v docker_uptime_kuma_data:/data \
+  -v ~/backups:/backup \
+  alpine sh -c "rm -rf /data/* && tar xzf /backup/uptime-kuma-2026-06-19.tar.gz -C /data"
+docker compose start uptime-kuma
+```
+
+### Inspecting the volume on the host
+
+```
+docker volume ls
+docker inspect volume docker_uptime_kuma_data
+```
+
+Shows the mountpoint on the host system: `"Mountpoint": "/var/lib/docker/volumes/docker_uptime_kuma_data/_data"`
+
+On the host system: `sudo ls /var/lib/docker/volumes/docker_uptime_kuma_data/_data`
+
+### Full reset (wipe all data)
+
+This setup (`docker/docker-compose.yml`) uses container `uptime-kuma` with named volume `uptime_kuma_data`. A complete reset means wiping that volume — all monitors, history, and settings are gone.
+
+```
+cd ~/repos/homelab/docker
+
+# Stop and remove the container
+docker compose stop uptime-kuma
+docker compose rm -f uptime-kuma
+
+# Delete the data volume (this is the actual "reset" — wipes everything)
+docker volume rm docker_uptime_kuma_data
+
+# Recreate fresh
+docker compose up -d uptime-kuma
+```
+
+Notes:
+- The volume is named `docker_uptime_kuma_data` because Compose prefixes it with the project name (the `docker/` directory). Confirm with `docker volume ls | grep uptime_kuma` if `docker volume rm` complains.
+- If the volume won't delete ("volume is in use"), the container wasn't removed yet — rerun the `rm -f` step.
+
+One-liner equivalent:
+
+```
+cd ~/repos/homelab/docker && docker compose rm -fsv uptime-kuma && docker volume rm docker_uptime_kuma_data && docker compose up -d uptime-kuma
+```
+
+`rm -fsv` stops the container and removes its anonymous volumes, but the named volume must still be removed explicitly with `docker volume rm` — that's the step that actually clears Uptime Kuma's state.
 
 ## Tailscale
 
@@ -813,3 +884,82 @@ https://www.reddit.com/r/selfhosted/comments/1u4dwms/comment/orcoeac/?utm_source
 - `{container=~".*app.*"} | json | user_email!=""`
 - `{container=~".*app.*"} | json | user_email="adminuser@example.com"`
 - `{container=~".*app.*"} | json | message="create_item_request"`
+
+
+
+# List of Services
+
+The tables below cover the Docker Compose + Caddy stack (`docker/`). Network URLs are served by Caddy at `*.homelab`. Localhost URLs only exist for services that publish a host port; most are reached via Caddy only. Most credentials are committed defaults/placeholders — change them.
+
+## Applications
+
+| Service | Localhost URL | Network URL (Caddy) | Credentials |
+|-|-|-|-|
+| grafana | N/A | http://grafana.homelab | admin / admin123 |
+| cadvisor | http://localhost:8089 | http://cadvisor.homelab | N/A |
+| homepage | N/A | http://homepage.homelab | N/A |
+| cronmaster | http://localhost:40123 | http://cronmaster.homelab | password: very_strong_password |
+| pihole | N/A | http://pihole.homelab | password: changeme |
+| kafka-ui | N/A | http://kafka-ui.homelab | N/A |
+| akhq | N/A | http://akhq.homelab | N/A |
+| gatus | http://localhost:8082 | http://gatus.homelab | N/A |
+| excalidraw | N/A | http://excalidraw.homelab | N/A |
+| dozzle | N/A | http://dozzle.homelab | N/A |
+| glance | N/A | http://glance.homelab | N/A |
+| uptime-kuma | N/A | http://uptime-kuma.homelab | set on first run, but set it to admin / password123 |
+| jellyfin | N/A | http://jellyfin.homelab | set on first run |
+| n8n | N/A | http://n8n.homelab | set on first run (/setup) |
+| flame | N/A | http://flame.homelab | password: changeMe |
+| redisinsight | N/A | http://redisinsight.homelab | N/A (connection pre-seeded) |
+| live-auction | N/A | http://live-auction.homelab | app-managed |
+| prometheus | N/A | http://prometheus.homelab | N/A |
+| loki | N/A | http://loki.homelab | N/A |
+| metabase | N/A | http://metabase.homelab | set on first run |
+| umami | N/A | http://umami.homelab | admin / umami |
+| ollama | N/A | http://ollama.homelab | N/A |
+| ollama-webui | N/A | http://ollama-webui.homelab | N/A (auth disabled) |
+| changedetection | N/A | http://changedetection.homelab | N/A |
+| komodo | http://localhost:9120 | http://komodo.homelab | admin / changeme |
+| netdata | N/A | http://netdata.homelab | N/A |
+| karakeep | N/A | http://karakeep.homelab | set on first run (signup) |
+| beszel | http://localhost:8090 | http://beszel.homelab | set on first run |
+| backrest | N/A | http://backrest.homelab | N/A |
+| paperless-ngx | N/A | http://paperless.homelab | admin / changeMe |
+| tubearchivist | http://localhost:8000 | http://tubearchivist.homelab | tubearchivist / changeMe |
+| pinchflat | N/A | http://pinchflat.homelab | N/A |
+| immich | N/A | http://immich.homelab | set on first run |
+| jotty | http://localhost:1122 | http://jotty.homelab | N/A |
+| cta-map | N/A | http://cta-map.homelab | N/A |
+| hermes | http://localhost:9119 | http://hermes.homelab | admin / changeMe |
+| archivebox | http://localhost:8010 | http://archivebox.homelab | admin / changeme |
+| matomo | http://localhost:8080 | N/A (no Caddy block) | set on first run; DB pass changeMe |
+| alloy | http://localhost:12345 | N/A (no Caddy block) | N/A |
+
+## Backing / infrastructure services
+
+No web UI; listed for completeness.
+
+| Service | Localhost URL | Network URL (Caddy) | Credentials |
+|-|-|-|-|
+| caddy | http://localhost (:80 / :443) | (the proxy itself) | N/A |
+| kafka (broker) | localhost:9092, localhost:29092 | N/A | N/A |
+| redis | localhost:6379 | N/A | password: changeMe |
+| test-db (postgres) | localhost:5432 | N/A | testuser / testpassword |
+| n8n postgres | N/A | N/A | changeUser / changePassword |
+| metabase-db (postgres) | N/A | N/A | metabase / changeMe |
+| umami-db (postgres) | N/A | N/A | umami / umami |
+| paperless-ngx-db (postgres) | N/A | N/A | paperless / paperless |
+| paperless-ngx-broker (redis) | N/A | N/A | N/A |
+| immich postgres | N/A | N/A | postgres / postgres |
+| immich-redis | N/A | N/A | N/A |
+| immich-machine-learning | N/A | N/A | N/A |
+| matomo-db (mariadb) | N/A | N/A | root pass: changeMe |
+| matomo-cron | N/A | N/A | N/A |
+| karakeep-chrome | N/A | N/A | N/A |
+| karakeep-meilisearch | N/A | N/A | N/A |
+| komodo-mongo | N/A | N/A | admin / admin |
+| komodo-periphery | N/A | N/A | N/A |
+| archivist-es (elasticsearch) | N/A | N/A | elastic / changeMe |
+| archivist-redis | N/A | N/A | N/A |
+| beszel-agent | N/A | N/A | N/A |
+| tailscale | N/A | N/A | N/A |
