@@ -153,6 +153,10 @@ http://hermes.homelab {
   reverse_proxy hermes:9119
 }
 
+http://penpot.homelab {
+  reverse_proxy penpot-frontend:8080
+}
+
 # Wildcard also matches the subdomain-routing hosts (admin./web./api./snap-*.)
 # used by SERVER_SECURITY_MODE=safe-subdomains-fullreplay. ArchiveBox routes by
 # the Host header internally, so every label proxies to the same container.

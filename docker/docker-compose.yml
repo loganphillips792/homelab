@@ -835,7 +835,8 @@ services:
     # ports: # don't need ports because caddy proxies to the container ports for us
     #   - "80:80"
     env_file:
-      - live-auction/.env
+      - path: live-auction/.env
+        required: false
     environment:
       - OTEL_SERVICE_NAME=live-auction-backend
       - OTEL_EXPORTER_OTLP_ENDPOINT=tempo:4317 # Removed http://
@@ -894,7 +895,8 @@ services:
     container_name: cta-map
     restart: unless-stopped
     env_file:
-      - ./cta-map/compose.env
+      - path: ./cta-map/compose.env
+        required: false
     environment:
       - PORT=8080
     volumes:
