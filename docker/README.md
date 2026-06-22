@@ -363,6 +363,12 @@ sudo dscacheutil -flushcache && sudo killall -HUP mDNSResponder
 docker compose -f docker/compose.all.yml up -d --pull always
 ```
 
+- Start a single service: `docker compose -f docker/compose.all.yml up gatus -d`
+
+- Start specific services: `docker compose -f docker/compose.all.yml up gatus prometheus -d`
+
+- Restart a service: `docker compose -f docker/compose.all.yml restart gatus`
+
 - Run specific services: `docker compose -f docker/docker-compose.yml up -d --build caddy pihole`
 
 - `docker compose -f docker/docker-compose.yml restart caddy` - restart specific service
