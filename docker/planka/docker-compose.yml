@@ -1,0 +1,64 @@
+# Planka (open-source Kanban).
+# Internal services communicate over the dedicated `planka` network. Only the
+# `planka` app container is also attached to the shared main-network so Caddy can
+# proxy http://planka.homelab -> planka:1337.
+#
+# WARNING: planka bakes BASE_URL into the frontend, so it only works at the URL
+# it's set to (same caveat as Penpot). Defaults to http://planka.homelab, reached
+# via Caddy -> add a planka.homelab record to Pi-hole DNS. Override BASE_URL with
+# the PLANKA_BASE_URL env var to serve it over localhost:1337 instead (testing).
+#
+# Security note: internal services should be added to the outgoing block list
+# (OUTGOING_BLOCKED_IPS / OUTGOING_BLOCKED_HOSTS). By default only localhost and
+# postgres hostnames are blocked. If you enable S3, OIDC, or other internal
+# integrations, add their hostnames there too.
+# Docs: https://docs.planka.cloud/docs/installation/docker/
+
+services:
+  planka:
+    image: ghcr.io/plankanban/planka:latest
+    container_name: planka
+    restart: always
+    volumes:
+      - planka_data:/app/data
+    ports:
+      - "1337:1337" # exposed on localhost for testing; caddy also proxies internally
+    networks:
+      - planka
+      - main-network
+    environment:
+      # Planka bakes BASE_URL into the frontend, so it only works at the URL it's
+      # set to (unlike drawio, it does NOT tolerate a host mismatch). Defaults to
+      # planka.homelab (served via Caddy). To test over localhost without DNS, set
+      # BASE_URL to match the published port -- but planka.homelab will then break:
+      #   PLANKA_BASE_URL=http://localhost:1337 docker compose up -d planka
+      - BASE_URL=${PLANKA_BASE_URL:-http://planka.homelab}
+      - DATABASE_URL=postgresql://postgres@planka-postgres/planka
+      - SECRET_KEY=${PLANKA_SECRET_KEY}
+    depends_on:
+      planka-postgres:
+        condition: service_healthy
+
+  planka-postgres:
+    image: postgres:16-alpine
+    container_name: planka-postgres
+    restart: always
+    volumes:
+      - planka_db_data:/var/lib/postgresql/data
+    networks:
+      - planka
+    environment:
+      - POSTGRES_DB=planka
+      - POSTGRES_HOST_AUTH_METHOD=trust
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d planka"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  planka_data:
+  planka_db_data:
+
+networks:
+  planka:

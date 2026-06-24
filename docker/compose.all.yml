@@ -7,3 +7,5 @@ include:
   - archivebox/docker-compose.yml
   - path: penpot/docker-compose.yml
     env_file: penpot/.env
+  - path: planka/docker-compose.yml
+    env_file: planka/.env

@@ -825,6 +825,67 @@ Notes:
 - The upstream compose's optional Traefik service is dropped — Caddy already handles ingress.
 
 
+## Planka
+
+[Planka](https://planka.app) is an open-source Kanban board (Trello-style project management). It runs as two services — the `planka` app and its own `planka-postgres` — defined in `planka/docker-compose.yml`. The internal services sit on a dedicated `planka` network; only `planka` also joins `main-network` so Caddy can proxy http://planka.homelab → `planka:1337`.
+
+Set `PLANKA_SECRET_KEY` in `docker/planka/.env` before first start (sessions and tokens derive from it — changing it later invalidates them). Generate one with:
+
+```
+openssl rand -hex 64
+```
+
+Add a `planka.homelab` record to Pi-hole DNS, then start the stack:
+
+```
+docker compose -f compose.all.yml up -d planka planka-postgres
+```
+
+Create the first admin user (it prints the generated email/password):
+
+```
+docker compose -f compose.all.yml run --rm planka npm run db:create-admin-user
+```
+
+Reach the UI at http://planka.homelab and log in with those credentials.
+
+> **Note — `BASE_URL` is baked into the frontend.** Like Penpot, Planka bakes its `BASE_URL` into every API/asset call, so it only works at the URL it's set to (unlike drawio, it does **not** tolerate a host mismatch). It defaults to `http://planka.homelab` (served via Caddy). The host port `1337` is published, so to test over localhost without DNS, override the URL to match and recreate:
+>
+> ```
+> PLANKA_BASE_URL=http://localhost:1337 docker compose -f compose.all.yml up -d planka
+> ```
+>
+> While set to localhost, `planka.homelab` won't work — switch `PLANKA_BASE_URL` back (or unset it) to return to Caddy serving.
+
+### Backup / Restore
+
+`planka/backup.sh` and `planka/restore.sh` are Planka's upstream scripts, pre-configured for the `planka` / `planka-postgres` container names. A backup exports the Postgres database and the data volume (avatars, backgrounds, attachments) into a single `.tgz`.
+
+Manual backup (writes the tarball to the current directory, or a directory you pass):
+
+```
+cd docker/planka && ./backup.sh
+```
+
+> **Danger — restore overwrites the running instance.** Make sure you're restoring the correct backup.
+
+```
+cd docker/planka && ./restore.sh 2026-01-17T15-37-22Z-backup.tgz
+```
+
+Automate a nightly backup at 2 AM with `crontab -e` (keeps 14 days):
+
+```
+0 2 * * * cd /home/logan/repos/homelab/docker/planka && bash backup.sh > /dev/null 2>&1
+0 2 * * * find /home/logan/repos/homelab/docker/planka/*.tgz -mtime +14 -delete > /dev/null 2>&1
+```
+
+Notes:
+
+- `planka-postgres` uses `POSTGRES_HOST_AUTH_METHOD=trust` (LAN-only, no DB password), matching upstream. Don't expose Postgres outside the `planka` network.
+- The upstream compose's optional Traefik/S3/OIDC config is dropped — Caddy handles ingress; enable the others later via env if needed.
+
+
 # DNS Process Explained
 
 1. Set Wifi DNS on mac to IP address of Mac (ipconfig getifaddr en0)
@@ -941,6 +1002,7 @@ The tables below cover the Docker Compose + Caddy stack (`docker/`). Network URL
 | akhq | N/A | http://akhq.homelab | N/A |
 | gatus | http://localhost:8082 | http://gatus.homelab | N/A |
 | excalidraw | N/A | http://excalidraw.homelab | N/A |
+| drawio | http://localhost:8080 | http://drawio.homelab | N/A |
 | dozzle | N/A | http://dozzle.homelab | N/A |
 | glance | N/A | http://glance.homelab | N/A |
 | uptime-kuma | N/A | http://uptime-kuma.homelab | set on first run, but set it to admin / password123 |
@@ -970,6 +1032,7 @@ The tables below cover the Docker Compose + Caddy stack (`docker/`). Network URL
 | hermes | http://localhost:9119 | http://hermes.homelab | admin / changeMe |
 | archivebox | http://localhost:8010 | http://archivebox.homelab | admin / changeme |
 | penpot | http://localhost:9001 | http://penpot.homelab | set on first run (registration) |
+| planka | http://localhost:1337 | http://planka.homelab | created via `npm run db:create-admin-user` |
 | penpot-mailcatch | http://localhost:1080 | N/A (no Caddy block) | N/A |
 | matomo | http://localhost:8080 | N/A (no Caddy block) | set on first run; DB pass changeMe |
 | alloy | http://localhost:12345 | N/A (no Caddy block) | N/A |
@@ -990,6 +1053,7 @@ No web UI; listed for completeness.
 | paperless-ngx-db (postgres) | N/A | N/A | paperless / paperless |
 | paperless-ngx-broker (redis) | N/A | N/A | N/A |
 | immich postgres | N/A | N/A | postgres / postgres |
+| planka-postgres | N/A | N/A | postgres (trust auth, no password) |
 | immich-redis | N/A | N/A | N/A |
 | immich-machine-learning | N/A | N/A | N/A |
 | matomo-db (mariadb) | N/A | N/A | root pass: changeMe |
