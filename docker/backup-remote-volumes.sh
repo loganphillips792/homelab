@@ -21,6 +21,8 @@ echo "Stopping docker-compose stacks..."
 docker compose -f docker/docker-compose.yml down
 docker compose --env-file docker/immich/docker-compose.env -f docker/immich/docker-compose.yml down
 docker compose --env-file docker/.env -f docker/tubearchivist/docker-compose.yml down
+# Stop Planka so its Postgres volume is copied consistently (not mid-write)
+docker compose --env-file docker/planka/.env -f docker/planka/docker-compose.yml down
 
 echo "Ensuring backup directory exists at $BACKUP_DIR..."
 mkdir -p "$BACKUP_DIR"
@@ -44,6 +46,7 @@ echo "Starting docker-compose stacks..."
 docker compose -f docker/docker-compose.yml up -d
 docker compose --env-file docker/immich/docker-compose.env -f docker/immich/docker-compose.yml up -d
 docker compose --env-file docker/.env -f docker/tubearchivist/docker-compose.yml up -d
+docker compose --env-file docker/planka/.env -f docker/planka/docker-compose.yml up -d
 
 echo "All stacks started again."
 EOF
