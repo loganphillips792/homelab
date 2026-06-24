@@ -46,6 +46,10 @@ http://excalidraw.homelab {
   reverse_proxy excalidraw:80
 }
 
+http://drawio.homelab {
+  reverse_proxy drawio:8080
+}
+
 http://dozzle.homelab {
   reverse_proxy dozzle:8080
 }

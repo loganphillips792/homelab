@@ -908,6 +908,9 @@ https://www.reddit.com/r/selfhosted/comments/1u4dwms/comment/orcoeac/?utm_source
 - [First steps - Trivy](https://trivy.dev/docs/latest/getting-started/)
 - https://github.com/HKUDS/nanobot
 - https://github.com/paperclipai/paperclip 
+- syncthing
+- stirling-PDF
+- Documenso
 
 
 
