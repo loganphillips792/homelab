@@ -989,6 +989,18 @@ https://www.reddit.com/r/selfhosted/comments/1u4dwms/comment/orcoeac/?utm_source
 
 The tables below cover the Docker Compose + Caddy stack (`docker/`). Network URLs are served by Caddy at `*.homelab`. Localhost URLs only exist for services that publish a host port; most are reached via Caddy only. Most credentials are committed defaults/placeholders — change them.
 
+## Services requiring URL change between localhost and homelab
+
+These services bake their public URL into the frontend at startup — they only work at the URL they were configured with. Switching between localhost and homelab access requires updating the variable below and recreating the container (`docker compose up -d <service>`, not `restart`).
+
+| Service | Variable | File | Localhost value | Homelab value |
+|-|-|-|-|-|
+| penpot | `PENPOT_PUBLIC_URI` | `penpot/.env` | `http://localhost:9001` | `http://penpot.homelab` |
+| planka | `PLANKA_BASE_URL` | env override at run time | `http://localhost:1337` | `http://planka.homelab` (unset = default) |
+| karakeep | `NEXTAUTH_URL` | `karakeep/.env` | `http://localhost:3000` | `http://karakeep.homelab` |
+| tubearchivist | `TA_HOST` | `docker/.env` | `http://localhost:8000` | `http://tubearchivist.homelab` |
+| archivebox | `BASE_URL` | `archivebox/docker-compose.yml` | `http://archivebox.localhost:8010` | `http://archivebox.homelab` |
+
 ## Applications
 
 | Service | Localhost URL | Network URL (Caddy) | Credentials |
