@@ -972,6 +972,7 @@ https://www.reddit.com/r/selfhosted/comments/1u4dwms/comment/orcoeac/?utm_source
 - syncthing
 - stirling-PDF
 - Documenso
+- https://github.com/9001/copyparty
 
 
 
