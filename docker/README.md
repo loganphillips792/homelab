@@ -1072,3 +1072,56 @@ No web UI; listed for completeness.
 | penpot-postgres | N/A | N/A | penpot / penpot |
 | penpot-valkey | N/A | N/A | N/A |
 | tailscale | N/A | N/A | N/A |
+
+
+
+# Install PopOS & Access Proxmox GUI outside of home network (Tailscale on Proxmox host)
+
+1, Download ISO
+2. Datacenter > pve > local (pve) > ISO Images > Upload
+3. Create VM
+	- Name: PopOS
+	- OS
+		- Storage: local
+		- ISO image: PopOS
+		- Type: Linux
+		- Disk size: 250 GiB
+		- CPU: 8 Cores
+		- Memory: 32768
+4. Click on PopOS VM
+5. Start
+6. Click Console
+7. Go through set up process
+8. ctrl+alt+f2
+	- `flatpak install flathub org.wezfurlong.wezterm`
+9. While you're on your home network, open https://10.0.0.98:8006 in a browser and log in. In the left sidebar, click your node name (probably "pve"), then click the Shell button. You now have a root command line on the Proxmox host. Everything in the next step gets typed here.
+10. 
+```
+curl -fsSL https://tailscale.com/install.sh | sh
+tailscale up
+```
+
+tailscale up prints a login URL. Copy it into a browser, sign in (make an account if you don't have one — Google/GitHub/email all work). This links the Proxmox host to your account.
+
+Then get its Tailscale address: `tailscale ip -4`
+
+
+On the phone: turn Wi-Fi off, leave cellular data on. This proves you're genuinely "outside" your home network.
+Confirm the Tailscale toggle is still on.
+Open a browser on the phone and go to:
+
+  https://100.x.y.z:8006
+(the Tailscale IP from Step 2, port 8006 — not the 10.0.0.98 address; that only works at home)
+
+You'll get a certificate warning because Proxmox uses a self-signed cert. Tap through it (Advanced → proceed) — it's your own server, it's safe.
+
+If you get errors from mobile
+
+- `apt update`
+- `apt full-upgrade`
+
+
+# Tailscale in LXC on proxmox as a subnet router
+
+https://www.reddit.com/r/Proxmox/comments/1g701ap/comment/lsmze85/?utm_source=share&utm_medium=web3x&utm_name=web3xcss&utm_term=1&utm_content=share_button
+
