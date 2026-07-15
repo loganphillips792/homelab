@@ -1125,3 +1125,4 @@ If you get errors from mobile
 
 https://www.reddit.com/r/Proxmox/comments/1g701ap/comment/lsmze85/?utm_source=share&utm_medium=web3x&utm_name=web3xcss&utm_term=1&utm_content=share_button
 
+[How safe is it to install Tailscale on a Proxmox cluster node? : r/Proxmox](https://www.reddit.com/r/Proxmox/comments/1uw0aek/how_safe_is_it_to_install_tailscale_on_a_proxmox/)
