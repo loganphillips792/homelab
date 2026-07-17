@@ -1,0 +1,47 @@
+# Navidrome (self-hosted music server, Subsonic-API compatible).
+# Single container on the shared main-network so Caddy can proxy
+# http://navidrome.homelab -> navidrome:4533. Port 4533 is also published, so the
+# UI works over localhost without DNS. Unlike Planka/Penpot, Navidrome does not
+# bake a base URL into the frontend, so both URLs work at once with no env changes.
+#
+# main-network is declared in the root docker-compose.yml, not here -- like the
+# other per-service files in this repo, this only comes up via compose.all.yml:
+#   docker compose -f compose.all.yml up -d navidrome
+# Docs: https://www.navidrome.org/docs/installation/docker/
+
+services:
+  navidrome:
+    image: deluan/navidrome:latest
+    container_name: navidrome
+    restart: unless-stopped
+    # Upstream recommends running as the UID:GID that owns the music library rather
+    # than root. Left commented because the uid differs between the Linux VM (1000)
+    # and a Mac running this locally (501) -- same reason jellyfin's is commented.
+    # Uncomment on the VM if you hit permission errors on /data.
+    # user: "1000:1000"
+    ports:
+      - "4533:4533" # exposed on localhost for testing; caddy also proxies internally
+    environment:
+      - ND_LOGLEVEL=info
+      - TZ=${TZ}
+    volumes:
+      # Navidrome's DB, cache and artwork.
+      #
+      # This MUST be a named volume, not a bind mount under ~/docker-volumes like
+      # most services here. Navidrome's SQLite DB runs in WAL mode, which needs
+      # shared-memory locking (the -shm file) via real mmap. On Docker Desktop a
+      # bind mount is VirtioFS ("fakeowner"), which doesn't support that, and the
+      # scanner dies partway through with "locking protocol" / "file is not a
+      # database" -- the DB is fine, SQLite just can't lock it. Named volumes live
+      # on real ext4 inside the VM. Bonus: backup-remote-volumes.sh tars named
+      # volumes, so this gets backed up while a bind mount would not have.
+      - navidrome_data:/data
+      # Music library, mounted read-only so a scan can never modify the files.
+      # Point NAVIDROME_MUSIC_DIR in navidrome/.env at your real library, e.g.
+      #   NAVIDROME_MUSIC_DIR=~/docker-volumes/pinchflat/downloads
+      - ${NAVIDROME_MUSIC_DIR:-~/docker-volumes/navidrome/music}:/music:ro
+    networks:
+      - main-network
+
+volumes:
+  navidrome_data:
