@@ -217,6 +217,115 @@ Confirm port 53 is now free: `sudo ss -lunpt | grep :53 || echo "Port 53 is free
     - resize2fs /dev/sda3
 - If at anytime there is a permission denied error during git pull process: `sudo chown -R logan:logan .` and then run `git pull` again
 
+## Allowing Claude to ssh into VM
+
+Claude can run `ssh logan@10.0.0.214` itself once its key is installed on the VM, which lets it inspect containers, read logs, and run commands directly instead of dictating them back to you.
+
+**Key auth is the only option — password auth cannot work.** Claude runs every command non-interactively, with no TTY attached, so SSH has nowhere to display a password prompt. It fails like this:
+
+```
+debug1: read_passphrase: can't open /dev/tty: Device not configured
+Permission denied, please try again.
+```
+
+Those are failed *empty* attempts, not a wrong password. Don't debug the password — the prompt never reached you. This applies to the `!` prefix in Claude Code too: `! ssh-copy-id ...` fails the same way, because that also runs without a TTY.
+
+Also: **don't paste the password into the chat.** It would be stored in the conversation transcript in plaintext and resent to the API on every subsequent turn. Key auth avoids the problem entirely.
+
+### Setup
+
+Do this in a **real terminal** (Terminal.app or iTerm — not Claude Code, which has no TTY).
+
+1. Create a keypair, if you don't already have one:
+
+    ```
+    ssh-keygen -t ed25519
+    ```
+
+    This writes two files and grants no access by itself:
+
+    - `~/.ssh/id_ed25519` — the **private** key. Stays on the Mac, never leaves it, never gets shared.
+    - `~/.ssh/id_ed25519.pub` — the **public** key. Safe to hand out; this is the half that goes on servers.
+
+    > **Skip this step if `~/.ssh/id_ed25519` already exists.** `ssh-keygen` defaults to that exact path. It prompts before overwriting, but accepting destroys the old private key permanently and locks you out of every server trusting it. Check with `ls ~/.ssh/` first.
+
+2. Install the public key on the VM:
+
+    ```
+    ssh-copy-id -i ~/.ssh/id_ed25519.pub logan@10.0.0.214
+    ```
+
+    This prompts for the account password — the last time you type it. Pass `-i` explicitly: without it, `ssh-copy-id` installs whatever key it finds first (e.g. `id_rsa_terraform.pub`), which probably isn't the one you want.
+
+3. Verify it works without a TTY, the same way Claude will call it:
+
+    ```
+    ssh -o BatchMode=yes logan@10.0.0.214 hostname
+    ```
+
+    `BatchMode=yes` disables all interactive prompts, so this fails immediately if key auth is broken rather than silently falling back to a password prompt that Claude could never answer.
+
+`ssh logan@10.0.0.214` now works with no password, and Claude can get in too.
+
+To confirm the key actually landed on the VM, compare fingerprints — clearer than eyeballing base64:
+
+```
+ssh-keygen -lf ~/.ssh/id_ed25519.pub
+ssh logan@10.0.0.214 'ssh-keygen -lf ~/.ssh/authorized_keys'
+```
+
+The first prints your key's fingerprint; the second prints one line per installed key. Yours should appear in the list.
+
+### What `authorized_keys` is
+
+`~/.ssh/authorized_keys` **on the VM** is the guest list: a plain text file, one public key per line. Any client that can prove it holds the matching private key gets let in as that user. That's the whole mechanism.
+
+`ssh-copy-id` just appends a line to it. You can do the same by hand — paste the contents of your `.pub` file onto a new line — and that's the fallback if SSH is locked out but you have console access via Proxmox.
+
+The login itself never transmits the private key. The server sends a challenge, the client signs it with the private key, the server verifies the signature against the public keys in `authorized_keys`. Nothing secret crosses the wire, which is why this is safer than a password.
+
+Consequences worth internalizing:
+
+- **The VM's `authorized_keys` is independent of your Mac.** Deleting local keys doesn't revoke anything — the line stays until you edit the file on the VM. Remove stale entries there when you rotate keys.
+- **`.pub` files on the Mac are disposable.** A modern OpenSSH private key file has its public key embedded, so SSH derives what it needs and auth works fine without them. Regenerate one anytime with `ssh-keygen -y -f ~/.ssh/id_ed25519 > ~/.ssh/id_ed25519.pub`.
+- **The private key is the irreplaceable half.** It's not derivable from anything. Lose it with no backup and you're back to password auth to re-enroll — or, on a box with `PasswordAuthentication no`, to the Proxmox console.
+
+### Back up the private key
+
+The file to back up is `~/.ssh/id_ed25519` — the one **without** the `.pub` extension. Permissions tell you which is which:
+
+```
+.rw-------  432  id_ed25519       <- secret, 600, owner-only. Back this up.
+.rw-r--r--  114  id_ed25519.pub   <- public, 644, world-readable. Disposable.
+```
+
+(SSH refuses to use a private key with loose permissions, which doubles as a sanity check.)
+
+To back it up, copy the file somewhere that survives this Mac dying:
+
+```
+cat ~/.ssh/id_ed25519
+```
+
+Paste the whole block — `-----BEGIN OPENSSH PRIVATE KEY-----` through `-----END OPENSSH PRIVATE KEY-----` — into 1Password/Bitwarden as a secure note. An encrypted USB drive or another machine you control works too. **Not** iCloud Drive or Dropbox in plaintext, not a git repo, not an AI chat window.
+
+To restore: write the file back to `~/.ssh/id_ed25519` and fix the permissions, or SSH will reject it:
+
+```
+chmod 600 ~/.ssh/id_ed25519
+```
+
+This is cheap insurance now and essential later. Today the VM still accepts `PasswordAuthentication`, so losing the key is a five-minute re-enroll. Turning password auth off is the standard hardening step for an SSH box — and the moment you do, this file is the only way in short of the Proxmox console.
+
+### Troubleshooting
+
+Run `ssh -v logan@10.0.0.214` and read the trace:
+
+- `Authentications that can continue: publickey,password` — the server accepts keys; the key just isn't in `~/.ssh/authorized_keys` on the VM yet.
+- `Offering public key: ... ` followed by the same line again — that key was rejected. Re-run `ssh-copy-id` with the right `-i`.
+- `read_passphrase: can't open /dev/tty` — no TTY, see above. You're not in a real terminal.
+- If the VM's IP changed, `known_hosts` will complain about a host key mismatch. The IP is DHCP; check the current one in `pve > UbuntuServerForDockerServices > Summary`.
+
 ## TailScale
 
 To access services outside of home network, we will use tailscale
@@ -886,6 +995,99 @@ Notes:
 - The upstream compose's optional Traefik/S3/OIDC config is dropped — Caddy handles ingress; enable the others later via env if needed.
 
 
+## Navidrome
+
+[Navidrome](https://www.navidrome.org) is a self-hosted music server and streamer that's compatible with the Subsonic API, so any Subsonic client app can play from it. It's a single container defined in `navidrome/docker-compose.yml`, on `main-network`, and Caddy proxies http://navidrome.homelab → `navidrome:4533`.
+
+The music library is set by `NAVIDROME_MUSIC_DIR` in `docker/navidrome/.env`, mounted read-only at `/music`. It currently points at the Elements external drive:
+
+```
+NAVIDROME_MUSIC_DIR=/Volumes/Elements/Music
+```
+
+That's a Mac path and it does **not** exist on the Linux VM. Docker would silently create an empty directory there rather than fail, leaving Navidrome scanning nothing — repoint it before running this on the VM. Unset the var entirely and it falls back to `~/docker-volumes/navidrome/music`.
+
+The `navidrome.homelab` record is already committed to `pihole/etc-dnsmasq.d/10-homelab.conf`, so it just needs Pi-hole to pick it up. Start the service and reload DNS:
+
+```
+docker compose -f compose.all.yml up -d navidrome
+docker compose -f compose.all.yml restart pihole caddy
+```
+
+Reach the UI at http://localhost:4533, or at http://navidrome.homelab wherever Caddy and Pi-hole are actually serving the stack (see the phone-access section below — the `.homelab` name does not resolve to the Mac today). The first account you create on the sign-up screen becomes the admin.
+
+Notes:
+
+- The library is mounted `:ro` so a scan can never modify the originals. Navidrome's own DB, cache and artwork live in the `navidrome_data` named volume.
+- That volume is deliberately **not** a `~/docker-volumes` bind mount like most services here. Navidrome's SQLite DB runs in WAL mode, which needs shared-memory locking via real `mmap`; a Docker Desktop bind mount is VirtioFS (`fakeowner`), which doesn't support it, and the scanner dies partway through with `locking protocol` / `file is not a database`. Named volumes are real ext4 inside the VM. It also means `backup-remote-volumes.sh` picks the DB up, since that script only tars named volumes.
+- The initial scan runs on startup — about 3 minutes for the ~5,400-track Elements library. Watch it with `docker compose -f compose.all.yml logs -f navidrome`; it ends with `Scanner: Finished scanning all libraries`. Rescans then run on a schedule (`ND_SCANSCHEDULE`).
+- Unlike Planka and Penpot, Navidrome doesn't bake a base URL into the frontend, so there's no `BASE_URL` env var to juggle — it serves correctly on whatever host it's reached by (localhost, LAN IP, or `.homelab`) with no config changes and no one URL breaking another.
+- Upstream's `user: 1000:1000` is left commented out in compose — the uid differs between the Linux VM (1000) and a Mac running it locally (501). Uncomment it on the VM if you hit permission errors on `/data`.
+- Its `compose.all.yml` include lists both `.env` and `navidrome/.env`: naming an `env_file` replaces the default `.env` lookup, so the shared one has to be listed explicitly or `${TZ}` resolves to empty.
+
+### Access from your phone (or any LAN device)
+
+Port 4533 is published on all interfaces, so anything on the same Wi-Fi can reach Navidrome directly by the host's LAN IP — no Caddy, no DNS, no Pi-hole involved. Get the address of the Mac running it:
+
+```
+ipconfig getifaddr en0
+```
+
+Then browse to `http://<that-ip>:4533`. At the time of writing that's http://10.0.0.227:4533.
+
+Since Navidrome speaks the Subsonic API, a native client is usually nicer than the web UI on a phone — Amperfy or play:Sub on iOS, Symfonium or DSub on Android. Point any of them at the same `http://<ip>:4533` with the admin login for offline sync and lock-screen controls.
+
+Three things worth knowing:
+
+- **The IP is DHCP and will eventually change.** If the phone stops connecting, re-run `ipconfig getifaddr en0` before assuming anything is broken. A DHCP reservation in the router pinning the Mac to a fixed address is the real fix.
+- **`navidrome.homelab` does not work from other devices when the stack runs on the Mac.** Caddy and Pi-hole aren't running there, and the records in `10-homelab.conf` all point at `10.0.0.32` while the Mac currently answers on `10.0.0.227` — so the name resolves to the wrong host. Pinning the Mac to `10.0.0.32` via DHCP reservation would make all the existing records correct at once. Until then, use the IP directly.
+- **To confirm it's genuinely reachable rather than just listening**, check the bind address and make a real request over the LAN (not loopback):
+
+```
+docker port navidrome                              # want 0.0.0.0:4533, not 127.0.0.1:4533
+curl --max-time 5 -o /dev/null -w '%{http_code}\n' http://<ip>:4533/app/   # want 200
+```
+
+macOS's firewall can also block this even when the port is bound correctly — check with `/usr/libexec/ApplicationFirewall/socketfilterfw --getglobalstate`.
+
+### Reinstall / start fresh
+
+Wipes the database and rebuilds from scratch.
+
+> **Danger — don't use `docker compose down navidrome`.** Depending on the Compose version that tears down the whole project, and `compose.all.yml` is every service in the stack. `stop` + `rm` can only touch navidrome.
+
+```
+cd ~/repos/homelab/docker
+
+# 1. Stop and remove just the container
+docker compose -f compose.all.yml stop navidrome
+docker compose -f compose.all.yml rm -f navidrome
+
+# 2. Delete the DB, cache and plugins -- this is the actual "uninstall"
+docker volume rm docker_navidrome_data
+
+# 3. Force a fresh image (optional, skip if you just want a clean DB)
+docker rmi deluan/navidrome:latest
+
+# 4. Rebuild from scratch
+docker compose -f compose.all.yml pull navidrome
+docker compose -f compose.all.yml up -d navidrome
+
+# 5. Watch the scan
+docker compose -f compose.all.yml logs -f navidrome
+```
+
+This throws away the admin account, play counts, ratings and playlists — you'll create a new admin on first load. The music itself is never at risk: the library is mounted `:ro`, so nothing Navidrome does can touch it. It just gets re-scanned from scratch — about 3 minutes for the ~5,400-track Elements library.
+
+> **Note — a reinstall won't fix `locking protocol` or `file is not a database`.** Those aren't corruption, so wiping the DB only buys you a clean one that breaks again on the next scan. They mean `/data` has ended up on a bind mount instead of the `navidrome_data` named volume — see the volume comment in `navidrome/docker-compose.yml`. Check with:
+>
+> ```
+> docker inspect navidrome --format '{{range .Mounts}}{{.Type}} {{.Destination}}{{"\n"}}{{end}}'
+> ```
+>
+> `/data` must say `volume`. If it says `bind`, that's the bug.
+
+
 # DNS Process Explained
 
 1. Set Wifi DNS on mac to IP address of Mac (ipconfig getifaddr en0)
@@ -1032,6 +1234,7 @@ The tables below cover the Docker Compose + Caddy stack (`docker/`). Network URL
 | cta-map | N/A | http://cta-map.homelab | N/A |
 | hermes | http://localhost:9119 | http://hermes.homelab | admin / changeMe |
 | archivebox | http://localhost:8010 | http://archivebox.homelab | admin / changeme |
+| navidrome | http://localhost:4533 | http://navidrome.homelab | set on first run (first user is admin) |
 | penpot | http://localhost:9001 | http://penpot.homelab | set on first run (registration) |
 | planka | http://localhost:1337 | http://planka.homelab | created via `npm run db:create-admin-user` |
 | penpot-mailcatch | http://localhost:1080 | N/A (no Caddy block) | N/A |

@@ -104,6 +104,21 @@
           type: jellyfin
           url: http://jellyfin:8096
           key: REPLACE_WITH_JELLYFIN_API_KEY
+    - Navidrome:
+        icon: navidrome
+        href: http://navidrome.homelab
+        description: Music server (Subsonic API)
+        # Optional widget -- shows a "now playing" count. Left off because it needs
+        # Subsonic token auth rather than an API key: pick any salt, then set
+        # token to md5(password + salt). Uncomment and fill in once an admin
+        # account exists:
+        #   echo -n 'yourpasswordyoursalt' | md5
+        # widget:
+        #   type: navidrome
+        #   url: http://navidrome:4533
+        #   user: admin
+        #   salt: yoursalt
+        #   token: REPLACE_WITH_MD5_OF_PASSWORD_PLUS_SALT
     - Pinchflat:
         icon: https://cdn.jsdelivr.net/gh/selfhst/icons/svg/uptime-kuma.svg
         href: http://pinchflat.homelab

@@ -9,3 +9,10 @@ include:
     env_file: penpot/.env
   - path: planka/docker-compose.yml
     env_file: planka/.env
+  # Both files are listed: navidrome/.env holds NAVIDROME_MUSIC_DIR, but naming an
+  # env_file replaces the default .env lookup, so the shared .env has to be listed
+  # explicitly too or ${TZ} would resolve to empty.
+  - path: navidrome/docker-compose.yml
+    env_file:
+      - .env
+      - navidrome/.env
