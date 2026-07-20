@@ -1175,6 +1175,7 @@ https://www.reddit.com/r/selfhosted/comments/1u4dwms/comment/orcoeac/?utm_source
 - stirling-PDF
 - Documenso
 - https://github.com/9001/copyparty
+- [OpenHands/OpenHands: 🙌 OpenHands: AI-Driven Development](https://github.com/OpenHands/openhands)
 
 
 
