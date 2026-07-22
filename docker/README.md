@@ -803,6 +803,31 @@ OR
 OR
 If you ever want to connect from another container in the same compose network, use the service name: `redis-cli -h redis -a your_password_here`
 
+## Redis Pub/Sub
+
+```
+cd docker/redis-pubsub && docker compose up -d     # or: docker compose -f docker/compose.all.yml up -d redis-pubsub
+```
+
+Two terminals to see pub/sub in action:
+
+```
+# terminal 1 — subscriber
+docker exec -it redis-pubsub redis-cli -a changeMe SUBSCRIBE news
+# terminal 2 — publisher
+docker exec -it redis-pubsub redis-cli -a changeMe PUBLISH news "hello"
+```
+
+`PSUBSCRIBE "news.*"` works for pattern matching. Same commands are in the compose file header for reference.
+
+One thing to note about pub/sub while you're messing around: if no client is subscribed at publish time, the message is simply dropped — there's no backlog or replay. That's the key difference from streams, and exactly why there's no persistence here.
+
+### Driving pub/sub from RedisInsight
+
+This stack ships its own dedicated RedisInsight (`redis-pubsub-insight`), separate from the main `redisinsight` service and scoped to just this stack. It's a nicer way to watch pub/sub than two `redis-cli` terminals — its **Pub/Sub** panel subscribes live and you can publish from the same screen. The connection to `redis-pubsub` is pre-seeded, so there's nothing to configure.
+
+Standalone it publishes on host port `5541` (the main redisinsight uses `5540`), so reach it at http://localhost:5541. Open the pre-seeded database → **Pub/Sub** tab to subscribe, then run a Workbench `PUBLISH news "hello"` (or the CLI) to see messages arrive.
+
 ## Umami
 
 Username: admin
@@ -1263,6 +1288,7 @@ No web UI; listed for completeness.
 | caddy | http://localhost (:80 / :443) | (the proxy itself) | N/A |
 | kafka (broker) | localhost:9092, localhost:29092 | N/A | N/A |
 | redis | localhost:6379 | N/A | password: changeMe |
+| redis-pubsub | localhost:6380 | N/A | password: changeMe |
 | test-db (postgres) | localhost:5432 | N/A | testuser / testpassword |
 | n8n postgres | N/A | N/A | changeUser / changePassword |
 | metabase-db (postgres) | N/A | N/A | metabase / changeMe |
