@@ -1,0 +1,75 @@
+# Standalone Redis for experimenting with pub/sub.
+#
+# Pub/sub is fire-and-forget: a PUBLISH is delivered only to clients SUBSCRIBEd
+# at that instant and is never stored. So there is deliberately no persistence
+# (no AOF, no RDB) and no data volume here — there is nothing to save.
+#
+# Run on its own:          cd docker/redis-pubsub && docker compose up -d
+# Or as part of the fleet: already wired into ../compose.all.yml
+#
+# Try it (open two terminals):
+#   subscribe: docker exec -it redis-pubsub redis-cli -a changeMe SUBSCRIBE news
+#   publish:   docker exec -it redis-pubsub redis-cli -a changeMe PUBLISH news "hello"
+#   patterns:  docker exec -it redis-pubsub redis-cli -a changeMe PSUBSCRIBE "news.*"
+#
+# Or use the bundled RedisInsight GUI (redis-pubsub-insight) at http://localhost:5541
+# — the pub/sub connection is pre-seeded, and its Pub/Sub panel does both ends at once.
+
+services:
+  redis-pubsub:
+    image: redis:7-alpine
+    container_name: redis-pubsub
+    restart: unless-stopped
+    # --save "" --appendonly no => persistence off; nothing about pub/sub hits disk.
+    command: redis-server --save "" --appendonly no --requirepass ${REDIS_PUBSUB_PASSWORD:-changeMe}
+    ports:
+      # 6380 on the host so it doesn't collide with the primary redis on 6379.
+      - "6380:6379"
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli -a ${REDIS_PUBSUB_PASSWORD:-changeMe} ping | grep PONG"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    networks:
+      - redis-pubsub
+
+  # Dedicated RedisInsight for this stack only — separate from the main
+  # `redisinsight` service. Its Pub/Sub panel subscribes live and publishes from
+  # the same screen, which beats juggling two redis-cli terminals. The connection
+  # to redis-pubsub is pre-seeded via RI_REDIS_* so there's nothing to set up.
+  redis-pubsub-insight:
+    image: redis/redisinsight:latest
+    container_name: redis-pubsub-insight
+    restart: unless-stopped
+    ports:
+      # 5541 on the host so it doesn't collide with the main redisinsight on 5540.
+      - "5541:5540"
+    volumes:
+      - redis-pubsub-insight-data:/data
+    environment:
+      - RI_APP_PORT=5540
+      - RI_APP_HOST=0.0.0.0
+      - RI_ENCRYPTION_KEY=${RI_ENCRYPTION_KEY:-changeMeToAStrongRandomKey}
+      - RI_ACCEPT_TERMS_AND_CONDITIONS=true
+      - RI_DATABASE_MANAGEMENT=true
+      # Preconfigure the pub/sub connection (ID defaults to 0 when omitted)
+      - RI_REDIS_HOST=redis-pubsub
+      - RI_REDIS_PORT=6379
+      - RI_REDIS_ALIAS=Redis Pub/Sub
+      - RI_REDIS_USERNAME=default
+      - RI_REDIS_PASSWORD=${REDIS_PUBSUB_PASSWORD:-changeMe}
+      - RI_REDIS_TLS=false
+      - RI_REDIS_DB=0
+    depends_on:
+      - redis-pubsub
+    networks:
+      - redis-pubsub
+
+# Own isolated network so this stack runs standalone without the shared
+# main-/kafka-network defined in ../docker-compose.yml.
+networks:
+  redis-pubsub:
+    driver: bridge
+
+volumes:
+  redis-pubsub-insight-data:
