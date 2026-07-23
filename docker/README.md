@@ -750,11 +750,169 @@ To ssh into VM:
 
 ## Test Postgres
 
+A standalone Postgres instance (`test-db`, container `postgres_db`, image `postgres:16`) defined in `docker/docker-compose.yml`. Nothing else in the stack uses it — it is not on `main-network` and no other service depends on it. It exists purely as a scratch database for experimenting with SQL, clients, and backup tooling.
 
+| Setting | Value |
+|-|-|
+| Host | `localhost:5432` |
+| User | `testuser` |
+| Password | `testpassword` |
+| Database | `test_database` |
 
+On first start it runs `docker/test-db-init.sql` (mounted at `/docker-entrypoint-initdb.d/10-test-table.sql`), which creates a sample `test-table`. Data lives in the `postgres_test_data` volume.
+
+- `docker compose -f docker/docker-compose.yml up -d test-db` - start it
 - `docker compose -f docker/docker-compose.yml exec -T test-db psql -U testuser -d test_database -f docker-entrypoint-initdb.d/10-test-table.sql` - if you have to rerun the SQL script
-
 - `docker exec -it postgres_db psql -U testuser -d test_database -c 'SELECT * FROM "test-table";'`
+
+### pgBackRest
+
+[pgBackRest](https://pgbackrest.org/) is a backup and restore tool for Postgres — full/differential/incremental backups, WAL archiving, and point-in-time recovery. The test Postgres above is the target used to try it out.
+
+#### macOS
+
+```
+brew install pgbackrest
+```
+
+This gives you the CLI locally, which is handy for reading docs/help and for inspecting a repo that lives on the Mac. It **cannot** back up `test-db` directly: pgBackRest needs filesystem access to `PGDATA`, and that lives inside the `postgres_test_data` Docker volume (i.e. inside the Docker Desktop VM, not on the Mac filesystem). So the steps below run pgBackRest *inside* the Postgres container.
+
+#### Setup (inside the container)
+
+1. Give the backup repo a home that survives container recreation. In `docker/docker-compose.yml`, add to the `test-db` service and to the top-level `volumes:` block:
+
+```yaml
+  test-db:
+    volumes:
+      - postgres_test_data:/var/lib/postgresql/data
+      - ./test-db-init.sql:/docker-entrypoint-initdb.d/10-test-table.sql:ro
+      - pgbackrest_repo:/var/lib/pgbackrest   # pgBackRest backup repository
+
+volumes:
+  pgbackrest_repo:
+```
+
+Then `docker compose -f docker/docker-compose.yml up -d test-db`.
+
+2. Install pgBackRest in the container (the official `postgres:16` image is Debian and already has the PGDG apt repo configured). Note this is lost if the container is recreated — bake it into a small `Dockerfile` if you want it permanent:
+
+```
+docker exec -u root -it postgres_db bash -c "apt-get update && apt-get install -y pgbackrest"
+```
+
+3. Create the repo directory and config, owned by the `postgres` user:
+
+```
+docker exec -u root -it postgres_db bash -c "mkdir -p /var/lib/pgbackrest /etc/pgbackrest /var/log/pgbackrest && chown -R postgres:postgres /var/lib/pgbackrest /etc/pgbackrest /var/log/pgbackrest"
+
+docker exec -u root -it postgres_db bash -c "cat > /etc/pgbackrest/pgbackrest.conf <<'EOF'
+[global]
+repo1-path=/var/lib/pgbackrest
+repo1-retention-full=2
+log-level-console=info
+start-fast=y
+
+[test]
+pg1-path=/var/lib/postgresql/data
+EOF
+chown postgres:postgres /etc/pgbackrest/pgbackrest.conf"
+```
+
+`test` is the *stanza* name — pgBackRest's label for one Postgres cluster and its repo. Every command below takes `--stanza=test`.
+
+4. Turn on WAL archiving so pgBackRest can do point-in-time recovery, then restart Postgres (`archive_mode` requires a restart):
+
+```
+docker exec -u postgres -it postgres_db psql -U testuser -d test_database -c "ALTER SYSTEM SET archive_mode = on;"
+docker exec -u postgres -it postgres_db psql -U testuser -d test_database -c "ALTER SYSTEM SET archive_command = 'pgbackrest --stanza=test archive-push %p';"
+docker exec -u postgres -it postgres_db psql -U testuser -d test_database -c "ALTER SYSTEM SET wal_level = replica;"
+
+docker compose -f docker/docker-compose.yml restart test-db
+```
+
+5. Initialize the stanza and verify archiving works end to end:
+
+```
+docker exec -u postgres -it postgres_db pgbackrest --stanza=test stanza-create
+docker exec -u postgres -it postgres_db pgbackrest --stanza=test check
+```
+
+`check` forces a WAL switch and confirms the archive landed in the repo. If it fails here, the backup will fail too.
+
+#### Backup example
+
+Take a full backup:
+
+```
+docker exec -u postgres -it postgres_db pgbackrest --stanza=test --type=full backup
+```
+
+Then an incremental one (only changed blocks since the last backup — much faster):
+
+```
+docker exec -u postgres -it postgres_db pgbackrest --stanza=test --type=incr backup
+```
+
+List what's in the repo:
+
+```
+docker exec -u postgres -it postgres_db pgbackrest --stanza=test info
+```
+
+```
+stanza: test
+    status: ok
+    cipher: none
+
+    db (current)
+        wal archive min/max (16): 000000010000000000000002/000000010000000000000004
+
+        full backup: 20260722-120000F
+            timestamp start/stop: 2026-07-22 12:00:00 / 2026-07-22 12:00:06
+            database size: 29.2MB, database backup size: 29.2MB
+            repo1: backup set size: 3.8MB, backup size: 3.8MB
+
+        incr backup: 20260722-120000F_20260722-121500I
+            ...
+```
+
+#### Restore example
+
+Prove it works by destroying data and getting it back:
+
+```
+# 1. Note what's there, then drop it
+docker exec -it postgres_db psql -U testuser -d test_database -c 'SELECT count(*) FROM "test-table";'
+docker exec -it postgres_db psql -U testuser -d test_database -c 'DROP TABLE "test-table";'
+
+# 2. Stop Postgres — restore needs the cluster shut down
+docker compose -f docker/docker-compose.yml stop test-db
+docker compose -f docker/docker-compose.yml start test-db
+docker exec -u root -it postgres_db bash -c "pg_ctlcluster 16 main stop || true"
+```
+
+Since the container's entrypoint *is* Postgres, the practical move is to run the restore from a throwaway container that mounts the same volumes:
+
+```
+docker run --rm -it \
+  -v homelab_postgres_test_data:/var/lib/postgresql/data \
+  -v homelab_pgbackrest_repo:/var/lib/pgbackrest \
+  --entrypoint bash postgres:16 -c "
+    apt-get update -qq && apt-get install -y -qq pgbackrest &&
+    printf '[global]\nrepo1-path=/var/lib/pgbackrest\n\n[test]\npg1-path=/var/lib/postgresql/data\n' > /etc/pgbackrest/pgbackrest.conf &&
+    su postgres -c 'pgbackrest --stanza=test --delta restore'"
+```
+
+(Check the real volume names with `docker volume ls` — Compose prefixes them with the project name.)
+
+Then bring it back up and confirm the table is there again:
+
+```
+docker compose -f docker/docker-compose.yml up -d test-db
+docker exec -it postgres_db psql -U testuser -d test_database -c 'SELECT count(*) FROM "test-table";'
+```
+
+`--delta` only rewrites files that differ from the backup, so repeat restores are quick. For point-in-time recovery add `--type=time --target="2026-07-22 12:10:00"`.
 
 ## Live-Auction
 
