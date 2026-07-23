@@ -1022,6 +1022,9 @@ Notes:
 
 ## Navidrome
 
+[What am I doing wrong? : r/navidrome](https://www.reddit.com/r/navidrome/comments/1v3mmm1/what_am_i_doing_wrong/)
+
+
 [Navidrome](https://www.navidrome.org) is a self-hosted music server and streamer that's compatible with the Subsonic API, so any Subsonic client app can play from it. It's a single container defined in `navidrome/docker-compose.yml`, on `main-network`, and Caddy proxies http://navidrome.homelab → `navidrome:4533`.
 
 The music library is set by `NAVIDROME_MUSIC_DIR` in `docker/navidrome/.env`, mounted read-only at `/music`. It currently points at the Elements external drive:
