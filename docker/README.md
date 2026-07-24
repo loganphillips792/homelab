@@ -793,7 +793,9 @@ curl -L -o ~/nyc-payroll.csv \
   'https://data.cityofnewyork.us/resource/k397-673e.csv?$limit=50000'
 ```
 
-> **The two endpoints do not produce the same file.** The bulk export writes display-name headers (`Fiscal Year,Payroll Number,…`) and US-format dates (`02/04/2013`). The SODA API writes field-name headers (`fiscal_year,payroll_number,…`) and ISO timestamps (`2013-02-04T00:00:00.000`). The table below is built for the **bulk export**; a `date` column will reject the SODA timestamps, so use `timestamp` for that column if you take the `$limit` route.
+> **Don't use the "Export" button on the dataset page.** It applies display formatting — currency becomes `"$95,897.00"` and hours become `"1,820"` — and `COPY` rejects it with `invalid input syntax for type numeric: "$95,897.00"`. The two `curl` URLs above return raw values (`95897.00`, `1820`) and load directly. If you've already downloaded the formatted file, see [Loading the UI export](#loading-the-ui-export) below rather than re-downloading a gigabyte.
+
+The two `curl` endpoints also differ from each other, though both load fine against the table below: the bulk export writes display-name headers (`Fiscal Year,Payroll Number,…`) and US-format dates (`02/04/2013`), while the SODA API writes field-name headers (`fiscal_year,…`) and ISO timestamps (`2013-02-04T00:00:00.000`). `COPY` skips the header row either way, and a `date` column accepts the ISO timestamps and truncates the time.
 
 #### 3. Create the table
 
@@ -876,6 +878,63 @@ docker exec -it postgres_db psql -U testuser -d nyc_payroll -c \
 ```
 
 Useful `psql` meta-commands once you're inside an interactive session (`docker exec -it postgres_db psql -U testuser -d nyc_payroll`): `\dt` lists tables, `\d payroll` describes one, `\dt+` adds on-disk size, `\timing` reports how long each query took, and `\l` lists databases.
+
+#### Reloading
+
+`COPY` appends. Running it a second time doubles the table rather than replacing it, and the row count is the only thing that tells you — there's no primary key here to reject duplicates. Truncate first:
+
+```
+docker exec -it postgres_db psql -U testuser -d nyc_payroll -c 'TRUNCATE payroll;'
+```
+
+This is the usual reason for a surprising `count(*)`. The other is the `$limit` in the download URL: if you took the fast-iteration route, `COPY` reports `COPY 50000` because the file genuinely has 50,000 rows. Re-download from the bulk export URL for the full 6.78M, then truncate and reload.
+
+#### Loading the UI export
+
+If you already downloaded via the dataset page's Export button, the numeric columns are formatted (`"$95,897.00"`, `"1,820"`) and `COPY` refuses them. Rather than re-downloading, load into an all-text staging table and cast on the way across.
+
+```
+docker exec -i postgres_db psql -U testuser -d nyc_payroll <<'EOF'
+CREATE TABLE payroll_raw (
+  fiscal_year text, payroll_number text, agency_name text,
+  last_name text, first_name text, mid_init text, agency_start_date text,
+  work_location_borough text, title_description text,
+  leave_status_as_of_june_30 text, base_salary text, pay_basis text,
+  regular_hours text, regular_gross_paid text, ot_hours text,
+  total_ot_paid text, total_other_pay text
+);
+EOF
+
+docker exec -i postgres_db psql -U testuser -d nyc_payroll \
+  -c "COPY payroll_raw FROM STDIN WITH (FORMAT csv, HEADER true)" < ~/nyc-payroll.csv
+```
+
+Then strip `$` and `,` with `regexp_replace` and cast. `nullif(…, '')` turns empty strings into `NULL`, which a bare cast would choke on:
+
+```
+docker exec -i postgres_db psql -U testuser -d nyc_payroll <<'EOF'
+INSERT INTO payroll
+SELECT
+  nullif(fiscal_year, '')::smallint,
+  nullif(payroll_number, '')::integer,
+  agency_name, last_name, first_name, mid_init,
+  nullif(agency_start_date, '')::date,
+  work_location_borough, title_description, leave_status_as_of_june_30,
+  nullif(regexp_replace(base_salary,        '[$,]', '', 'g'), '')::numeric,
+  pay_basis,
+  nullif(regexp_replace(regular_hours,      '[$,]', '', 'g'), '')::numeric,
+  nullif(regexp_replace(regular_gross_paid, '[$,]', '', 'g'), '')::numeric,
+  nullif(regexp_replace(ot_hours,           '[$,]', '', 'g'), '')::numeric,
+  nullif(regexp_replace(total_ot_paid,      '[$,]', '', 'g'), '')::numeric,
+  nullif(regexp_replace(total_other_pay,    '[$,]', '', 'g'), '')::numeric
+FROM payroll_raw;
+
+DROP TABLE payroll_raw;
+ANALYZE payroll;
+EOF
+```
+
+Negatives survive this: the export writes them as `$-237.94` and `-9.5`, so stripping `[$,]` leaves `-237.94`, which casts cleanly. Parenthesized accounting negatives — `($237.94)` — would not, but this dataset doesn't use them.
 
 ### Queries
 
