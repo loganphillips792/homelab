@@ -1273,6 +1273,88 @@ This throws away the admin account, play counts, ratings and playlists — you'l
 >
 > `/data` must say `volume`. If it says `bind`, that's the bug.
 
+## Backrest
+
+[Backrest](https://github.com/garethgeorge/backrest) is a web UI over [restic](https://restic.net). restic does the actual work — deduplicated, encrypted, incremental snapshots — and Backrest adds the parts the CLI doesn't have: cron-scheduled backups, automatic repo maintenance (`prune`, `check`, `forget`), a file browser for restores, and notification hooks. The restic CLI is still there underneath if you need it.
+
+Unlike most of the recent additions here, Backrest is defined in the **root** `docker-compose.yml`, not in its own `backrest/docker-compose.yml` — so there's no `compose.all.yml` include for it. It's on `main-network` and Caddy proxies http://backrest.homelab → `backrest:9898`.
+
+**There is no published port**, which is the difference from Navidrome. The compose block has no `ports:` at all, so `http://localhost:9898` does not exist — Caddy plus Pi-hole DNS are the only way in, and that's why the services table lists `N/A` for the localhost column. The same caveat from the Navidrome section applies: the `.homelab` records all point at `10.0.0.32`, so if you're running the stack on a Mac answering on a different address, the name resolves to the wrong host and nothing reaches Backrest.
+
+### Mounts
+
+Backrest has more mounts than anything else in the stack, and which one is which matters:
+
+| Container path | Host source | What it is |
+|-|-|-|
+| `/data` | `~/docker-volumes/backrest/data` | `BACKREST_DATA` — the managed restic binary, the oplog SQLite DB, `jwt-secret` |
+| `/config` | `./backrest/config` | `config.json` — repos, plans, admin user |
+| `/cache` | `./backrest/cache` | `XDG_CACHE_HOME`, passed through to restic; a big speedup, don't skip it |
+| `/tmp` | `./backrest/tmp` | `TMPDIR` |
+| `/root/.config/rclone` | `./backrest/rclone` | only needed if you back up to an rclone remote |
+| `/userdata` | `${BACKREST_USERDATA:-/Users/logan/docker-volumes}` | the backup **sources** — what gets snapshotted |
+| `/repos` | `${BACKREST_REPOS:-/Users/logan/repos}` | local restic **repositories** — where snapshots are written |
+
+The last two are the ones to get right, and they're easy to mix up: `/userdata` is what you're backing *up*, `/repos` is what you're backing up *to*.
+
+> **Watch out — `/repos` currently points at your git checkouts.** Upstream's convention is that `/repos` holds local restic repositories, but `BACKREST_REPOS` is commented out in `docker/.env`, so the `:-/Users/logan/repos` fallback applies and `/repos` is really `~/repos`. Creating a local repo at `/repos/homelab` would write restic pack files into `~/repos/homelab`, on top of a git working tree. Before configuring a local repo, point it somewhere dedicated — uncomment the line in `docker/.env` and set it:
+>
+> ```
+> BACKREST_REPOS=/Users/logan/docker-volumes/backrest/repos
+> ```
+>
+> then recreate the container so the new bind takes effect (`stop` + `rm` + `up -d`, see below).
+
+### Running it
+
+```
+docker compose -f compose.all.yml up -d backrest
+docker compose -f compose.all.yml restart pihole caddy
+```
+
+Then open http://backrest.homelab. The first load prompts you to create a username and password — there's no default login.
+
+Once you're in, it takes two objects to actually start backing anything up:
+
+1. **A repo.** Add one with URI `/repos/<name>` for local storage, and give it a passphrase. Backrest runs `restic init` for you.
+2. **A plan.** Point it at a path under `/userdata`, give it a cron schedule and a retention policy (e.g. keep 7 daily / 4 weekly / 6 monthly).
+
+Cron schedules are evaluated in the container's timezone, which comes from `TZ` in the shared `docker/.env`.
+
+> **The repo passphrase is not recoverable.** restic has no backdoor, no reset, no escrow — if you lose it, every snapshot in that repo is permanently unreadable. Store it somewhere that isn't only inside the thing you're backing up.
+
+Notes:
+
+- restic is not baked into the image. Backrest downloads a compatible version into `/data` on first run and keeps it updated. Set `BACKREST_RESTIC_COMMAND` if you'd rather pin a specific binary.
+- `/userdata` is mounted **read-write**. Nothing in a normal backup flow writes to it, but unlike Navidrome's `:ro` music mount there's nothing enforcing that.
+- Backrest's own state lives on bind mounts, and `backup-remote-volumes.sh` only tars **named** volumes — so its config and oplog are not covered by that script. `docker/backrest/config/config.json` is the one file worth keeping if you want your repos and plans back.
+- `docker/backrest/config/` and `docker/backrest/data/` are **committed to this repo**, live SQLite files and secrets included. This instance is for testing, so that's deliberate — but it means a fresh clone inherits an existing admin user and JWT secret rather than starting clean. Don't treat this as a template for a real deployment.
+- `docker/backrest/data/` is stale. It's left over from November 2025, when `/data` was mapped there; compose now maps `/data` to `~/docker-volumes/backrest/data`, so nothing reads those tracked files anymore.
+
+### Reinstall / start fresh
+
+Wipes the admin account, repo definitions and plans.
+
+> **Danger — don't use `docker compose down backrest`.** Depending on the Compose version that tears down the whole project, and `compose.all.yml` is every service in the stack. `stop` + `rm` can only touch backrest.
+
+```
+cd ~/repos/homelab/docker
+
+# 1. Stop and remove just the container
+docker compose -f compose.all.yml stop backrest
+docker compose -f compose.all.yml rm -f backrest
+
+# 2. Delete the config and data -- this is the actual "uninstall"
+rm -rf ~/docker-volumes/backrest/data
+rm -f ./backrest/config/config.json
+
+# 3. Rebuild from scratch
+docker compose -f compose.all.yml pull backrest
+docker compose -f compose.all.yml up -d backrest
+```
+
+**This does not delete your snapshots.** Those live in the restic repo under `/repos`, which is a completely separate mount — the reinstall only throws away Backrest's knowledge of them. Re-add the repo with the same passphrase and every existing snapshot reappears, browsable and restorable. That separation is the point: Backrest is a front end over the repo, not the repo itself.
+
 
 # DNS Process Explained
 
@@ -1424,7 +1506,7 @@ These services bake their public URL into the frontend at startup — they only 
 | netdata | N/A | http://netdata.homelab | N/A |
 | karakeep | N/A | http://karakeep.homelab | set on first run (signup) |
 | beszel | http://localhost:8090 | http://beszel.homelab | set on first run |
-| backrest | N/A | http://backrest.homelab | N/A |
+| backrest | N/A | http://backrest.homelab | set on first run |
 | paperless-ngx | N/A | http://paperless.homelab | admin / changeMe |
 | tubearchivist | http://localhost:8000 | http://tubearchivist.homelab | tubearchivist / changeMe |
 | pinchflat | N/A | http://pinchflat.homelab | N/A |
