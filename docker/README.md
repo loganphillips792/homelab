@@ -765,6 +765,162 @@ On first start it runs `docker/test-db-init.sql` (mounted at `/docker-entrypoint
 - `docker compose -f docker/docker-compose.yml exec -T test-db psql -U testuser -d test_database -f docker-entrypoint-initdb.d/10-test-table.sql` - if you have to rerun the SQL script
 - `docker exec -it postgres_db psql -U testuser -d test_database -c 'SELECT * FROM "test-table";'`
 
+### Creating a database and importing CSV data
+
+`test-table` has a handful of rows, which is too small for anything interesting — the planner will always pick a sequential scan, and a backup finishes before you can watch it. For a realistic dataset, NYC OpenData publishes [Citywide Payroll Data (Fiscal Year)](https://data.cityofnewyork.us/City-Government/Citywide-Payroll-Data-Fiscal-Year-/k397-673e/about_data): every city employee's salary and overtime, **6.78 million rows**, free and no API key.
+
+#### 1. Create the database
+
+Keep it out of `test_database` so it's easy to throw away:
+
+```
+docker exec -it postgres_db createdb -U testuser nyc_payroll
+```
+
+`createdb` is a thin wrapper around `CREATE DATABASE`; `dropdb -U testuser nyc_payroll` reverses it.
+
+#### 2. Download the CSV
+
+```
+curl -L -o ~/nyc-payroll.csv \
+  'https://data.cityofnewyork.us/api/views/k397-673e/rows.csv?accessType=DOWNLOAD'
+```
+
+That's the full export — close to a gigabyte, so give it a few minutes. To iterate faster, the SODA API serves a subset instead:
+
+```
+curl -L -o ~/nyc-payroll.csv \
+  'https://data.cityofnewyork.us/resource/k397-673e.csv?$limit=50000'
+```
+
+> **The two endpoints do not produce the same file.** The bulk export writes display-name headers (`Fiscal Year,Payroll Number,…`) and US-format dates (`02/04/2013`). The SODA API writes field-name headers (`fiscal_year,payroll_number,…`) and ISO timestamps (`2013-02-04T00:00:00.000`). The table below is built for the **bulk export**; a `date` column will reject the SODA timestamps, so use `timestamp` for that column if you take the `$limit` route.
+
+#### 3. Create the table
+
+Column order here must match the CSV's column order exactly — `COPY` matches by position, not by name, and the header row is skipped rather than read:
+
+```sql
+CREATE TABLE payroll (
+  fiscal_year                 smallint,
+  payroll_number              integer,
+  agency_name                 text,
+  last_name                   text,
+  first_name                  text,
+  mid_init                    text,
+  agency_start_date           date,
+  work_location_borough       text,
+  title_description           text,
+  leave_status_as_of_june_30  text,
+  base_salary                 numeric(12,2),
+  pay_basis                   text,
+  regular_hours               numeric(10,2),
+  regular_gross_paid          numeric(12,2),
+  ot_hours                    numeric(10,2),
+  total_ot_paid               numeric(12,2),
+  total_other_pay             numeric(12,2)
+);
+```
+
+Pipe it in as a heredoc:
+
+```
+docker exec -i postgres_db psql -U testuser -d nyc_payroll <<'EOF'
+CREATE TABLE payroll (
+  fiscal_year smallint, payroll_number integer, agency_name text,
+  last_name text, first_name text, mid_init text, agency_start_date date,
+  work_location_borough text, title_description text,
+  leave_status_as_of_june_30 text, base_salary numeric(12,2), pay_basis text,
+  regular_hours numeric(10,2), regular_gross_paid numeric(12,2),
+  ot_hours numeric(10,2), total_ot_paid numeric(12,2), total_other_pay numeric(12,2)
+);
+EOF
+```
+
+The money columns are `numeric`, not `float8` — binary floating point can't represent most decimal amounts exactly, so sums drift. Use `numeric` for anything you'd put in a report.
+
+#### 4. Load it
+
+`COPY … FROM STDIN` reads from the client connection, so the file never has to exist inside the container — `docker exec -i` pipes it straight in:
+
+```
+docker exec -i postgres_db psql -U testuser -d nyc_payroll \
+  -c "COPY payroll FROM STDIN WITH (FORMAT csv, HEADER true)" < ~/nyc-payroll.csv
+```
+
+Expect a couple of minutes for the full file. It prints `COPY 6775830` when it lands.
+
+The `MM/DD/YYYY` dates parse without any extra work because Postgres defaults to `DateStyle = 'ISO, MDY'`. Confirm with `SHOW DateStyle;` if a date column errors — on an `DMY` server you'd need `SET DateStyle = 'ISO, MDY';` first.
+
+Empty fields become `NULL` automatically under `FORMAT csv`. If `COPY` aborts partway, it rolls back the whole load — you never end up with a half-populated table.
+
+#### 5. Analyze, then look around
+
+Run `ANALYZE` first. `COPY` does not update planner statistics, so until it runs the planner thinks the table is empty and will pick bad plans:
+
+```
+docker exec -it postgres_db psql -U testuser -d nyc_payroll -c 'ANALYZE payroll;'
+```
+
+```
+docker exec -it postgres_db psql -U testuser -d nyc_payroll -c \
+  'SELECT agency_name, count(*), round(avg(base_salary)) AS avg_base
+     FROM payroll WHERE fiscal_year = 2025
+     GROUP BY agency_name ORDER BY count(*) DESC LIMIT 10;'
+```
+
+```
+docker exec -it postgres_db psql -U testuser -d nyc_payroll -c \
+  'SELECT title_description, round(sum(total_ot_paid)) AS ot
+     FROM payroll WHERE fiscal_year = 2025
+     GROUP BY title_description ORDER BY ot DESC LIMIT 10;'
+```
+
+Useful `psql` meta-commands once you're inside an interactive session (`docker exec -it postgres_db psql -U testuser -d nyc_payroll`): `\dt` lists tables, `\d payroll` describes one, `\dt+` adds on-disk size, `\timing` reports how long each query took, and `\l` lists databases.
+
+### Queries
+
+Note the quoting throughout: `test-table` has a hyphen, so it needs SQL double quotes, which means the whole statement has to be wrapped in shell single quotes.
+
+`EXPLAIN` prefixes the statement and shows the planner's *estimate* without running the query:
+
+```
+docker exec -it postgres_db psql -U testuser -d test_database -c 'EXPLAIN SELECT * FROM "test-table";'
+```
+
+To actually execute it and get real timings and row counts:
+
+```
+docker exec -it postgres_db psql -U testuser -d test_database -c 'EXPLAIN ANALYZE SELECT * FROM "test-table";'
+```
+
+The fuller form, with the options that matter most:
+
+```
+docker exec -it postgres_db psql -U testuser -d test_database -c 'EXPLAIN (ANALYZE, BUFFERS, VERBOSE) SELECT * FROM "test-table";'
+```
+
+- `ANALYZE` — really runs it; adds `actual time` and `actual rows` next to the estimates. A big gap between estimated and actual rows is usually the thing worth chasing.
+- `BUFFERS` — shows blocks read from shared buffers vs disk, so you can tell whether "slow" means cache misses.
+- `VERBOSE` — lists output columns and schema-qualified names.
+
+> **`EXPLAIN ANALYZE` executes the statement.** Harmless on a `SELECT`, but on an `INSERT`/`UPDATE`/`DELETE` it really writes. Wrap those in a transaction you throw away:
+>
+> ```
+> docker exec -it postgres_db psql -U testuser -d test_database -c 'BEGIN; EXPLAIN ANALYZE DELETE FROM "test-table"; ROLLBACK;'
+> ```
+
+On `test-table` the plan will be a `Seq Scan` no matter what you do — with a handful of rows the planner correctly decides an index isn't worth the indirection, so the output only shows you the mechanics. The `payroll` table loaded above is where this gets interesting. Filter it, then add an index and run the same `EXPLAIN ANALYZE` again:
+
+```
+docker exec -it postgres_db psql -U testuser -d nyc_payroll -c \
+  "EXPLAIN ANALYZE SELECT * FROM payroll WHERE agency_name = 'POLICE DEPARTMENT' AND fiscal_year = 2025;"
+
+docker exec -it postgres_db psql -U testuser -d nyc_payroll -c \
+  'CREATE INDEX idx_payroll_agency_year ON payroll (agency_name, fiscal_year);'
+```
+
+The first run is a `Parallel Seq Scan` across all 6.78M rows; after the index it becomes a `Bitmap Index Scan`, usually a couple of orders of magnitude faster. Compare the `actual time` values rather than the estimated `cost` — cost is in arbitrary planner units and only meaningful relative to other plans.
+
 ### Backup / Restore with the built-in CLI tools
 
 Before reaching for pgBackRest, note that Postgres ships its own backup tools and they're already inside the `postgres:16` image — no `apt-get`, no config file, no stanza. These are **logical** backups: `pg_dump` produces a stream of SQL (or a compressed archive of it) that recreates the schema and data, rather than copying the data files.
