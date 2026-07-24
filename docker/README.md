@@ -765,6 +765,106 @@ On first start it runs `docker/test-db-init.sql` (mounted at `/docker-entrypoint
 - `docker compose -f docker/docker-compose.yml exec -T test-db psql -U testuser -d test_database -f docker-entrypoint-initdb.d/10-test-table.sql` - if you have to rerun the SQL script
 - `docker exec -it postgres_db psql -U testuser -d test_database -c 'SELECT * FROM "test-table";'`
 
+### Backup / Restore with the built-in CLI tools
+
+Before reaching for pgBackRest, note that Postgres ships its own backup tools and they're already inside the `postgres:16` image — no `apt-get`, no config file, no stanza. These are **logical** backups: `pg_dump` produces a stream of SQL (or a compressed archive of it) that recreates the schema and data, rather than copying the data files.
+
+That difference decides which tool you want:
+
+| | `pg_dump` / `pg_restore` | pgBackRest |
+|-|-|-|
+| What it copies | SQL statements (logical) | data files + WAL (physical) |
+| Setup | none, already installed | apt install, config, stanza, WAL archiving |
+| Cluster downtime | none, runs against a live DB | restore needs Postgres stopped |
+| Point-in-time recovery | no | yes |
+| Cross-version / cross-arch restore | yes | no, same major version only |
+| Speed on a large DB | slow, rebuilds by replaying SQL | fast, incremental |
+
+For a scratch database this size, `pg_dump` is the right default.
+
+> **Don't use `docker exec -t` when redirecting a dump to a file.** A TTY translates `\n` to `\r\n`, which silently corrupts the output — plain SQL dumps get subtly mangled and custom-format archives become unrestorable. Use `docker exec` with no flags for dumping and `docker exec -i` for restoring, exactly as written below.
+
+#### Dump
+
+Plain SQL, the readable format — you can open it in an editor and see the `CREATE TABLE` / `COPY` statements:
+
+```
+docker exec postgres_db pg_dump -U testuser -d test_database > ~/test_database.sql
+```
+
+Custom format (`-Fc`) is the better default for anything real. It's compressed, and `pg_restore` can then restore selectively, reorder, or run in parallel:
+
+```
+docker exec postgres_db pg_dump -U testuser -d test_database -Fc > ~/test_database.dump
+```
+
+A single table — note the doubled quoting, since `test-table` has a hyphen and needs SQL double quotes that must survive the shell:
+
+```
+docker exec postgres_db pg_dump -U testuser -d test_database -Fc -t '"test-table"' > ~/test_table.dump
+```
+
+Schema only (`-s`) or data only (`-a`) are useful for diffing structure or reloading rows into an existing schema:
+
+```
+docker exec postgres_db pg_dump -U testuser -d test_database -s > ~/schema.sql
+```
+
+`pg_dump` covers one database and does **not** include roles, passwords or other cluster-wide objects. Those come from `pg_dumpall`:
+
+```
+docker exec postgres_db pg_dumpall -U testuser --globals-only > ~/globals.sql
+```
+
+#### Restore
+
+Plain SQL dumps are just SQL, so they go back through `psql`:
+
+```
+docker exec -i postgres_db psql -U testuser -d test_database < ~/test_database.sql
+```
+
+Custom-format dumps go through `pg_restore`. `--clean --if-exists` drops each object before recreating it, which makes the restore repeatable instead of failing on "already exists":
+
+```
+docker exec -i postgres_db pg_restore -U testuser -d test_database --clean --if-exists < ~/test_database.dump
+```
+
+Useful flags: `-j 4` restores in parallel (custom/directory formats only), `--no-owner` ignores ownership when restoring as a different role, and `-t '"test-table"'` pulls a single table out of a full dump.
+
+To restore into a clean database instead of over the top of the existing one:
+
+```
+docker exec -i postgres_db dropdb -U testuser --if-exists restore_test
+docker exec -i postgres_db createdb -U testuser restore_test
+docker exec -i postgres_db pg_restore -U testuser -d restore_test < ~/test_database.dump
+```
+
+#### Round trip
+
+Same proof as the pgBackRest section below — destroy the data and get it back — but with no cluster restart and no downtime:
+
+```
+# 1. Dump
+docker exec postgres_db pg_dump -U testuser -d test_database -Fc > ~/test_database.dump
+
+# 2. Destroy
+docker exec -it postgres_db psql -U testuser -d test_database -c 'DROP TABLE "test-table";'
+
+# 3. Restore
+docker exec -i postgres_db pg_restore -U testuser -d test_database --clean --if-exists < ~/test_database.dump
+
+# 4. Confirm
+docker exec -it postgres_db psql -U testuser -d test_database -c 'SELECT count(*) FROM "test-table";'
+```
+
+Notes:
+
+- The dump is a **consistent snapshot**. `pg_dump` runs in a repeatable-read transaction, so it captures the database as of the moment it started even while writes continue — no need to stop anything.
+- It does not block writers, but it does hold a lock that blocks `ALTER`/`DROP` on the tables it's reading for the duration.
+- Running the tools inside the container sidesteps client/server version mismatches. If you'd rather use a Homebrew `pg_dump` against `localhost:5432`, the client must be the **same or newer** major version than the server, or it refuses with a version-mismatch error.
+- Dumps land on the host via shell redirection, so they're outside the `postgres_test_data` volume — which is the point. A backup inside the volume you're protecting isn't a backup.
+
 ### pgBackRest
 
 [pgBackRest](https://pgbackrest.org/) is a backup and restore tool for Postgres — full/differential/incremental backups, WAL archiving, and point-in-time recovery. The test Postgres above is the target used to try it out.
