@@ -1673,6 +1673,11 @@ open claw
 
 https://www.reddit.com/r/selfhosted/comments/1u4dwms/comment/orcoeac/?utm_source=share&utm_medium=web3x&utm_name=web3xcss&utm_term=1&utm_content=share_button
 
+https://github.com/calcom/cal.diy 
+
+https://github.com/AppFlowy-IO/AppFlowy
+
+
 
 [20 apps i actually run on my home server and which ones are worth it : r/selfhosted](https://www.reddit.com/r/selfhosted/comments/1u4dwms/comment/orcoeac/?utm_source=share&utm_medium=web3x&utm_name=web3xcss&utm_term=1)
 
