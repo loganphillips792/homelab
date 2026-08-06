@@ -280,6 +280,43 @@ This tells Tailscale to route `*.homelab` DNS queries through Pi-hole, which res
 * **`context canceled` during login** — Usually caused by an invalid auth key or the container restart-looping. Check `docker logs` for the underlying error.
 * **Duplicate `TS_EXTRA_ARGS`** — Docker only keeps the last value of a duplicate environment variable. Merge all flags into a single `TS_EXTRA_ARGS` line.
 
+# Estimating Docker image download size
+
+Figure out how much `docker compose -f docker/compose.all.yml up -d` would download from a clean Docker state, without pulling anything. Registries report the compressed size of every layer in the image manifest, and `docker manifest inspect` works without the daemon running.
+
+```bash
+# List every unique image in the stack
+docker compose -f docker/compose.all.yml config --images | sort -u > /tmp/images.txt
+
+# Fetch each image's manifest (registry metadata only — nothing is pulled)
+mkdir -p /tmp/manifests
+xargs -P 8 -I{} sh -c 'docker manifest inspect -v "{}" > "/tmp/manifests/$(echo {} | tr "/:@" "___").json"' < /tmp/images.txt
+
+# Sum compressed layer sizes per platform, deduping layers shared across images
+# (Docker only downloads each layer once)
+for arch in arm64 amd64; do
+  for f in /tmp/manifests/*.json; do
+    jq -r --arg arch "$arch" '
+      def entries: if type=="array" then . else [.] end;
+      def mf: (.SchemaV2Manifest // .OCIManifest);
+      [entries[] | select(mf != null)] as $all
+      | ([$all[] | select(.Descriptor.platform.architecture==$arch and .Descriptor.platform.os=="linux")]) as $match
+      | (if ($match|length)>0 then $match[0]
+         elif ($all|length)==1 then $all[0]
+         else ([$all[] | select(.Descriptor.platform.architecture=="amd64")] | .[0]) // $all[0]
+         end) as $m
+      | $m | mf.layers[]? | "\(.digest) \(.size)"
+    ' "$f"
+  done | sort -u -k1,1 | awk -v a="$arch" '{s+=$2} END {printf "%s: %.2f GB compressed download\n", a, s/1e9}'
+done
+```
+
+As of Aug 2026 this comes to ~19 GB (arm64) / ~20 GB (amd64) compressed, roughly 48–50 GB on disk after extraction.
+
+> **Note:** The 48–50 GB number only matters for disk space; it never crosses the network, since decompression happens locally after the download.
+>
+> One caveat on top of that ~20 GB: it's just the images. Anything the apps fetch at runtime — most notably any Ollama models you pull, plus small one-time downloads like Immich's ML models — is extra network traffic after startup.
+
 # TODO
 
 - Install https://github.com/prometheus-pve/prometheus-pve-exporter on proxmox to get prometheus metrics of all services
