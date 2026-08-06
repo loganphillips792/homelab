@@ -750,11 +750,435 @@ To ssh into VM:
 
 ## Test Postgres
 
+A standalone Postgres instance (`test-db`, container `postgres_db`, image `postgres:16`) defined in `docker/docker-compose.yml`. Nothing else in the stack uses it — it is not on `main-network` and no other service depends on it. It exists purely as a scratch database for experimenting with SQL, clients, and backup tooling.
 
+| Setting | Value |
+|-|-|
+| Host | `localhost:5432` |
+| User | `testuser` |
+| Password | `testpassword` |
+| Database | `test_database` |
 
+On first start it runs `docker/test-db-init.sql` (mounted at `/docker-entrypoint-initdb.d/10-test-table.sql`), which creates a sample `test-table`. Data lives in the `postgres_test_data` volume.
+
+- `docker compose -f docker/docker-compose.yml up -d test-db` - start it
 - `docker compose -f docker/docker-compose.yml exec -T test-db psql -U testuser -d test_database -f docker-entrypoint-initdb.d/10-test-table.sql` - if you have to rerun the SQL script
-
 - `docker exec -it postgres_db psql -U testuser -d test_database -c 'SELECT * FROM "test-table";'`
+
+### Creating a database and importing CSV data
+
+`test-table` has a handful of rows, which is too small for anything interesting — the planner will always pick a sequential scan, and a backup finishes before you can watch it. For a realistic dataset, NYC OpenData publishes [Citywide Payroll Data (Fiscal Year)](https://data.cityofnewyork.us/City-Government/Citywide-Payroll-Data-Fiscal-Year-/k397-673e/about_data): every city employee's salary and overtime, **6.78 million rows**, free and no API key.
+
+#### 1. Create the database
+
+Keep it out of `test_database` so it's easy to throw away:
+
+```
+docker exec -it postgres_db createdb -U testuser nyc_payroll
+```
+
+`createdb` is a thin wrapper around `CREATE DATABASE`; `dropdb -U testuser nyc_payroll` reverses it.
+
+#### 2. Download the CSV
+
+```
+curl -L -o ~/nyc-payroll.csv \
+  'https://data.cityofnewyork.us/api/views/k397-673e/rows.csv?accessType=DOWNLOAD'
+```
+
+That's the full export — close to a gigabyte, so give it a few minutes. To iterate faster, the SODA API serves a subset instead:
+
+```
+curl -L -o ~/nyc-payroll.csv \
+  'https://data.cityofnewyork.us/resource/k397-673e.csv?$limit=50000'
+```
+
+The two endpoints differ, though both load fine against the table below: the bulk export writes display-name headers (`Fiscal Year,Payroll Number,…`) and US-format dates (`02/04/2013`), while the SODA API writes field-name headers (`fiscal_year,…`) and ISO timestamps (`2013-02-04T00:00:00.000`). `COPY` skips the header row either way, and a `date` column accepts the ISO timestamps and truncates the time.
+
+#### 3. Create the table
+
+Column order here must match the CSV's column order exactly — `COPY` matches by position, not by name, and the header row is skipped rather than read:
+
+```sql
+CREATE TABLE payroll (
+  fiscal_year                 smallint,
+  payroll_number              integer,
+  agency_name                 text,
+  last_name                   text,
+  first_name                  text,
+  mid_init                    text,
+  agency_start_date           date,
+  work_location_borough       text,
+  title_description           text,
+  leave_status_as_of_june_30  text,
+  base_salary                 numeric(12,2),
+  pay_basis                   text,
+  regular_hours               numeric(10,2),
+  regular_gross_paid          numeric(12,2),
+  ot_hours                    numeric(10,2),
+  total_ot_paid               numeric(12,2),
+  total_other_pay             numeric(12,2)
+);
+```
+
+Pipe it in as a heredoc:
+
+```
+docker exec -i postgres_db psql -U testuser -d nyc_payroll <<'EOF'
+CREATE TABLE payroll (
+  fiscal_year smallint, payroll_number integer, agency_name text,
+  last_name text, first_name text, mid_init text, agency_start_date date,
+  work_location_borough text, title_description text,
+  leave_status_as_of_june_30 text, base_salary numeric(12,2), pay_basis text,
+  regular_hours numeric(10,2), regular_gross_paid numeric(12,2),
+  ot_hours numeric(10,2), total_ot_paid numeric(12,2), total_other_pay numeric(12,2)
+);
+EOF
+```
+
+The money columns are `numeric`, not `float8` — binary floating point can't represent most decimal amounts exactly, so sums drift. Use `numeric` for anything you'd put in a report.
+
+#### 4. Load it
+
+`COPY … FROM STDIN` reads from the client connection, so the file never has to exist inside the container — `docker exec -i` pipes it straight in:
+
+```
+docker exec -i postgres_db psql -U testuser -d nyc_payroll \
+  -c "COPY payroll FROM STDIN WITH (FORMAT csv, HEADER true)" < ~/nyc-payroll.csv
+```
+
+Expect a couple of minutes for the full file. It prints `COPY 6775830` when it lands.
+
+The `MM/DD/YYYY` dates parse without any extra work because Postgres defaults to `DateStyle = 'ISO, MDY'`. Confirm with `SHOW DateStyle;` if a date column errors — on an `DMY` server you'd need `SET DateStyle = 'ISO, MDY';` first.
+
+Empty fields become `NULL` automatically under `FORMAT csv`. If `COPY` aborts partway, it rolls back the whole load — you never end up with a half-populated table.
+
+#### 5. Analyze, then look around
+
+Run `ANALYZE` first. `COPY` does not update planner statistics, so until it runs the planner thinks the table is empty and will pick bad plans:
+
+```
+docker exec -it postgres_db psql -U testuser -d nyc_payroll -c 'ANALYZE payroll;'
+```
+
+```
+docker exec -it postgres_db psql -U testuser -d nyc_payroll -c \
+  'SELECT agency_name, count(*), round(avg(base_salary)) AS avg_base
+     FROM payroll WHERE fiscal_year = 2025
+     GROUP BY agency_name ORDER BY count(*) DESC LIMIT 10;'
+```
+
+```
+docker exec -it postgres_db psql -U testuser -d nyc_payroll -c \
+  'SELECT title_description, round(sum(total_ot_paid)) AS ot
+     FROM payroll WHERE fiscal_year = 2025
+     GROUP BY title_description ORDER BY ot DESC LIMIT 10;'
+```
+
+Useful `psql` meta-commands once you're inside an interactive session (`docker exec -it postgres_db psql -U testuser -d nyc_payroll`): `\dt` lists tables, `\d payroll` describes one, `\dt+` adds on-disk size, `\timing` reports how long each query took, and `\l` lists databases.
+
+#### Reloading
+
+`COPY` appends. Running it a second time doubles the table rather than replacing it, and the row count is the only thing that tells you — there's no primary key here to reject duplicates. Truncate first:
+
+```
+docker exec -it postgres_db psql -U testuser -d nyc_payroll -c 'TRUNCATE payroll;'
+```
+
+This is the usual reason for a surprising `count(*)`. The other is the `$limit` in the download URL: if you took the fast-iteration route, `COPY` reports `COPY 50000` because the file genuinely has 50,000 rows. Re-download from the bulk export URL for the full 6.78M, then truncate and reload.
+
+### Queries
+
+Note the quoting throughout: `test-table` has a hyphen, so it needs SQL double quotes, which means the whole statement has to be wrapped in shell single quotes.
+
+`EXPLAIN` prefixes the statement and shows the planner's *estimate* without running the query:
+
+```
+docker exec -it postgres_db psql -U testuser -d test_database -c 'EXPLAIN SELECT * FROM "test-table";'
+```
+
+To actually execute it and get real timings and row counts:
+
+```
+docker exec -it postgres_db psql -U testuser -d test_database -c 'EXPLAIN ANALYZE SELECT * FROM "test-table";'
+```
+
+The fuller form, with the options that matter most:
+
+```
+docker exec -it postgres_db psql -U testuser -d test_database -c 'EXPLAIN (ANALYZE, BUFFERS, VERBOSE) SELECT * FROM "test-table";'
+```
+
+- `ANALYZE` — really runs it; adds `actual time` and `actual rows` next to the estimates. A big gap between estimated and actual rows is usually the thing worth chasing.
+- `BUFFERS` — shows blocks read from shared buffers vs disk, so you can tell whether "slow" means cache misses.
+- `VERBOSE` — lists output columns and schema-qualified names.
+
+> **`EXPLAIN ANALYZE` executes the statement.** Harmless on a `SELECT`, but on an `INSERT`/`UPDATE`/`DELETE` it really writes. Wrap those in a transaction you throw away:
+>
+> ```
+> docker exec -it postgres_db psql -U testuser -d test_database -c 'BEGIN; EXPLAIN ANALYZE DELETE FROM "test-table"; ROLLBACK;'
+> ```
+
+On `test-table` the plan will be a `Seq Scan` no matter what you do — with a handful of rows the planner correctly decides an index isn't worth the indirection, so the output only shows you the mechanics. The `payroll` table loaded above is where this gets interesting. Filter it, then add an index and run the same `EXPLAIN ANALYZE` again:
+
+```
+docker exec -it postgres_db psql -U testuser -d nyc_payroll -c \
+  "EXPLAIN ANALYZE SELECT * FROM payroll WHERE agency_name = 'POLICE DEPARTMENT' AND fiscal_year = 2025;"
+
+docker exec -it postgres_db psql -U testuser -d nyc_payroll -c \
+  'CREATE INDEX idx_payroll_agency_year ON payroll (agency_name, fiscal_year);'
+```
+
+The first run is a `Parallel Seq Scan` across all 6.78M rows; after the index it becomes a `Bitmap Index Scan`, usually a couple of orders of magnitude faster. Compare the `actual time` values rather than the estimated `cost` — cost is in arbitrary planner units and only meaningful relative to other plans.
+
+### Backup / Restore with the built-in CLI tools
+
+Before reaching for pgBackRest, note that Postgres ships its own backup tools and they're already inside the `postgres:16` image — no `apt-get`, no config file, no stanza. These are **logical** backups: `pg_dump` produces a stream of SQL (or a compressed archive of it) that recreates the schema and data, rather than copying the data files.
+
+That difference decides which tool you want:
+
+| | `pg_dump` / `pg_restore` | pgBackRest |
+|-|-|-|
+| What it copies | SQL statements (logical) | data files + WAL (physical) |
+| Setup | none, already installed | apt install, config, stanza, WAL archiving |
+| Cluster downtime | none, runs against a live DB | restore needs Postgres stopped |
+| Point-in-time recovery | no | yes |
+| Cross-version / cross-arch restore | yes | no, same major version only |
+| Speed on a large DB | slow, rebuilds by replaying SQL | fast, incremental |
+
+For a scratch database this size, `pg_dump` is the right default.
+
+> **Don't use `docker exec -t` when redirecting a dump to a file.** A TTY translates `\n` to `\r\n`, which silently corrupts the output — plain SQL dumps get subtly mangled and custom-format archives become unrestorable. Use `docker exec` with no flags for dumping and `docker exec -i` for restoring, exactly as written below.
+
+#### Dump
+
+Plain SQL, the readable format — you can open it in an editor and see the `CREATE TABLE` / `COPY` statements:
+
+```
+docker exec postgres_db pg_dump -U testuser -d test_database > ~/test_database.sql
+```
+
+Custom format (`-Fc`) is the better default for anything real. It's compressed, and `pg_restore` can then restore selectively, reorder, or run in parallel:
+
+```
+docker exec postgres_db pg_dump -U testuser -d test_database -Fc > ~/test_database.dump
+```
+
+A single table — note the doubled quoting, since `test-table` has a hyphen and needs SQL double quotes that must survive the shell:
+
+```
+docker exec postgres_db pg_dump -U testuser -d test_database -Fc -t '"test-table"' > ~/test_table.dump
+```
+
+Schema only (`-s`) or data only (`-a`) are useful for diffing structure or reloading rows into an existing schema:
+
+```
+docker exec postgres_db pg_dump -U testuser -d test_database -s > ~/schema.sql
+```
+
+`pg_dump` covers one database and does **not** include roles, passwords or other cluster-wide objects. Those come from `pg_dumpall`:
+
+```
+docker exec postgres_db pg_dumpall -U testuser --globals-only > ~/globals.sql
+```
+
+#### Restore
+
+Plain SQL dumps are just SQL, so they go back through `psql`:
+
+```
+docker exec -i postgres_db psql -U testuser -d test_database < ~/test_database.sql
+```
+
+Custom-format dumps go through `pg_restore`. `--clean --if-exists` drops each object before recreating it, which makes the restore repeatable instead of failing on "already exists":
+
+```
+docker exec -i postgres_db pg_restore -U testuser -d test_database --clean --if-exists < ~/test_database.dump
+```
+
+Useful flags: `-j 4` restores in parallel (custom/directory formats only), `--no-owner` ignores ownership when restoring as a different role, and `-t '"test-table"'` pulls a single table out of a full dump.
+
+To restore into a clean database instead of over the top of the existing one:
+
+```
+docker exec -i postgres_db dropdb -U testuser --if-exists restore_test
+docker exec -i postgres_db createdb -U testuser restore_test
+docker exec -i postgres_db pg_restore -U testuser -d restore_test < ~/test_database.dump
+```
+
+#### Round trip
+
+Same proof as the pgBackRest section below — destroy the data and get it back — but with no cluster restart and no downtime:
+
+```
+# 1. Dump
+docker exec postgres_db pg_dump -U testuser -d test_database -Fc > ~/test_database.dump
+
+# 2. Destroy
+docker exec -it postgres_db psql -U testuser -d test_database -c 'DROP TABLE "test-table";'
+
+# 3. Restore
+docker exec -i postgres_db pg_restore -U testuser -d test_database --clean --if-exists < ~/test_database.dump
+
+# 4. Confirm
+docker exec -it postgres_db psql -U testuser -d test_database -c 'SELECT count(*) FROM "test-table";'
+```
+
+Notes:
+
+- The dump is a **consistent snapshot**. `pg_dump` runs in a repeatable-read transaction, so it captures the database as of the moment it started even while writes continue — no need to stop anything.
+- It does not block writers, but it does hold a lock that blocks `ALTER`/`DROP` on the tables it's reading for the duration.
+- Running the tools inside the container sidesteps client/server version mismatches. If you'd rather use a Homebrew `pg_dump` against `localhost:5432`, the client must be the **same or newer** major version than the server, or it refuses with a version-mismatch error.
+- Dumps land on the host via shell redirection, so they're outside the `postgres_test_data` volume — which is the point. A backup inside the volume you're protecting isn't a backup.
+
+### pgBackRest
+
+[pgBackRest](https://pgbackrest.org/) is a backup and restore tool for Postgres — full/differential/incremental backups, WAL archiving, and point-in-time recovery. The test Postgres above is the target used to try it out.
+
+#### macOS
+
+```
+brew install pgbackrest
+```
+
+This gives you the CLI locally, which is handy for reading docs/help and for inspecting a repo that lives on the Mac. It **cannot** back up `test-db` directly: pgBackRest needs filesystem access to `PGDATA`, and that lives inside the `postgres_test_data` Docker volume (i.e. inside the Docker Desktop VM, not on the Mac filesystem). So the steps below run pgBackRest *inside* the Postgres container.
+
+#### Setup (inside the container)
+
+1. Give the backup repo a home that survives container recreation. In `docker/docker-compose.yml`, add to the `test-db` service and to the top-level `volumes:` block:
+
+```yaml
+  test-db:
+    volumes:
+      - postgres_test_data:/var/lib/postgresql/data
+      - ./test-db-init.sql:/docker-entrypoint-initdb.d/10-test-table.sql:ro
+      - pgbackrest_repo:/var/lib/pgbackrest   # pgBackRest backup repository
+
+volumes:
+  pgbackrest_repo:
+```
+
+Then `docker compose -f docker/docker-compose.yml up -d test-db`.
+
+2. Install pgBackRest in the container (the official `postgres:16` image is Debian and already has the PGDG apt repo configured). Note this is lost if the container is recreated — bake it into a small `Dockerfile` if you want it permanent:
+
+```
+docker exec -u root -it postgres_db bash -c "apt-get update && apt-get install -y pgbackrest"
+```
+
+3. Create the repo directory and config, owned by the `postgres` user:
+
+```
+docker exec -u root -it postgres_db bash -c "mkdir -p /var/lib/pgbackrest /etc/pgbackrest /var/log/pgbackrest && chown -R postgres:postgres /var/lib/pgbackrest /etc/pgbackrest /var/log/pgbackrest"
+
+docker exec -u root -it postgres_db bash -c "cat > /etc/pgbackrest/pgbackrest.conf <<'EOF'
+[global]
+repo1-path=/var/lib/pgbackrest
+repo1-retention-full=2
+log-level-console=info
+start-fast=y
+
+[test]
+pg1-path=/var/lib/postgresql/data
+EOF
+chown postgres:postgres /etc/pgbackrest/pgbackrest.conf"
+```
+
+`test` is the *stanza* name — pgBackRest's label for one Postgres cluster and its repo. Every command below takes `--stanza=test`.
+
+4. Turn on WAL archiving so pgBackRest can do point-in-time recovery, then restart Postgres (`archive_mode` requires a restart):
+
+```
+docker exec -u postgres -it postgres_db psql -U testuser -d test_database -c "ALTER SYSTEM SET archive_mode = on;"
+docker exec -u postgres -it postgres_db psql -U testuser -d test_database -c "ALTER SYSTEM SET archive_command = 'pgbackrest --stanza=test archive-push %p';"
+docker exec -u postgres -it postgres_db psql -U testuser -d test_database -c "ALTER SYSTEM SET wal_level = replica;"
+
+docker compose -f docker/docker-compose.yml restart test-db
+```
+
+5. Initialize the stanza and verify archiving works end to end:
+
+```
+docker exec -u postgres -it postgres_db pgbackrest --stanza=test stanza-create
+docker exec -u postgres -it postgres_db pgbackrest --stanza=test check
+```
+
+`check` forces a WAL switch and confirms the archive landed in the repo. If it fails here, the backup will fail too.
+
+#### Backup example
+
+Take a full backup:
+
+```
+docker exec -u postgres -it postgres_db pgbackrest --stanza=test --type=full backup
+```
+
+Then an incremental one (only changed blocks since the last backup — much faster):
+
+```
+docker exec -u postgres -it postgres_db pgbackrest --stanza=test --type=incr backup
+```
+
+List what's in the repo:
+
+```
+docker exec -u postgres -it postgres_db pgbackrest --stanza=test info
+```
+
+```
+stanza: test
+    status: ok
+    cipher: none
+
+    db (current)
+        wal archive min/max (16): 000000010000000000000002/000000010000000000000004
+
+        full backup: 20260722-120000F
+            timestamp start/stop: 2026-07-22 12:00:00 / 2026-07-22 12:00:06
+            database size: 29.2MB, database backup size: 29.2MB
+            repo1: backup set size: 3.8MB, backup size: 3.8MB
+
+        incr backup: 20260722-120000F_20260722-121500I
+            ...
+```
+
+#### Restore example
+
+Prove it works by destroying data and getting it back:
+
+```
+# 1. Note what's there, then drop it
+docker exec -it postgres_db psql -U testuser -d test_database -c 'SELECT count(*) FROM "test-table";'
+docker exec -it postgres_db psql -U testuser -d test_database -c 'DROP TABLE "test-table";'
+
+# 2. Stop Postgres — restore needs the cluster shut down
+docker compose -f docker/docker-compose.yml stop test-db
+docker compose -f docker/docker-compose.yml start test-db
+docker exec -u root -it postgres_db bash -c "pg_ctlcluster 16 main stop || true"
+```
+
+Since the container's entrypoint *is* Postgres, the practical move is to run the restore from a throwaway container that mounts the same volumes:
+
+```
+docker run --rm -it \
+  -v homelab_postgres_test_data:/var/lib/postgresql/data \
+  -v homelab_pgbackrest_repo:/var/lib/pgbackrest \
+  --entrypoint bash postgres:16 -c "
+    apt-get update -qq && apt-get install -y -qq pgbackrest &&
+    printf '[global]\nrepo1-path=/var/lib/pgbackrest\n\n[test]\npg1-path=/var/lib/postgresql/data\n' > /etc/pgbackrest/pgbackrest.conf &&
+    su postgres -c 'pgbackrest --stanza=test --delta restore'"
+```
+
+(Check the real volume names with `docker volume ls` — Compose prefixes them with the project name.)
+
+Then bring it back up and confirm the table is there again:
+
+```
+docker compose -f docker/docker-compose.yml up -d test-db
+docker exec -it postgres_db psql -U testuser -d test_database -c 'SELECT count(*) FROM "test-table";'
+```
+
+`--delta` only rewrites files that differ from the backup, so repeat restores are quick. For point-in-time recovery add `--type=time --target="2026-07-22 12:10:00"`.
 
 ## Live-Auction
 
@@ -1115,6 +1539,88 @@ This throws away the admin account, play counts, ratings and playlists — you'l
 >
 > `/data` must say `volume`. If it says `bind`, that's the bug.
 
+## Backrest
+
+[Backrest](https://github.com/garethgeorge/backrest) is a web UI over [restic](https://restic.net). restic does the actual work — deduplicated, encrypted, incremental snapshots — and Backrest adds the parts the CLI doesn't have: cron-scheduled backups, automatic repo maintenance (`prune`, `check`, `forget`), a file browser for restores, and notification hooks. The restic CLI is still there underneath if you need it.
+
+Unlike most of the recent additions here, Backrest is defined in the **root** `docker-compose.yml`, not in its own `backrest/docker-compose.yml` — so there's no `compose.all.yml` include for it. It's on `main-network` and Caddy proxies http://backrest.homelab → `backrest:9898`.
+
+**There is no published port**, which is the difference from Navidrome. The compose block has no `ports:` at all, so `http://localhost:9898` does not exist — Caddy plus Pi-hole DNS are the only way in, and that's why the services table lists `N/A` for the localhost column. The same caveat from the Navidrome section applies: the `.homelab` records all point at `10.0.0.32`, so if you're running the stack on a Mac answering on a different address, the name resolves to the wrong host and nothing reaches Backrest.
+
+### Mounts
+
+Backrest has more mounts than anything else in the stack, and which one is which matters:
+
+| Container path | Host source | What it is |
+|-|-|-|
+| `/data` | `~/docker-volumes/backrest/data` | `BACKREST_DATA` — the managed restic binary, the oplog SQLite DB, `jwt-secret` |
+| `/config` | `./backrest/config` | `config.json` — repos, plans, admin user |
+| `/cache` | `./backrest/cache` | `XDG_CACHE_HOME`, passed through to restic; a big speedup, don't skip it |
+| `/tmp` | `./backrest/tmp` | `TMPDIR` |
+| `/root/.config/rclone` | `./backrest/rclone` | only needed if you back up to an rclone remote |
+| `/userdata` | `${BACKREST_USERDATA:-/Users/logan/docker-volumes}` | the backup **sources** — what gets snapshotted |
+| `/repos` | `${BACKREST_REPOS:-/Users/logan/repos}` | local restic **repositories** — where snapshots are written |
+
+The last two are the ones to get right, and they're easy to mix up: `/userdata` is what you're backing *up*, `/repos` is what you're backing up *to*.
+
+> **Watch out — `/repos` currently points at your git checkouts.** Upstream's convention is that `/repos` holds local restic repositories, but `BACKREST_REPOS` is commented out in `docker/.env`, so the `:-/Users/logan/repos` fallback applies and `/repos` is really `~/repos`. Creating a local repo at `/repos/homelab` would write restic pack files into `~/repos/homelab`, on top of a git working tree. Before configuring a local repo, point it somewhere dedicated — uncomment the line in `docker/.env` and set it:
+>
+> ```
+> BACKREST_REPOS=/Users/logan/docker-volumes/backrest/repos
+> ```
+>
+> then recreate the container so the new bind takes effect (`stop` + `rm` + `up -d`, see below).
+
+### Running it
+
+```
+docker compose -f compose.all.yml up -d backrest
+docker compose -f compose.all.yml restart pihole caddy
+```
+
+Then open http://backrest.homelab. The first load prompts you to create a username and password — there's no default login.
+
+Once you're in, it takes two objects to actually start backing anything up:
+
+1. **A repo.** Add one with URI `/repos/<name>` for local storage, and give it a passphrase. Backrest runs `restic init` for you.
+2. **A plan.** Point it at a path under `/userdata`, give it a cron schedule and a retention policy (e.g. keep 7 daily / 4 weekly / 6 monthly).
+
+Cron schedules are evaluated in the container's timezone, which comes from `TZ` in the shared `docker/.env`.
+
+> **The repo passphrase is not recoverable.** restic has no backdoor, no reset, no escrow — if you lose it, every snapshot in that repo is permanently unreadable. Store it somewhere that isn't only inside the thing you're backing up.
+
+Notes:
+
+- restic is not baked into the image. Backrest downloads a compatible version into `/data` on first run and keeps it updated. Set `BACKREST_RESTIC_COMMAND` if you'd rather pin a specific binary.
+- `/userdata` is mounted **read-write**. Nothing in a normal backup flow writes to it, but unlike Navidrome's `:ro` music mount there's nothing enforcing that.
+- Backrest's own state lives on bind mounts, and `backup-remote-volumes.sh` only tars **named** volumes — so its config and oplog are not covered by that script. `docker/backrest/config/config.json` is the one file worth keeping if you want your repos and plans back.
+- `docker/backrest/config/` and `docker/backrest/data/` are **committed to this repo**, live SQLite files and secrets included. This instance is for testing, so that's deliberate — but it means a fresh clone inherits an existing admin user and JWT secret rather than starting clean. Don't treat this as a template for a real deployment.
+- `docker/backrest/data/` is stale. It's left over from November 2025, when `/data` was mapped there; compose now maps `/data` to `~/docker-volumes/backrest/data`, so nothing reads those tracked files anymore.
+
+### Reinstall / start fresh
+
+Wipes the admin account, repo definitions and plans.
+
+> **Danger — don't use `docker compose down backrest`.** Depending on the Compose version that tears down the whole project, and `compose.all.yml` is every service in the stack. `stop` + `rm` can only touch backrest.
+
+```
+cd ~/repos/homelab/docker
+
+# 1. Stop and remove just the container
+docker compose -f compose.all.yml stop backrest
+docker compose -f compose.all.yml rm -f backrest
+
+# 2. Delete the config and data -- this is the actual "uninstall"
+rm -rf ~/docker-volumes/backrest/data
+rm -f ./backrest/config/config.json
+
+# 3. Rebuild from scratch
+docker compose -f compose.all.yml pull backrest
+docker compose -f compose.all.yml up -d backrest
+```
+
+**This does not delete your snapshots.** Those live in the restic repo under `/repos`, which is a completely separate mount — the reinstall only throws away Backrest's knowledge of them. Re-add the repo with the same passphrase and every existing snapshot reappears, browsable and restorable. That separation is the point: Backrest is a front end over the repo, not the repo itself.
+
 
 # DNS Process Explained
 
@@ -1166,6 +1672,11 @@ https://github.com/crowdsecurity/crowdsec
 open claw
 
 https://www.reddit.com/r/selfhosted/comments/1u4dwms/comment/orcoeac/?utm_source=share&utm_medium=web3x&utm_name=web3xcss&utm_term=1&utm_content=share_button
+
+https://github.com/calcom/cal.diy 
+
+https://github.com/AppFlowy-IO/AppFlowy
+
 
 
 [20 apps i actually run on my home server and which ones are worth it : r/selfhosted](https://www.reddit.com/r/selfhosted/comments/1u4dwms/comment/orcoeac/?utm_source=share&utm_medium=web3x&utm_name=web3xcss&utm_term=1)
@@ -1266,7 +1777,7 @@ These services bake their public URL into the frontend at startup — they only 
 | netdata | N/A | http://netdata.homelab | N/A |
 | karakeep | N/A | http://karakeep.homelab | set on first run (signup) |
 | beszel | http://localhost:8090 | http://beszel.homelab | set on first run |
-| backrest | N/A | http://backrest.homelab | N/A |
+| backrest | N/A | http://backrest.homelab | set on first run |
 | paperless-ngx | N/A | http://paperless.homelab | admin / changeMe |
 | tubearchivist | http://localhost:8000 | http://tubearchivist.homelab | tubearchivist / changeMe |
 | pinchflat | N/A | http://pinchflat.homelab | N/A |
