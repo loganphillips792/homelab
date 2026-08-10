@@ -49,6 +49,9 @@ services:
     restart: unless-stopped
     environment:
       - ELASTIC_PASSWORD=${TA_ELASTIC_PASSWORD}
+      # Entrypoint chowns the bind-mounted data dir to 1000:0 on start.
+      # Without it ES can't create node.lock and crash-loops (AccessDeniedException).
+      - TAKE_FILE_OWNERSHIP=true
       - ES_JAVA_OPTS=-Xms1g -Xmx1g
       - xpack.security.enabled=true
       - discovery.type=single-node
