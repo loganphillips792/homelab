@@ -445,6 +445,32 @@ To access services outside of home network, we will use tailscale
 
 - After making DNS changes to the pihole DNS file: `docker compose -f docker/docker-compose.yml restart pihole caddy`
 
+### Applying Pi-hole config changes
+
+Pi-hole runs as a Docker container on your server, with `./pihole/etc-dnsmasq.d` bind-mounted to `/etc/dnsmasq.d` (docker/docker-compose.yml:197). Since it's a bind mount, the container already sees your edited file — you just need the DNS server inside to re-read it.
+
+On the server, either of these works:
+
+```bash
+# restart just the DNS resolver inside the container (fast, no container downtime)
+docker exec pihole pihole restartdns
+
+# or restart the whole container
+docker restart pihole
+```
+
+Or with docker compose (run from the `docker/` directory, or add `-f docker/docker-compose.yml` from repo root):
+
+```bash
+# restart just the DNS resolver inside the container
+docker compose exec pihole pihole restartdns
+
+# or restart the whole container
+docker compose restart pihole
+```
+
+One nuance: `docker compose restart` only restarts the container — it does **not** pick up changes to `docker-compose.yml` itself (env vars, ports, volumes). For those you'd need `docker compose up -d pihole`, which recreates the container. For conf file edits, `restart` (or the `exec ... restartdns`) is all you need.
+
 - After making changes to prometheus: `docker compose -f docker/docker-compose.yml restart prometheus`
 
 - docker compose -f docker/docker-compose.yml up caddy pihole cronmaster -d 
