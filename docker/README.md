@@ -49,6 +49,8 @@
     5. apt update
     6. apt upgrade
 5. Go to https://10.0.0.98:8006 on another computer (connected to same wifi network)
+
+    > **Note:** `10.0.0.98` was the IP set during install. The network has since moved to `192.168.1.x` and the host was re-IP'd to `192.168.1.98`, so the web UI is now **https://192.168.1.98:8006**. See [Changing the Proxmox Host IP](#changing-the-proxmox-host-ip-router--subnet-changed).
 6. Setup Ubuntu VM for Docker
     1. Download Ubuntu Desktop ISO
     2. Datacenter > pve > local (pve) > ISO Images > Upload Ubuntu ISO file
@@ -216,6 +218,79 @@ Confirm port 53 is now free: `sudo ss -lunpt | grep :53 || echo "Port 53 is free
     - apt install lvm2
     - resize2fs /dev/sda3
 - If at anytime there is a permission denied error during git pull process: `sudo chown -R logan:logan .` and then run `git pull` again
+
+## Changing the Proxmox Host IP (router / subnet changed)
+
+> Done on 2026-08-10 when the home network moved from the Xfinity gateway's `10.0.0.x` to a router on `192.168.1.x`. The host went from `10.0.0.98` → `192.168.1.98`, so the web UI is now **https://192.168.1.98:8006**.
+
+Proxmox uses a **static** IP (set during install, step 3.5 above). It does not adapt when the router or subnet changes — the host keeps its old address, ignores ARP requests for the new subnet, and becomes invisible to every device on the network. Scanning will not find it; you need the physical console.
+
+### 1. Confirm the subnet actually changed (from the Mac)
+
+```bash
+ipconfig getifaddr en0   # Mac's current IP — if it's not on the same subnet as Proxmox, that's the problem
+
+# Optional: sweep the subnet and list live devices (a misconfigured Proxmox won't appear)
+for i in $(seq 1 254); do ping -c 1 -W 300 192.168.1.$i >/dev/null 2>&1 & done; wait
+arp -a
+```
+
+If `ping <proxmox-ip>` fails and `arp -an | grep <proxmox-ip>` shows `(incomplete)`, the host isn't answering on this network at all — either the static IP is for the wrong subnet, or **the ethernet cable isn't plugged in** (that was half the problem last time).
+
+### 2. Fix the static IP at the console
+
+Plug a display + keyboard into the mini PC and log in as root.
+
+1. Check current state: `ip a` (look for `vmbr0`) and `cat /etc/network/interfaces`
+2. `nano /etc/network/interfaces` — in the `iface vmbr0 inet static` block, set the new address and gateway:
+
+    ```
+    address 192.168.1.98/24
+    gateway 192.168.1.1
+    ```
+
+3. `nano /etc/hosts` — change the IP on the `pve` line, keep the hostname parts as-is (the `comcast.net` domain is just what the installer picked up from the ISP; Proxmox only cares that hostname → IP is consistent):
+
+    ```
+    192.168.1.98 pve.hsd1.il.comcast.net pve
+    ```
+
+4. `cat /etc/resolv.conf` — if `nameserver` points at the old subnet, change it to the new router IP (or keep `75.75.75.75`)
+5. Apply: `ifreload -a` (or reboot)
+
+### 3. Verify
+
+On the mini PC:
+
+- `ip a` shows `vmbr0` with the new address
+- `ping -c 2 192.168.1.1` gets replies. If not, run `ip link show`: `NO-CARRIER` on the physical NIC (`enp1s0`) means a cable/port problem, not config. Also confirm the NIC line says `master vmbr0`.
+
+On the Mac:
+
+- `ping -c 2 192.168.1.98`
+- Open **https://192.168.1.98:8006** (https, colon before the port; accept the self-signed cert warning)
+
+### 4. Follow-ups after a subnet change
+
+Everything else that referenced the old subnet is affected too:
+
+- The Ubuntu VM is DHCP, so it gets a new IP automatically — find it in `pve > UbuntuServerForDockerServices > Summary`, then update whatever references the old one (ssh targets, Pi-hole DNS records in `docker/pihole/etc-dnsmasq.d/10-homelab.conf`, Mac DNS settings)
+- Tailscale advertises the old subnet (`--advertise-routes=10.0.0.0/24`) and needs the new one
+- Many IPs elsewhere in this README still say `10.0.0.x`
+
+### Moving the network back to `10.0.0.x`
+
+Possible — but only if you change the **router's** subnet too. The subnet isn't something the mini PC chooses; it has to match the network the router runs. Setting Proxmox back to `10.0.0.98` while the router stays on `192.168.1.x` just recreates the exact unreachable situation described above.
+
+There's a real case for doing it, though: the whole homelab config assumes `10.0.0.x` — the Pi-hole DNS records, Tailscale's `--advertise-routes=10.0.0.0/24`, and dozens of IPs in this README. Moving the network back would make all of that correct again in one shot, instead of updating every reference to `192.168.1.x`.
+
+How it would go:
+
+1. **Change the router's LAN subnet.** Log into the router at http://192.168.1.1, find LAN/DHCP settings, and set the router's IP to `10.0.0.1` with subnet mask `255.255.255.0`, DHCP pool something like `10.0.0.10`–`10.0.0.200`. Save — the router reboots its network, and every device (Mac included) picks up a new `10.0.0.x` address when it reconnects. Most routers allow this; some ISP-locked gateways don't, so this is the one thing to verify.
+2. **Revert Proxmox at the console** (or via the web UI's Shell *before* flipping the router): put `/etc/network/interfaces` back to `address 10.0.0.98/24`, `gateway 10.0.0.1`, put `10.0.0.98` back in `/etc/hosts`, then `ifreload -a`. Back to https://10.0.0.98:8006.
+3. **Optional but worth it:** add DHCP reservations in the router so the Ubuntu VM and the Mac always get the same addresses — a changing DHCP IP is a recurring source of breakage elsewhere in this README (Navidrome section, `known_hosts` mismatches).
+
+The trade-off: brief network disruption while every device re-DHCPs, and if anything else on the network was configured against `192.168.1.x` in the meantime, it moves too. But if the router cooperates, it's the cleaner end state for this repo.
 
 ## Allowing Claude to ssh into VM
 
