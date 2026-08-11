@@ -49,6 +49,11 @@ services:
     restart: unless-stopped
     environment:
       - ELASTIC_PASSWORD=${TA_ELASTIC_PASSWORD}
+      # Docker creates the bind-mount dir (~/docker-volumes/tubearchivist/es) owned by
+      # root:root, but ES runs as uid 1000 and can't write its node.lock there, so it
+      # crash-loops with AccessDeniedException. This flag makes the image's entrypoint
+      # chown the data dir to 1000:0 before starting ES.
+      - TAKE_FILE_OWNERSHIP=true
       - ES_JAVA_OPTS=-Xms1g -Xmx1g
       - xpack.security.enabled=true
       - discovery.type=single-node

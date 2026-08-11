@@ -3,7 +3,8 @@ services:
     image: tailscale/tailscale:latest
     hostname: tailscale
     environment:
-      - TS_AUTHKEY=xxxx
+      # Generate a reusable auth key: login.tailscale.com -> Settings -> Keys
+      - TS_AUTHKEY=${TS_AUTHKEY}
       - TS_STATE_DIR=/var/lib/tailscale
       - TS_USERSPACE=false
       - TS_EXTRA_ARGS=--advertise-tags=tag:container --advertise-routes=10.0.0.0/24 --accept-routes
@@ -532,8 +533,6 @@ services:
     container_name: beszel-agent
     restart: unless-stopped
     network_mode: host
-    env_file:
-      - ./beszel/.env
     volumes:
       - ~/docker-volumes/beszel/beszel_agent_data:/var/lib/beszel-agent
       - ~/docker-volumes/beszel/beszel_socket:/beszel_socket
@@ -614,6 +613,9 @@ services:
       - main-network
 
   komodo-mongo:
+    # MongoDB 5+ needs AVX; the VM's default QEMU vCPU has none, so mongo dies with SIGILL.
+    # Fix on the Proxmox host while the VM is off: qm set <vmid> --cpu host
+    # (Fallback if the CPU type can't change: pin mongo:4.4, the last non-AVX version.)
     image: mongo:latest
     container_name: komodo-mongo
     labels:
