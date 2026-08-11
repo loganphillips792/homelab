@@ -447,11 +447,12 @@ To access services outside of home network, we will use tailscale
 One command that picks up any kind of change — new images, compose file edits, and bind-mounted config file edits:
 
 ```bash
-docker compose -f docker/compose.all.yml up -d --pull always --force-recreate --remove-orphans
+docker compose --progress plain -f docker/compose.all.yml up -d --pull always --force-recreate --remove-orphans
 ```
 
 What each flag buys you:
 
+- `--progress plain` — prints one log line per event instead of the live-redrawing display, so nothing gets collapsed into "... N more" and pull errors stay visible in scrollback (global flag, so it goes before `-f`)
 - `--pull always` — pulls newer images for every service before starting (catches `:latest` updates)
 - `--force-recreate` — recreates **every** container, even ones compose thinks are unchanged. This is the piece that solves the bind-mount problem: every process comes up fresh and re-reads its config files, so Caddyfile/gatus/prometheus/pihole edits all take effect without you tracking which ones changed
 - `--remove-orphans` — removes containers for services deleted from the compose files
