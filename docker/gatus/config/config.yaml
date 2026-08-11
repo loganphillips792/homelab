@@ -1,11 +1,262 @@
+​# Monitors for all services routed through Caddy (see docker/caddy/Caddyfile).
+# Using the .homelab URLs means each check exercises the full user path:
+# DNS (pihole) -> Caddy -> service. Gatus itself is not monitored (it can't
+# report its own downtime); uptime-kuma covers that.
+#
+# Services with a dedicated health endpoint use it; everything else is a GET /
+# expecting a 200 (redirects are followed).
+
 endpoints:
-  - name: example
-    url: https://example.org
-    interval: 30s
+  # --- Infrastructure ---
+  - name: Pi-hole
+    group: infrastructure
+    url: http://pihole.homelab/admin/
+    interval: 60s
     conditions:
       - "[STATUS] == 200"
+  - name: Komodo
+    group: infrastructure
+    url: http://komodo.homelab
+    interval: 60s
+    conditions:
+      - "[STATUS] == 200"
+  - name: Backrest
+    group: infrastructure
+    url: http://backrest.homelab
+    interval: 60s
+    conditions:
+      - "[STATUS] == 200"
+  - name: Cronmaster
+    group: infrastructure
+    url: http://cronmaster.homelab
+    interval: 60s
+    conditions:
+      - "[STATUS] == 200"
+
+  # --- Monitoring & observability ---
   - name: Grafana
-    url: http://localhost:3000
-    interval: 30s
+    group: monitoring
+    url: http://grafana.homelab/api/health
+    interval: 60s
+    conditions:
+      - "[STATUS] == 200"
+  - name: Prometheus
+    group: monitoring
+    url: http://prometheus.homelab/-/healthy
+    interval: 60s
+    conditions:
+      - "[STATUS] == 200"
+  - name: Loki
+    group: monitoring
+    url: http://loki.homelab/ready
+    interval: 60s
+    conditions:
+      - "[STATUS] == 200"
+  - name: cAdvisor
+    group: monitoring
+    url: http://cadvisor.homelab
+    interval: 60s
+    conditions:
+      - "[STATUS] == 200"
+  - name: Dozzle
+    group: monitoring
+    url: http://dozzle.homelab
+    interval: 60s
+    conditions:
+      - "[STATUS] == 200"
+  - name: Netdata
+    group: monitoring
+    url: http://netdata.homelab
+    interval: 60s
+    conditions:
+      - "[STATUS] == 200"
+  - name: Beszel
+    group: monitoring
+    url: http://beszel.homelab
+    interval: 60s
+    conditions:
+      - "[STATUS] == 200"
+  - name: Uptime Kuma
+    group: monitoring
+    url: http://uptime-kuma.homelab
+    interval: 60s
+    conditions:
+      - "[STATUS] == 200"
+  - name: Change Detection
+    group: monitoring
+    url: http://changedetection.homelab
+    interval: 60s
+    conditions:
+      - "[STATUS] == 200"
+
+  # --- Dashboards ---
+  - name: Homepage
+    group: dashboards
+    url: http://homepage.homelab
+    interval: 60s
+    conditions:
+      - "[STATUS] == 200"
+  - name: Glance
+    group: dashboards
+    url: http://glance.homelab
+    interval: 60s
+    conditions:
+      - "[STATUS] == 200"
+  - name: Flame
+    group: dashboards
+    url: http://flame.homelab
+    interval: 60s
+    conditions:
+      - "[STATUS] == 200"
+
+  # --- Media ---
+  - name: Jellyfin
+    group: media
+    url: http://jellyfin.homelab/health
+    interval: 60s
+    conditions:
+      - "[STATUS] == 200"
+  - name: Navidrome
+    group: media
+    url: http://navidrome.homelab
+    interval: 60s
+    conditions:
+      - "[STATUS] == 200"
+  - name: Immich
+    group: media
+    url: http://immich.homelab
+    interval: 60s
+    conditions:
+      - "[STATUS] == 200"
+  - name: TubeArchivist
+    group: media
+    url: http://tubearchivist.homelab
+    interval: 60s
+    conditions:
+      - "[STATUS] == 200"
+  - name: Pinchflat
+    group: media
+    url: http://pinchflat.homelab
+    interval: 60s
+    conditions:
+      - "[STATUS] == 200"
+
+  # --- Apps ---
+  - name: Paperless-ngx
+    group: apps
+    url: http://paperless.homelab
+    interval: 60s
+    conditions:
+      - "[STATUS] == 200"
+  - name: Karakeep
+    group: apps
+    url: http://karakeep.homelab
+    interval: 60s
+    conditions:
+      - "[STATUS] == 200"
+  - name: Planka
+    group: apps
+    url: http://planka.homelab
+    interval: 60s
+    conditions:
+      - "[STATUS] == 200"
+  - name: Penpot
+    group: apps
+    url: http://penpot.homelab
+    interval: 60s
+    conditions:
+      - "[STATUS] == 200"
+  - name: Excalidraw
+    group: apps
+    url: http://excalidraw.homelab
+    interval: 60s
+    conditions:
+      - "[STATUS] == 200"
+  - name: draw.io
+    group: apps
+    url: http://drawio.homelab
+    interval: 60s
+    conditions:
+      - "[STATUS] == 200"
+  - name: Jotty
+    group: apps
+    url: http://jotty.homelab
+    interval: 60s
+    conditions:
+      - "[STATUS] == 200"
+  - name: ArchiveBox
+    group: apps
+    url: http://archivebox.homelab
+    interval: 60s
+    conditions:
+      - "[STATUS] == 200"
+  - name: n8n
+    group: apps
+    url: http://n8n.homelab/healthz
+    interval: 60s
+    conditions:
+      - "[STATUS] == 200"
+
+  # --- Data & AI ---
+  - name: Metabase
+    group: data-and-ai
+    url: http://metabase.homelab/api/health
+    interval: 60s
+    conditions:
+      - "[STATUS] == 200"
+  - name: Umami
+    group: data-and-ai
+    url: http://umami.homelab/api/heartbeat
+    interval: 60s
+    conditions:
+      - "[STATUS] == 200"
+  - name: Ollama
+    group: data-and-ai
+    url: http://ollama.homelab
+    interval: 60s
+    conditions:
+      - "[STATUS] == 200"
+  - name: Ollama WebUI
+    group: data-and-ai
+    url: http://ollama-webui.homelab
+    interval: 60s
+    conditions:
+      - "[STATUS] == 200"
+  - name: Kafka UI
+    group: data-and-ai
+    url: http://kafka-ui.homelab
+    interval: 60s
+    conditions:
+      - "[STATUS] == 200"
+  - name: AKHQ
+    group: data-and-ai
+    url: http://akhq.homelab
+    interval: 60s
+    conditions:
+      - "[STATUS] == 200"
+  - name: RedisInsight
+    group: data-and-ai
+    url: http://redisinsight.homelab
+    interval: 60s
+    conditions:
+      - "[STATUS] == 200"
+
+  # --- Projects ---
+  - name: Live Auction
+    group: projects
+    url: http://live-auction.homelab
+    interval: 60s
+    conditions:
+      - "[STATUS] == 200"
+  - name: CTA Map
+    group: projects
+    url: http://cta-map.homelab
+    interval: 60s
+    conditions:
+      - "[STATUS] == 200"
+  - name: Hermes
+    group: projects
+    url: http://hermes.homelab
+    interval: 60s
     conditions:
       - "[STATUS] == 200"
