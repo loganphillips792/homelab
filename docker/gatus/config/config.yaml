@@ -1,4 +1,4 @@
-​# Monitors for all services routed through Caddy (see docker/caddy/Caddyfile).
+# Monitors for all services routed through Caddy (see docker/caddy/Caddyfile).
 # Using the .homelab URLs means each check exercises the full user path:
 # DNS (pihole) -> Caddy -> service. Gatus itself is not monitored (it can't
 # report its own downtime); uptime-kuma covers that.
