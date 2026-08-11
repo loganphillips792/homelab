@@ -1540,13 +1540,23 @@ Notes:
 
 [Navidrome](https://www.navidrome.org) is a self-hosted music server and streamer that's compatible with the Subsonic API, so any Subsonic client app can play from it. It's a single container defined in `navidrome/docker-compose.yml`, on `main-network`, and Caddy proxies http://navidrome.homelab → `navidrome:4533`.
 
-The music library is set by `NAVIDROME_MUSIC_DIR` in `docker/navidrome/.env`, mounted read-only at `/music`. It currently points at the Elements external drive:
+The music library is set by `NAVIDROME_MUSIC_DIR` in `docker/navidrome/.env`, mounted read-only at `/music`. It currently points at the SSD external drive:
 
 ```
-NAVIDROME_MUSIC_DIR=/Volumes/Elements/Music
+NAVIDROME_MUSIC_DIR=/Volumes/SSD/music
 ```
 
 That's a Mac path and it does **not** exist on the Linux VM. Docker would silently create an empty directory there rather than fail, leaving Navidrome scanning nothing — repoint it before running this on the VM. Unset the var entirely and it falls back to `~/docker-volumes/navidrome/music`.
+
+If Navidrome is already running and you change the library path, update the env variable and then run:
+
+```
+docker compose -f compose.all.yml up -d navidrome
+```
+
+Compose re-reads the env file, sees the bind mount source changed, and automatically recreates the container with the new mount. On startup Navidrome rescans the new library location.
+
+The key thing to avoid is `docker compose restart navidrome` — restart just stops and starts the existing container with its old mounts, so the env change would be silently ignored. Volume/env changes always require a recreate, which `up -d` handles for you.
 
 The `navidrome.homelab` record is already committed to `pihole/etc-dnsmasq.d/10-homelab.conf`, so it just needs Pi-hole to pick it up. Start the service and reload DNS:
 
