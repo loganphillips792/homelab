@@ -559,7 +559,8 @@ services:
       - main-network
 
   karakeep-chrome:
-    image: gcr.io/zenika-hub/alpine-chrome:124
+    # gcr.io/zenika-hub is dead (billing disabled on Zenika's Google project); Docker Hub has the same image
+    image: zenika/alpine-chrome:124
     container_name: karakeep-chrome
     restart: unless-stopped
     command:
