@@ -442,6 +442,24 @@ To access services outside of home network, we will use tailscale
 
 ## Useful Commands
 
+### Updating everything after a git pull
+
+One command that picks up any kind of change — new images, compose file edits, and bind-mounted config file edits:
+
+```bash
+docker compose -f docker/compose.all.yml up -d --pull always --force-recreate --remove-orphans
+```
+
+What each flag buys you:
+
+- `--pull always` — pulls newer images for every service before starting (catches `:latest` updates)
+- `--force-recreate` — recreates **every** container, even ones compose thinks are unchanged. This is the piece that solves the bind-mount problem: every process comes up fresh and re-reads its config files, so Caddyfile/gatus/prometheus/pihole edits all take effect without you tracking which ones changed
+- `--remove-orphans` — removes containers for services deleted from the compose files
+
+The trade-off is that everything restarts, changed or not — so a brief blip on every service (including DNS via pihole) each time you run it, and it takes a bit longer than a plain `up -d`. Named volumes and bind mounts persist, so no data is at risk. For a homelab pull-and-update routine, that's a fine price for never having to think about what kind of change was in the pull.
+
+One side effect of pulling regularly: old image layers pile up. An occasional `docker image prune -f` cleans those out.
+
 
 - After making DNS changes to the pihole DNS file: `docker compose -f docker/docker-compose.yml restart pihole caddy`
 
