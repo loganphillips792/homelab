@@ -559,6 +559,20 @@ docker compose -f docker/compose.all.yml up -d --pull always
 
 - `docker compose -f docker/docker-compose.yml up -d --force-recreate loki grafana alloy n8n`
 
+## Restart vs recreate
+
+`docker compose restart` stops and starts the existing containers without recreating them — fast, but it won't pick up changes to your compose file or a new image.
+
+```bash
+# restart just one service
+docker compose restart web
+
+# recreate containers so compose-file changes take effect
+docker compose up -d --force-recreate
+
+# full teardown (removes containers/network) and rebuild
+docker compose down && docker compose up -d --build
+```
 
 Backup N8N Database: `ssh logan@10.0.0.33 'cd ~/homelab/docker && docker compose exec -T postgres pg_dump -U changeUser n8n' > n8n-postgres-backup_$(date +%F).sql`
 Backup N8N Volume: `ssh logan@10.0.0.33 'docker run --rm -v n8n_storage:/volume alpine sh -c "cd /volume && tar -czf - ."' > n8n-storage-backup.tar.gz`
