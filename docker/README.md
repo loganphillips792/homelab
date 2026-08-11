@@ -461,6 +461,15 @@ The trade-off is that everything restarts, changed or not — so a brief blip on
 
 One side effect of pulling regularly: old image layers pile up. An occasional `docker image prune -f` cleans those out.
 
+### Restarting a single service
+
+Name the service to limit `up` to just it:
+
+```bash
+docker compose -f docker/compose.all.yml up -d gatus
+```
+
+None of the extra flags from the full-update command are needed: `up -d` already recreates the container when its compose config changed. If you only edited a bind-mounted config file (nothing in the YAML), add `--force-recreate` so the process comes up fresh and re-reads it. Avoid `docker compose restart <service>` after YAML/env changes — restart reuses the existing container config and silently ignores them.
 
 - After making DNS changes to the pihole DNS file: `docker compose -f docker/docker-compose.yml restart pihole caddy`
 
