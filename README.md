@@ -77,8 +77,26 @@ How to set up SSH if going from fresh install ?
                 - Select PopOS ISO > Next
     7. Set up Home Assistant
 
+## VM sizing (do this when creating the VM)
 
+The host `pve` has **28 GiB** of physical RAM. Never allocate a VM more RAM than the host
+can actually back — if the guest's page cache and Docker stack grow past what's left, the
+**entire Proxmox host hard-freezes** with nothing written to its logs (no OOM record). This
+was the cause of the repeated "VM crashes" on Jun 26, Jul 20, and Aug 11 2026.
 
+Also set `onboot` so the VM comes back on its own after a host reboot — without it the VM
+just stays off and it looks like it crashed again.
+
+|command|result|
+|-|-|
+|`qm set 100 --memory 20480`|`memory: 20480` (20 GiB, leaves ~8.5 GiB for Proxmox)|
+|`qm set 100 --onboot 1`|`onboot: 1`|
+
+Memory changes only take effect on the VM's next stop/start. Check the current values with
+`qm config 100 | grep -E '^(memory|balloon|onboot)'` and the host's total with `free -m`.
+
+> Note: VM 101 (PopOS, stopped) is also configured for 32 GiB — never run it at the same
+> time as VM 100.
 
 pct status 109
 

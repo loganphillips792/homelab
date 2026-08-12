@@ -514,7 +514,23 @@ pveversion --verbose
 
 `ssh logan@10.0.0.32 "cd /home/logan/homelab/docker && docker compose pull ollama && docker compose up -d ollama"`
 
+### Checking memory pressure on the Proxmox host
 
+Run from the Mac — this is the number that actually matters, not the gauge in the Proxmox UI:
+
+```bash
+ssh root@192.168.1.98 "free -m | awk 'NR==2{print \$7\" MiB available\"}'; cat /proc/pressure/memory"
+```
+
+Trouble looks like host `available` dropping under ~1500 MiB, or the PSI `some avg60` value climbing off `0.00`. Both healthy means the host has room even if the VM looks full.
+
+**Ignore the VM's memory gauge in the Proxmox UI.** It reports `total - free`, which counts the guest's page cache as "used", so a healthy VM running this Docker stack sits around 90% more or less permanently. Linux fills spare RAM with disk cache on purpose and drops it the instant a process needs the memory. To see real guest usage, look at the `available` column instead:
+
+```bash
+free -m
+```
+
+For context, a normal reading on the 20 GiB VM: ~12 GiB genuinely in use by processes, ~6 GiB page cache, ~7 GiB available. The Proxmox UI shows that same moment as 90%.
 
 # Backup strategy
 
@@ -718,6 +734,27 @@ localhost:5678
 localhost:8083
 
 ## PiHole
+
+### Pointing a device at Pi-hole for DNS
+
+On any device that should get ad-blocking and resolve `*.homelab` names, **replace the public
+resolvers with the VM's IP**:
+
+|remove|use instead|
+|-|-|
+|`1.1.1.1`|`192.168.1.150` (the Ubuntu VM)|
+|`8.8.8.8`||
+
+Pi-hole runs in Docker on the VM and publishes port 53, so the VM's IP *is* the DNS server.
+Leaving `1.1.1.1` or `8.8.8.8` in the list defeats the point — the OS will happily use the
+public resolver instead, so ads come back and `*.homelab` hostnames fail to resolve, seemingly
+at random. Set it per-device (macOS: WiFi > Details > DNS) or once in the router's DHCP
+settings so every device picks it up.
+
+> **One exception — do not do this on the VM itself.** The VM's own upstream resolvers in
+> `/etc/netplan/01-network-manager-all.yaml` must stay public (`1.1.1.1`, `9.9.9.9`). Pointing
+> the VM at itself creates a resolution loop, and that netplan step is what frees port 53 for
+> Pi-hole in the first place. Same applies to Pi-hole's own upstream setting.
 
 - Get IP address of Mac Host: `ipconfig getifaddr en0`
 - The IP address of the customs.list is of the host machine (Mac)
@@ -2035,3 +2072,10 @@ If you get errors from mobile
 https://www.reddit.com/r/Proxmox/comments/1g701ap/comment/lsmze85/?utm_source=share&utm_medium=web3x&utm_name=web3xcss&utm_term=1&utm_content=share_button
 
 [How safe is it to install Tailscale on a Proxmox cluster node? : r/Proxmox](https://www.reddit.com/r/Proxmox/comments/1uw0aek/how_safe_is_it_to_install_tailscale_on_a_proxmox/)
+
+
+# Adding linux VM and setting up RDP and tailscale
+
+https://www.freerdp.com
+
+https://endeavouros.com
