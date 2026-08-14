@@ -1673,6 +1673,8 @@ Two separate things have to be true: the host path has to be **mounted before th
 
 **1. Make the mount permanent (do this first)**
 
+Add the SSD to the VM: `VM > Hardweare > Add > USB Device > Use USB Vendor/Device ID > Select the SSD`
+
 A bind mount resolves its source once, at container-create time. If the container already existed when you ran `mount /dev/sdb1 /mnt/ssd`, it is still bound to the empty pre-mount directory — mounting afterwards does not propagate into a running container. The same trap fires on every reboot if the mount isn't in `/etc/fstab`.
 
 ```
