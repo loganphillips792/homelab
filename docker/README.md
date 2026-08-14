@@ -1667,6 +1667,67 @@ Notes:
 - Upstream's `user: 1000:1000` is left commented out in compose — the uid differs between the Linux VM (1000) and a Mac running it locally (501). Uncomment it on the VM if you hit permission errors on `/data`.
 - Its `compose.all.yml` include lists both `.env` and `navidrome/.env`: naming an `env_file` replaces the default `.env` lookup, so the shared one has to be listed explicitly or `${TZ}` resolves to empty.
 
+### Changing the mount path (external drive on the VM)
+
+Two separate things have to be true: the host path has to be **mounted before the container is created**, and `NAVIDROME_MUSIC_DIR` has to point at it. Miss either one and Navidrome shows **"not a valid path"** — Docker silently creates the missing bind source as an empty directory rather than failing, so `/music` inside the container is an empty dir.
+
+**1. Make the mount permanent (do this first)**
+
+A bind mount resolves its source once, at container-create time. If the container already existed when you ran `mount /dev/sdb1 /mnt/ssd`, it is still bound to the empty pre-mount directory — mounting afterwards does not propagate into a running container. The same trap fires on every reboot if the mount isn't in `/etc/fstab`.
+
+```
+lsblk -f /dev/sdb1          # note FSTYPE + UUID
+```
+
+Add a line to `/etc/fstab` (`sudo vim /etc/fstab`), keyed by **UUID** — `/dev/sdb1` can shift between boots:
+
+```
+# ext4:
+UUID=<uuid>  /mnt/ssd  ext4     defaults,nofail                          0 2
+# exFAT/NTFS (typical for an external drive):
+UUID=<uuid>  /mnt/ssd  exfat    defaults,nofail,uid=1000,gid=1000,umask=022  0 0
+# hfsplus (what the SSD external drive actually is — Mac-formatted):
+UUID=<uuid>  /mnt/ssd  hfsplus  ro,nofail                                0 0
+```
+
+Or skip the editor and append:
+
+```
+echo "UUID=$(sudo blkid -s UUID -o value /dev/sdb1)  /mnt/ssd  ext4  defaults,nofail  0 2" | sudo tee -a /etc/fstab
+```
+
+`nofail` matters — without it the VM drops to emergency mode at boot if the SSD is ever unplugged. Then verify before trusting it to a reboot:
+
+```
+sudo findmnt --verify                 # syntax-checks the whole fstab
+sudo umount /mnt/ssd && sudo mount -a && ls /mnt/ssd
+findmnt /mnt/ssd                      # prints a row = actually mounted
+```
+
+`findmnt` printing a row is the confirmation you want — `ls` succeeding proves nothing, since an unmounted mountpoint is just an empty directory that lists fine. A syntax error in `fstab` is one of the few ways to make a VM unbootable, hence the `--verify` pass first. `findmnt -S /dev/sdb1` goes the other way and lists every mountpoint the device is currently attached at, which is how you catch it already being mounted somewhere else (`mount` will refuse with `already mounted on ...`).
+
+**2. Point the env var at it**
+
+In `docker/navidrome/.env`:
+
+```
+NAVIDROME_MUSIC_DIR=/mnt/ssd/music   # or just /mnt/ssd if the files are at the drive root
+```
+
+**3. Recreate, don't restart**
+
+```
+docker compose -f compose.all.yml up -d --force-recreate navidrome
+docker exec navidrome ls /music | head
+```
+
+If that `ls` shows your music, the UI picks it up on the next scan.
+
+Two caveats:
+
+- `navidrome/.env` is git-tracked and shared with the Mac, so setting `/mnt/ssd` there breaks the Mac side. If you run Navidrome in both places, that file wants to be gitignored with a `.env.example` committed instead.
+- If the drive is ext4 owned by root with restrictive permissions you'll need `chown`/`chmod` on it, or leave the container running as root (the `user: "1000:1000"` line stays commented).
+
 ### Access from your phone (or any LAN device)
 
 Port 4533 is published on all interfaces, so anything on the same Wi-Fi can reach Navidrome directly by the host's LAN IP — no Caddy, no DNS, no Pi-hole involved. Get the address of the Mac running it:
