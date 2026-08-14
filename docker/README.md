@@ -1878,6 +1878,27 @@ docker compose -f compose.all.yml up -d backrest
 
 **This does not delete your snapshots.** Those live in the restic repo under `/repos`, which is a completely separate mount — the reinstall only throws away Backrest's knowledge of them. Re-add the repo with the same passphrase and every existing snapshot reappears, browsable and restorable. That separation is the point: Backrest is a front end over the repo, not the repo itself.
 
+## Immich
+
+### Server commands (`immich-admin`)
+
+The `immich-server` image ships an administrative CLI. Run it inside the running container — either directly by container name, or through compose (paths below are relative to the repo root):
+
+```
+docker exec -it immich-server immich-admin help
+docker compose -f docker/compose.all.yml exec immich-server immich-admin help
+```
+
+```
+docker exec -it immich-server immich-admin list-users
+docker exec -it immich-server immich-admin reset-admin-password
+docker exec -it immich-server immich-admin disable-password-login
+docker exec -it immich-server immich-admin enable-password-login
+docker exec -it immich-server immich-admin change-media-location
+```
+
+`-it` matters for `reset-admin-password` — it prompts for the new password interactively.
+
 
 # DNS Process Explained
 
