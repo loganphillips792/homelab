@@ -1,0 +1,49 @@
+# Termix (self-hosted web SSH/RDP/VNC client + server manager).
+#
+# Two containers: termix serves the web UI and terminal backend, guacd is the
+# Apache Guacamole proxy daemon that termix shells out to for the RDP/VNC
+# protocols. Both sit on the shared main-network so Caddy can proxy
+# http://termix.homelab -> termix:8080.
+#
+# main-network is declared in the root docker-compose.yml, not here -- like the
+# other per-service files in this repo, this only comes up via compose.all.yml:
+#   docker compose -f compose.all.yml up -d termix guacd
+# Docs: https://github.com/LukeGus/Termix
+
+services:
+  termix:
+    image: ghcr.io/lukegus/termix:latest
+    container_name: termix
+    restart: unless-stopped
+    # ports: # don't need ports because caddy proxies to the container ports for us
+    #   - "8080:8080" # 8080 is already published on the host by drawio
+    volumes:
+      - termix-data:/app/data
+    environment:
+      PORT: "8080"
+      # guacd is reached by service name over main-network. GUACD_TUNNEL_HOST is
+      # the other direction -- the address guacd uses to call back into termix.
+      GUACD_HOST: "guacd"
+      GUACD_TUNNEL_HOST: "termix"
+      GUACD_RECORDING_PATH: "/termix-data/session_recordings/guacamole"
+    depends_on:
+      - guacd
+    networks:
+      - main-network
+
+  guacd:
+    image: guacamole/guacd:1.6.0
+    container_name: guacd
+    restart: unless-stopped
+    # ports: # 4822 is only ever consumed by termix over the docker network
+    #   - "4822:4822"
+    volumes:
+      # Same volume termix mounts at /app/data, mounted here at the path
+      # GUACD_RECORDING_PATH points into so session recordings land somewhere
+      # both containers can see.
+      - termix-data:/termix-data
+    networks:
+      - main-network
+
+volumes:
+  termix-data:

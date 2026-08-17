@@ -792,6 +792,27 @@ docker exec pihole tail -n 100 -f /var/log/pihole/pihole.log
 
 `docker exec pihole pihole reloaddns`
 
+### Applying DNS record changes
+
+After adding or editing a `host-record` in `pihole/etc-dnsmasq.d/10-homelab.conf`, the file is
+already visible inside the container (it's a bind mount) — dnsmasq just has to re-read it:
+
+```bash
+docker compose -f docker/compose.all.yml restart pihole
+# or, without a restart:
+docker compose -f docker/compose.all.yml exec pihole pihole reloaddns
+```
+
+Then verify the new name resolves, e.g. for `termix.homelab`:
+
+```bash
+dig +short termix.homelab @192.168.1.150
+```
+
+That should return `192.168.1.150`. An empty result means the record didn't take — check that the
+IP in `10-homelab.conf` matches the VM's current IP (the committed records use a `10.0.0.32`
+placeholder, so the deployed copy on the VM is what actually matters).
+
 ## Homepage
 
 http://homepage.homela
