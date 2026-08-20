@@ -106,6 +106,11 @@ journalctl -u pve-lxc@109
 
 pveversion --verbose
 
+# Elementary OS VM
+
+1. Download the ISO from https://elementary.io
+2. Datacenter > pve > local (pve) > Upload > Select Elementary OS iso
+
 # Terraform
 
 - On host machine (mac os)
