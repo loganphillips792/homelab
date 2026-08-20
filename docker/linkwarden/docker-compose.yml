@@ -1,0 +1,89 @@
+# Linkwarden (self-hosted bookmark manager + web archiver).
+#
+# Three containers: the app, its own Postgres, and its own Meilisearch. Upstream's
+# compose names the latter two just `postgres` and `meilisearch` -- both are prefixed
+# here instead, because `postgres` already exists as a top-level service in the root
+# docker-compose.yml and a verbatim copy would collide with it.
+#
+# Storage differs from upstream too: upstream bind-mounts ./pgdata, ./data and
+# ./meili_data, but this repo uses named volumes for database/app state. That also
+# keeps the data backed up -- backup-remote-volumes.sh tars named volumes and would
+# skip bind mounts entirely.
+#
+# main-network is declared in the root docker-compose.yml, not here -- like the other
+# per-service files in this repo, this only comes up via compose.all.yml:
+#   docker compose -f compose.all.yml up -d linkwarden
+# Secrets live in linkwarden/.env next to this file.
+# Docs: https://docs.linkwarden.app/self-hosting/installation
+
+services:
+  linkwarden:
+    image: ghcr.io/linkwarden/linkwarden:latest
+    container_name: linkwarden
+    restart: unless-stopped
+    env_file:
+      - ./.env
+    ports:
+      - "3000:3000" # exposed on localhost for testing; caddy also proxies internally
+    environment:
+      # Infrastructure wiring rather than a secret, so it stays in the compose file.
+      # MEILI_MASTER_KEY, NEXTAUTH_* and DATABASE_URL all arrive via env_file.
+      - MEILI_HOST=http://linkwarden-meilisearch:7700
+      - TZ=${TZ}
+    volumes:
+      # /data/data is upstream's container path, not a typo -- the app's storage
+      # folder resolves under its /data working directory.
+      - linkwarden_data:/data/data
+    depends_on:
+      linkwarden-postgres:
+        condition: service_healthy
+      linkwarden-meilisearch:
+        condition: service_healthy
+    networks:
+      - main-network
+
+  linkwarden-postgres:
+    image: postgres:16-alpine
+    container_name: linkwarden-postgres
+    restart: unless-stopped
+    env_file:
+      - ./.env # supplies POSTGRES_PASSWORD
+    volumes:
+      - linkwarden_pgdata:/var/lib/postgresql/data
+    # Upstream's default user/db (postgres/postgres) are kept as-is so Linkwarden's
+    # Prisma migrations run against exactly what upstream expects. DATABASE_URL in
+    # .env must match.
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - main-network
+
+  linkwarden-meilisearch:
+    # Same tag karakeep-meilisearch already pins, so both share one image layer.
+    image: getmeili/meilisearch:v1.13.3
+    container_name: linkwarden-meilisearch
+    restart: unless-stopped
+    env_file:
+      - ./.env # supplies MEILI_MASTER_KEY
+    environment:
+      MEILI_NO_ANALYTICS: "true"
+    volumes:
+      - linkwarden_meili:/meili_data
+    healthcheck:
+      # /health needs no master key and only reports available once the HTTP
+      # server is actually listening, so depends_on: service_healthy is meaningful.
+      test: ["CMD-SHELL", "curl -fsS http://localhost:7700/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - main-network
+
+volumes:
+  linkwarden_data:
+  linkwarden_pgdata:
+  linkwarden_meili:
