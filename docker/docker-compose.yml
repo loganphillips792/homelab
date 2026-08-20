@@ -62,6 +62,7 @@ services:
   kafka:
     image: apache/kafka:4.0.0
     container_name: kafka
+    restart: unless-stopped
     ports:
       - "9092:9092"
       - "29092:29092"
@@ -109,6 +110,7 @@ services:
   kafka-ui:
     container_name: kafka-ui
     image: provectuslabs/kafka-ui:latest
+    restart: unless-stopped
     # ports: # don't need ports because caddy proxies to the container ports for us
     #   - 8080:8080
     environment:
@@ -158,6 +160,7 @@ services:
   dozzle:
     container_name: dozzle
     image: amir20/dozzle:latest
+    restart: unless-stopped
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
     # ports: # don't need ports because caddy proxies to the container ports for us
@@ -166,7 +169,7 @@ services:
       - main-network
 
   cadvisor:
-    image: ghcr.io/google/cadvisor:v0.53.0
+    image: ghcr.io/google/cadvisor:v0.60.5
     container_name: cadvisor
     restart: unless-stopped
     privileged: true
@@ -209,7 +212,7 @@ services:
 
 
   prometheus:
-    image: prom/prometheus:v2.47.2
+    image: prom/prometheus:v3.14.0
     container_name: prometheus
     # ports: # don't need ports because caddy proxies to the container ports for us
     #   - "9090:9090"
@@ -246,7 +249,7 @@ services:
 
 
   alloy:
-    image: grafana/alloy:latest
+    image: grafana/alloy:v1.18.1
     container_name: alloy
     ports:
       - "12345:12345"  # Alloy UI
@@ -274,7 +277,7 @@ services:
       - loki
 
   grafana:
-    image: grafana/grafana:10.2.0
+    image: grafana/grafana:13.2.0
     container_name: grafana
     # ports: # don't need ports because caddy proxies to the container ports for us
     #   - "3000:3000"
@@ -768,14 +771,17 @@ services:
     volumes:
       - ~/docker-volumes/jellyfin/config:/config
       - ~/docker-volumes/jellyfin/cache:/cache
-      # Media libraries: update these with your actual host paths.
-      # - type: bind
-      #   source: /mnt/media
-      #   target: /media
-      # - type: bind
-      #   source: /mnt/media2
-      #   target: /media2
-      #   read_only: true
+      # Music library, mounted read-only so Jellyfin can never modify the files.
+      # Set JELLYFIN_MUSIC_DIR in docker/.env -- on the VM that's the SSD at
+      # /mnt/ssd/music (see "Changing the mount path" in README.md). The host path
+      # must already be mounted BEFORE the container is created: a bind mount
+      # resolves its source once, and docker silently creates a missing source as
+      # an empty dir rather than failing, so the library shows up empty.
+      - ${JELLYFIN_MUSIC_DIR:-~/docker-volumes/jellyfin/music}:/media/music:ro
+      # Movie library, same rules. Also on the SSD, so it's covered by the same
+      # /mnt/ssd fstab entry -- and it goes stale on a remount for the same reason.
+      - ${JELLYFIN_MOVIES_DIR:-~/docker-volumes/jellyfin/movies}:/media/movies:ro
+      # Additional libraries: add more mounts under /media, one per content type.
       # Optional - extra fonts to be used during transcoding with subtitle burn-in
       # - type: bind
       #   source: /usr/local/share/fonts
@@ -856,6 +862,7 @@ services:
 # https://github.com/loganphillips792/live-auction
   live-auction:
     image: dockedupstream/live-auction:latest
+    restart: unless-stopped
     # ports: # don't need ports because caddy proxies to the container ports for us
     #   - "80:80"
     env_file:

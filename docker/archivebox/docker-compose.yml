@@ -38,8 +38,8 @@ services:
       # HOMELAB host: comment the line below and uncomment the archivebox.homelab one,
       #   which needs the *.archivebox.homelab wildcard in Pi-hole dnsmasq + the wildcard
       #   Caddy site block (both already committed).
-      - BASE_URL=http://archivebox.localhost:8010
-      # - BASE_URL=http://archivebox.homelab
+      # - BASE_URL=http://archivebox.localhost:8010
+      - BASE_URL=http://archivebox.homelab
       - PUBLIC_ADD_VIEW=False             # set True to let anyone submit URLs to archive
       - TZ=${TZ}
     shm_size: "1gb"                       # Chrome runs more efficiently with a larger shared-memory pool

@@ -257,6 +257,55 @@ ssh root@10.0.0.53 -i ~/.ssh/id_rsa_terraform "ss -tulnp | grep 8096 || echo 'No
 
 Go to set up page: `http://localhost:8096/web/index.html#!/wizardstart.html`
 
+## Running Jellyfin without docker compose
+
+Standalone `docker run` equivalent of the `jellyfin` service in
+`docker/docker-compose.yml`, for a brand new VM with nothing else on it -- no
+compose stack, no Caddy, no user-defined networks. Jellyfin goes on the default
+`bridge` network and is reached directly on port 8096.
+
+```sh
+docker pull jellyfin/jellyfin
+
+# 1. Config/cache dirs. Safe to create empty -- Jellyfin populates them.
+mkdir -p ~/docker-volumes/jellyfin/config ~/docker-volumes/jellyfin/cache
+
+# 2. Media dirs. These must ALREADY hold the library (and, if they live on a
+#    separate disk, that disk must already be mounted). A bind mount resolves
+#    its source once, and docker silently creates a missing source as an empty
+#    dir rather than failing, so the library would just show up empty.
+ls /mnt/ssd/music /mnt/ssd/movies
+
+# 3. Run it. Media is mounted read-only so Jellyfin can never modify the files.
+docker run -d \
+  --name jellyfin \
+  --restart unless-stopped \
+  -p 8096:8096/tcp \
+  -p 7359:7359/udp \
+  -e JELLYFIN_PublishedServerUrl=http://example.com \
+  -v ~/docker-volumes/jellyfin/config:/config \
+  -v ~/docker-volumes/jellyfin/cache:/cache \
+  --mount type=bind,source=/mnt/ssd/music,target=/media/music,readonly \
+  --mount type=bind,source=/mnt/ssd/movies,target=/media/movies,readonly \
+  jellyfin/jellyfin
+```
+
+Then open the setup wizard at `http://<vm-ip>:8096/web/index.html#!/wizardstart.html`
+and point the libraries at `/media/music` and `/media/movies`.
+
+Notes:
+
+- `/mnt/ssd/music` and `/mnt/ssd/movies` are the values of `JELLYFIN_MUSIC_DIR` /
+  `JELLYFIN_MOVIES_DIR` in `docker/.env` -- substitute your own paths. Add more
+  libraries by repeating `--mount` with a different `target=/media/<name>`.
+  Use absolute paths in `--mount`; the shell does not expand `~` there (it does
+  for `-v`, which is why the config/cache lines can use it).
+- `7359/udp` is client autodiscovery. Drop it if you only ever connect by
+  entering the server address manually.
+- Set `JELLYFIN_PublishedServerUrl` to the address clients actually use
+  (e.g. `http://<vm-ip>:8096`); it is only an autodiscovery hint.
+- Check on it with `docker logs -f jellyfin` and `docker ps --filter name=jellyfin`.
+
 # Tailscale
 
 [Download | Tailscale](https://tailscale.com/download/linux)
