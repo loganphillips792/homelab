@@ -134,6 +134,9 @@ pveversion --verbose
     - Network
         - Bridge: vmbr0
         - Model: VirtIO (paravirtualized)
+    - Confirm
+        - Check "Start after created"
+4. Select the VM under `pve` and click `>_ Console` in the upper right hand corner
 
 # Terraform
 
