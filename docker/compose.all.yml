@@ -17,3 +17,7 @@ include:
     env_file:
       - .env
       - navidrome/.env
+  - path: linkwarden/docker-compose.yml
+    env_file:
+      - .env
+      - linkwarden/.env

@@ -154,6 +154,12 @@ endpoints:
     interval: 60s
     conditions:
       - "[STATUS] == 200"
+  - name: Linkwarden
+    group: apps
+    url: http://linkwarden.homelab
+    interval: 60s
+    conditions:
+      - "[STATUS] == 200"
   - name: Planka
     group: apps
     url: http://planka.homelab

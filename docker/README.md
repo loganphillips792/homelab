@@ -1461,6 +1461,60 @@ All of Hoarder's data are in the DATA_DIR. If you can periodically snapshot that
 
 - If admin forgets password: https://docs.karakeep.app/FAQ/#if-you-are-an-administrator
 
+## Linkwarden
+
+Bookmark manager and web archiver at http://linkwarden.homelab (also http://localhost:3000).
+Runs alongside Karakeep rather than replacing it — the two overlap in purpose.
+
+Three containers, defined in `linkwarden/docker-compose.yml` and included from `compose.all.yml`:
+
+| Container | Purpose | Named volume |
+|-|-|-|
+| `linkwarden` | the app (bundles its own headless browser for archiving) | `linkwarden_data` (`/data/data`) |
+| `linkwarden-postgres` | its own Postgres 16 | `linkwarden_pgdata` |
+| `linkwarden-meilisearch` | full-text search index | `linkwarden_meili` |
+
+Upstream calls the latter two just `postgres` and `meilisearch`; they are prefixed here because
+`postgres` already exists as a top-level service in `docker-compose.yml`.
+
+**Deploy** (on the server, after `git pull` — edits on the Mac are inert until pulled):
+
+```
+docker compose -f docker/compose.all.yml up -d linkwarden
+docker compose -f docker/compose.all.yml up -d --force-recreate pihole caddy gatus homepage
+```
+
+The second line picks up the bind-mounted config edits (DNS record, Caddy site block, Gatus
+endpoint, Homepage tile). `--force-recreate` is what makes those processes re-read their files.
+
+Register the first account promptly after it comes up — it becomes the admin. To close signups
+afterwards, add `NEXT_PUBLIC_DISABLE_REGISTRATION=true` to `linkwarden/.env` and
+`docker compose -f docker/compose.all.yml up -d linkwarden` (not `restart`, which ignores env
+changes).
+
+Secrets are in `linkwarden/.env`. `NEXTAUTH_SECRET`, `POSTGRES_PASSWORD` and `MEILI_MASTER_KEY`
+must be three *different* values; regenerate any with `openssl rand -hex 32`. If you change
+`POSTGRES_PASSWORD` on an existing install, `DATABASE_URL` in the same file has to be updated to
+match, and the password changed inside the running DB — the env var only sets it on first init.
+
+AI auto-tagging against the local `ollama` service is wired but commented out at the bottom of
+`linkwarden/.env`; uncomment both lines and pull the model first (`docker exec ollama ollama pull llama3.1`).
+
+Backup — the app data and the DB; the Meilisearch index is derived and can be rebuilt:
+
+```
+ssh logan@10.0.0.32 "docker run --rm -v docker_linkwarden_data:/data -v \$HOME:/backup alpine sh -c 'tar czf /backup/linkwarden-data-\$(date +%Y%m%d-%H%M%S).tar.gz -C /data .'"
+ssh logan@10.0.0.32 "cd ~/homelab/docker && docker compose -f compose.all.yml exec -T linkwarden-postgres pg_dump -U postgres postgres" > linkwarden-db_$(date +%F).sql
+```
+
+Full reset (wipes everything):
+
+```
+docker compose -f docker/compose.all.yml rm -fsv linkwarden linkwarden-postgres linkwarden-meilisearch
+docker volume rm docker_linkwarden_data docker_linkwarden_pgdata docker_linkwarden_meili
+docker compose -f docker/compose.all.yml up -d linkwarden
+```
+
 ## C Advisor
 
 [Failure to get data in Prometheus on latest Docker · Issue #3749 · google/cadvisor](https://github.com/google/cadvisor/issues/3749)
@@ -2019,6 +2073,7 @@ These services bake their public URL into the frontend at startup — they only 
 | penpot | `PENPOT_PUBLIC_URI` | `penpot/.env` | `http://localhost:9001` | `http://penpot.homelab` |
 | planka | `PLANKA_BASE_URL` | env override at run time | `http://localhost:1337` | `http://planka.homelab` (unset = default) |
 | karakeep | `NEXTAUTH_URL` | `karakeep/.env` | `http://localhost:3000` | `http://karakeep.homelab` |
+| linkwarden | `NEXTAUTH_URL` | `linkwarden/.env` | `http://localhost:3000/api/v1/auth` | `http://linkwarden.homelab/api/v1/auth` |
 | tubearchivist | `TA_HOST` | `docker/.env` | `http://localhost:8000` | `http://tubearchivist.homelab` |
 | archivebox | `BASE_URL` | `archivebox/docker-compose.yml` | `http://archivebox.localhost:8010` | `http://archivebox.homelab` |
 
@@ -2054,6 +2109,7 @@ These services bake their public URL into the frontend at startup — they only 
 | komodo | http://localhost:9120 | http://komodo.homelab | admin / changeme |
 | netdata | N/A | http://netdata.homelab | N/A |
 | karakeep | N/A | http://karakeep.homelab | set on first run (signup) |
+| linkwarden | http://localhost:3000 | http://linkwarden.homelab | set on first run (first user is admin) |
 | beszel | http://localhost:8090 | http://beszel.homelab | set on first run |
 | backrest | N/A | http://backrest.homelab | set on first run |
 | paperless-ngx | N/A | http://paperless.homelab | admin / changeMe |

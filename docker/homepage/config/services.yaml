@@ -177,6 +177,10 @@
         icon: karakeep
         href: http://karakeep.homelab
         description: Knowledge base with web capture
+    - Linkwarden:
+        icon: linkwarden
+        href: http://linkwarden.homelab
+        description: Bookmark manager and web archiver
     - Excalidraw:
         icon: https://cdn.jsdelivr.net/gh/walkxcode/dashboard-icons@master/svg/excalidraw.svg
         href: http://excalidraw.homelab
