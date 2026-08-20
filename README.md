@@ -110,6 +110,30 @@ pveversion --verbose
 
 1. Download the ISO from https://elementary.io
 2. Datacenter > pve > local (pve) > Upload > Select Elementary OS iso
+3. Create VM
+    - General
+        - Node: pve
+        - VM ID: default
+        - Name: ElementaryOS
+    - OS
+        - Storage: local
+        - ISO image: Elementary OS image
+    - System
+        - Defaults
+    - Disks
+        - Bus/Device: SCSI 0
+        - SCSI Controller: VirtIO SCSI single
+        - Storage: local-lvm
+        - Disk size (GiB): 3
+        - Cache: Default (No cache)
+    - CPU
+        - Sockets: 1
+        - Cores: 1
+        - Type: Default
+        - Memory (MiB): 2048
+    - Network
+        - Bridge: vmbr0
+        - Model: VirtIO (paravirtualized)
 
 # Terraform
 
