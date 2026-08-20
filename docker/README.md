@@ -125,7 +125,15 @@
         2. Create Docker Volumes directory: `mkdir ~/docker-volumes`
         3. `cd homelab`
         4. `git clone https://github.com/loganphillips792/homelab.git`
-        5. Update the IP Addresses in the PiHole DNS config to the IP Address of the Ubuntu VM: `sed -i 's/10\.0\.0\.32/10.0.0.214/g' docker/pihole/etc-dnsmasq.d/10-homelab.conf`
+        5. Update the IP Addresses in the PiHole DNS config to the IP Address of the Ubuntu VM. `ip route get` asks the kernel which source address it would use to reach an off-link destination, so it returns the address on the default-route interface and never a `br-*` Docker bridge (no packets are sent — it's a pure routing-table lookup):
+
+            ```bash
+            VM_IP=$(ip -4 route get 1.1.1.1 | grep -oP 'src \K\S+')
+            echo "$VM_IP"   # sanity-check before rewriting
+            sed -i "s/10\.0\.0\.32/$VM_IP/g" docker/pihole/etc-dnsmasq.d/10-homelab.conf
+            ```
+
+            Note the quotes change from single to double on the `sed` so `$VM_IP` expands.
             - If these records are updated after the docker containers are already running, run `docker compose restart pihole` to restart pihole and apply the DNS changes
         6. Add .env file for live-auction (optional)
 
@@ -426,8 +434,8 @@ To access services outside of home network, we will use tailscale
     - Expiration: 90 days
     - Ephemeral: No
     - Tags: `tag:container`
-5. Update `docker-compose.yml` with auth key
-6. `docker compose up -d tailscale`
+5. Set `TS_AUTHKEY` in `docker/.env` on the server (not in `docker-compose.yml` — that just reads `${TS_AUTHKEY}`)
+6. `docker compose -f compose.all.yml up -d tailscale`
 7. Configure "Split DNS"
   1. DNS Tab
   2. Scroll down to Nameservers and click `Add nameserver` > `Custom`
@@ -471,6 +479,26 @@ docker compose -f docker/compose.all.yml up -d gatus
 
 None of the extra flags from the full-update command are needed: `up -d` already recreates the container when its compose config changed. If you only edited a bind-mounted config file (nothing in the YAML), add `--force-recreate` so the process comes up fresh and re-reads it. Avoid `docker compose restart <service>` after YAML/env changes — restart reuses the existing container config and silently ignores them.
 
+#### Why `--force-recreate` is only sometimes needed
+
+Compose stores a hash of each service's resolved config on the container, as the `com.docker.compose.config-hash` label. On `up -d` it recomputes that hash and recreates the container when it differs.
+
+So a change **inside the YAML** needs no flag. Editing `BASE_URL` on the archivebox service changes the resolved config, the hash differs, and recreation happens on its own:
+
+```bash
+docker compose -f docker/compose.all.yml up -d archivebox
+```
+
+Interpolation runs before hashing, so this holds for `${VAR}` values pulled from `.env` too — the resolved value is what gets hashed, not the literal `${VAR}`.
+
+`--force-recreate` exists for the case where the hash *doesn't* change but the running process is still stale: you edited a bind-mounted file like `caddy/Caddyfile` or `prometheus/prometheus.yml`, which compose can't see into. Nothing in the YAML moved, so `up -d` considers the container current and leaves it running with the old config in memory.
+
+```bash
+docker compose -f docker/compose.all.yml up -d --force-recreate caddy
+```
+
+Adding the flag when it wasn't needed is harmless — it just recreates a container that would have been recreated anyway.
+
 - After making DNS changes to the pihole DNS file: `docker compose -f docker/docker-compose.yml restart pihole caddy`
 
 ### Applying Pi-hole config changes
@@ -498,6 +526,27 @@ docker compose restart pihole
 ```
 
 One nuance: `docker compose restart` only restarts the container — it does **not** pick up changes to `docker-compose.yml` itself (env vars, ports, volumes). For those you'd need `docker compose up -d pihole`, which recreates the container. For conf file edits, `restart` (or the `exec ... restartdns`) is all you need.
+
+### Applying DNS record changes
+
+After adding or editing a `host-record` in `pihole/etc-dnsmasq.d/10-homelab.conf`, the file is
+already visible inside the container (it's a bind mount) — dnsmasq just has to re-read it:
+
+```bash
+docker compose -f docker/compose.all.yml restart pihole
+# or, without a restart:
+docker compose -f docker/compose.all.yml exec pihole pihole reloaddns
+```
+
+Then verify the new name resolves, e.g. for `navidrome.homelab`:
+
+```bash
+dig +short navidrome.homelab @192.168.1.150
+```
+
+That should return `192.168.1.150`. An empty result means the record didn't take — check that the
+IP in `10-homelab.conf` matches the VM's current IP (the committed records use a `10.0.0.32`
+placeholder, so the deployed copy on the VM is what actually matters).
 
 - After making changes to prometheus: `docker compose -f docker/docker-compose.yml restart prometheus`
 
@@ -532,10 +581,35 @@ free -m
 
 For context, a normal reading on the 20 GiB VM: ~12 GiB genuinely in use by processes, ~6 GiB page cache, ~7 GiB available. The Proxmox UI shows that same moment as 90%.
 
+### Recommended settings for VM 100
+
+Run these on the Proxmox host (`ssh root@192.168.1.98`, or the node's Shell in the web UI):
+
+1. **Lower VM 100's memory to something the host can actually back** — 20 GiB is the suggested figure, leaving ~8 GiB for Proxmox itself:
+
+   ```bash
+   qm set 100 --memory 20480
+   ```
+
+   Takes effect on the VM's next stop/start, not immediately.
+
+2. **Enable autostart** so the VM comes back on its own after a host reboot:
+
+   ```bash
+   qm set 100 --onboot 1
+   ```
+
+Check what's currently set with:
+
+```bash
+ssh root@192.168.1.98 "qm config 100 | grep -E 'memory|onboot|balloon'"
+```
+
 # Backup strategy
 
 - Backup: `./docker/backup-remote-volumes.sh`
 - Restore: `./restore-docker-backup.sh <tar-file-name>`
+- ArchiveBox volume only: `./docker/archivebox/backup-archivebox.sh` (see below)
 
 
 Download Proxmox Backup Server: https://www.proxmox.com/en/downloads/proxmox-backup-server/iso
@@ -579,6 +653,51 @@ Create VM with ISO image
   - Backup > Backup now
     - Storage: backup-storage
   - `ssh root@10.0.0.43 "ls /backups/vm/"`
+
+## ArchiveBox volume backup
+
+`./docker/archivebox/backup-archivebox.sh` backs up only the ArchiveBox data volume — the SQLite index plus the `archive/` snapshot tree — without stopping the rest of the stack. It stops the container so SQLite is quiescent, streams a gzipped tar over ssh, restarts the container, then verifies the archive locally before reporting success.
+
+```bash
+# Default: writes ~/archivebox-backup/archivebox-<timestamp>.tar.gz
+./docker/archivebox/backup-archivebox.sh
+
+# Somewhere else — positional or env var
+./docker/archivebox/backup-archivebox.sh ~/somewhere-else
+OUT_DIR=~/somewhere-else ./docker/archivebox/backup-archivebox.sh
+```
+
+Other overrides: `REMOTE_HOST` (default `logan@192.168.1.150`), `CONTAINER` (default `archivebox`), `REMOTE_VOLUME_PARENT` (default `~/docker-volumes`, resolved on the remote host).
+
+It exits 0 only when the tarball is readable and non-empty, so it chains safely:
+
+```bash
+./docker/archivebox/backup-archivebox.sh && echo "backed up"
+```
+
+### Why it verifies instead of trusting the exit code
+
+The remote chain is `docker stop && tar czf -; docker start`. The `;` guarantees the container comes back even if tar fails — but it also means ssh reports the exit status of `docker start`, never of `tar`. Two failures slip past a plain `set -e`:
+
+- **`docker stop` fails** → `tar` never runs, but the local shell already created the redirect target, leaving a zero-byte `.tar.gz`. `tar tzf` exits 0 on an empty file, so the script also requires a non-zero entry count.
+- **`tar` dies mid-stream** (full disk, OOM) → a truncated file that looks plausible until restore day. `tar tzf` catches this one.
+
+In both cases the script deletes the bad file and exits 1, so a failed run never leaves behind something that looks like a backup.
+
+### Restoring
+
+```bash
+# Inspect before touching anything
+tar tzf ~/archivebox-backup/archivebox-<timestamp>.tar.gz | head
+
+# Replace the volume on the server
+ssh logan@192.168.1.150 'docker stop archivebox >/dev/null'
+ssh logan@192.168.1.150 'rm -rf ~/docker-volumes/archivebox'
+ssh logan@192.168.1.150 'tar xzf - -C ~/docker-volumes' < ~/archivebox-backup/archivebox-<timestamp>.tar.gz
+ssh logan@192.168.1.150 'docker start archivebox >/dev/null'
+```
+
+The tar is rooted at `archivebox/`, so it extracts into `~/docker-volumes/` and recreates that directory.
 
 # Deploying
 
@@ -718,6 +837,30 @@ localhost:8080
 
 localhost:3000
 
+
+### Upgrading the observability stack
+
+Pull, recreate, then watch Grafana come up — the migration runs on first boot of a new image, so the logs are where a bad upgrade shows itself:
+
+```bash
+docker compose -f docker/compose.all.yml pull prometheus grafana alloy
+docker compose -f docker/compose.all.yml up -d prometheus grafana alloy
+docker compose -f docker/compose.all.yml logs -f grafana
+```
+
+### If Grafana crash-loops on the migration
+
+A half-applied schema migration leaves `grafana.db` in a state Grafana can't boot from, so it restarts into the same error forever. Wiping the volume is the whole fix. The compose project name defaults to the directory holding the file (`docker/`), which is why the volume is `docker_grafana_data` and not `grafana_data`:
+
+```bash
+docker compose -f docker/compose.all.yml stop grafana
+docker volume rm docker_grafana_data
+docker compose -f docker/compose.all.yml up -d grafana
+```
+
+**This deletes real state.** `grafana_data` is mounted at `/var/lib/grafana` (`docker-compose.yml:287`), so the wipe destroys `grafana.db`: dashboards created in the UI, alert rules added in the UI, annotations, API keys, and any users beyond admin. If there's anything in there you care about, export it before running the `rm` — a crash-looping Grafana can't export, so this is a decision you make once and can't take back.
+
+**What returns on its own.** `./grafana/provisioning` and `grafana.ini` are bind mounts, not part of the volume, so they survive untouched: the datasources and the four provisioned dashboards (`overview.json`, `homelab.json`, `y0neis-dashboard.json`, `observability/logs-dashboard.json`) reload at boot, and the admin login is recreated from `GF_SECURITY_ADMIN_USER` / `GF_SECURITY_ADMIN_PASSWORD` in compose. A stack whose dashboards all live in `provisioning/` loses nothing but the SQLite DB.
 
 ## N8N
 
@@ -892,7 +1035,103 @@ cd ~/repos/homelab/docker && docker compose rm -fsv uptime-kuma && docker volume
 
 ## Tailscale
 
-**Note:** When updating the auth token (or any env var), use `docker compose up -d tailscale`, not `docker compose restart tailscale`. `restart` reuses the existing container config and won't pick up the new value. `up -d` recreates the container with the updated config.
+### Updating the auth key
+
+The full loop, start to finish. Step 1 and step 5 are in the Tailscale admin console, the rest on the server.
+
+**1. Generate a new auth key**
+
+https://login.tailscale.com/admin/settings/keys → *Generate auth key*:
+
+- Description: `homelab-docker`
+- Reusable: **yes** (the container re-uses it on every fresh state dir)
+- Expiration: 90 days
+- Ephemeral: **no** (ephemeral nodes disappear from the tailnet when they go offline)
+- Tags: `tag:container`
+
+The tag isn't optional. The container passes `--advertise-tags=tag:container`
+(`docker-compose.yml`), and Tailscale rejects a key whose tags don't cover what the node
+tries to advertise. `tag:container` also has to exist in `tagOwners` under Access Controls —
+see the TailScale setup section above.
+
+Copy the key when it's shown; the console won't display it again.
+
+**2. Put it in `docker/.env` on the server**
+
+`docker/.env` is git-tracked, but only with the placeholder `TS_AUTHKEY=changeMe` — the real
+key lives on the server copy and is never committed. So edit it in place there rather than
+committing and pulling:
+
+```bash
+ssh logan@<server>
+cd ~/homelab/docker   # wherever the repo lives on the server
+nano .env             # set TS_AUTHKEY=tskey-auth-...
+```
+
+Only `.env` needs touching. `docker-compose.yml` already reads `TS_AUTHKEY=${TS_AUTHKEY}`,
+so nothing in the YAML changes when the key rotates.
+
+**3. Recreate the container**
+
+`docker compose restart` won't do it — that reuses the existing container with its old
+environment. The container has to be recreated so the new `TS_AUTHKEY` gets baked in:
+
+```bash
+docker compose -f compose.all.yml up -d tailscale
+```
+
+Compose sees the changed env var and recreates just that service. If it ever decides
+nothing changed, force it:
+
+```bash
+docker compose -f compose.all.yml up -d --force-recreate tailscale
+```
+
+**4. Verify**
+
+```bash
+docker compose -f compose.all.yml exec tailscale tailscale status
+```
+
+The node should show as online. Then confirm it's still in the tailnet at
+https://login.tailscale.com/admin/machines, and that the `10.0.0.0/24` subnet route is still
+approved — a re-auth can drop route approval, and losing it breaks `*.homelab` access from
+outside the house without the container itself looking broken.
+
+**5. Revoke the old key**
+
+Back on the Keys page, once the new key is confirmed working.
+
+#### If the new key seems to do nothing
+
+`TS_AUTHKEY` is only consumed by the container's entrypoint when there's no valid node state
+in `~/docker-volumes/tailscale/state` (the volume mount in `docker-compose.yml`). If the node
+is still logged in and authorized, the new key is simply ignored — recreating changes nothing,
+and that's fine: the node stays connected on its existing credentials. A new key only takes
+effect when the node is logged out or its old key expired.
+
+That's also why key expiry doesn't knock the node offline on its own. Auth keys authenticate
+the *initial* login; the node key that gets issued is what keeps it connected, and it has its
+own expiry (Machines → the node → *Disable key expiry* if you'd rather it never need
+re-auth).
+
+To deliberately force a re-auth with the new key:
+
+```bash
+docker compose -f compose.all.yml exec tailscale tailscale logout
+docker compose -f compose.all.yml up -d --force-recreate tailscale
+```
+
+Nuclear option, if the state dir itself is the problem — this makes the node re-register from
+scratch and it may come back as a duplicate (`tailscale-1`) in the machines list:
+
+```bash
+docker compose -f compose.all.yml rm -fs tailscale
+sudo rm -rf ~/docker-volumes/tailscale/state/*
+docker compose -f compose.all.yml up -d tailscale
+```
+
+### Setup
 
 1. Create account at https://login.tailscale.com/admin
 2. Generate auth key and add to env variable in `docker-compose.yml`
@@ -1457,9 +1696,50 @@ Password: changeme
 
 All of Hoarder's data are in the DATA_DIR. If you can periodically snapshot that folder, that would take a full backup of hoarder. You don't need to backup meillisearch as the data there can be reconstructed.
 
-`ssh logan@10.0.0.33 "docker run --rm -v karakeep-data:/data -v \$HOME:/backup alpine sh -c 'tar czf /backup/karakeep-backup-\$(date +%Y%m%d-%H%M%S).tar.gz -C /data .'"`
+```bash
+mkdir -p ~/backups && ssh logan@192.168.1.150 \
+  "docker run --rm -v karakeep-data:/data alpine tar czf - -C /data ." \
+  > ~/backups/karakeep-backup-$(date +%Y%m%d-%H%M%S).tar.gz
+```
 
 - If admin forgets password: https://docs.karakeep.app/FAQ/#if-you-are-an-administrator
+
+### Reset a lost admin password
+
+The admin panel (Admin Settings -> Users List -> reset password action) covers non-admin users.
+If you're locked out of the admin account itself, edit the SQLite DB directly. Karakeep must be
+stopped first:
+
+```bash
+docker compose -f docker/compose.all.yml stop karakeep-web
+
+docker volume ls | grep karakeep        # confirm the name (likely docker_karakeep-data)
+docker run --rm -it -v docker_karakeep-data:/data alpine sh
+```
+
+Inside that shell:
+
+```sh
+apk add --no-cache sqlite
+sqlite3 /data/db.db
+```
+
+```sql
+.tables                             -- list the tables, if you need to poke around
+select id, email, role from user;   -- in case you forgot which email you signed up with
+update user set password='$2a$10$5u40XUq/cD/TmLdCOyZ82ePENE6hpkbodJhsp7.e/BgZssUO5DDTa', salt='' where email='<your@email>';
+.quit
+```
+
+That hash is the documented one for the password `adminadmin`. Then:
+
+```bash
+docker compose -f docker/compose.all.yml start karakeep-web
+```
+
+Log in at http://karakeep.homelab with your email + `adminadmin` and change it immediately in User
+Settings. Use single quotes around the hash (the `$` segments would otherwise get expanded by the
+shell) — that's why the interactive shell is easier than a one-liner.
 
 ## Linkwarden
 
@@ -1506,6 +1786,27 @@ Backup — the app data and the DB; the Meilisearch index is derived and can be 
 ssh logan@10.0.0.32 "docker run --rm -v docker_linkwarden_data:/data -v \$HOME:/backup alpine sh -c 'tar czf /backup/linkwarden-data-\$(date +%Y%m%d-%H%M%S).tar.gz -C /data .'"
 ssh logan@10.0.0.32 "cd ~/homelab/docker && docker compose -f compose.all.yml exec -T linkwarden-postgres pg_dump -U postgres postgres" > linkwarden-db_$(date +%F).sql
 ```
+
+`pg_dump postgres` is the right database — `POSTGRES_DB` isn't set in `linkwarden/docker-compose.yml`,
+so it defaults to `postgres`. What it does *not* capture is globals: roles, their passwords, and
+tablespaces. That's harmless as long as `postgres` is the only role, because the Postgres entrypoint
+recreates that superuser from `POSTGRES_PASSWORD` on a fresh volume. If a second role is ever added,
+use `pg_dumpall` instead (`-c` prefixes the dump with DROP statements so it can be replayed over an
+existing cluster):
+
+```
+ssh logan@10.0.0.32 "cd ~/homelab/docker && docker compose -f compose.all.yml exec -T linkwarden-postgres pg_dumpall -U postgres -c" > linkwarden-all_$(date +%F).sql
+```
+
+**Keep the `-T`.** It disables TTY allocation, and a TTY rewrites `LF` as `CRLF` on the way out — so
+the otherwise-identical `docker exec -t ... > file` found in most forum posts produces a dump with
+mangled line endings that can fail or silently corrupt on restore. Same trap applies to the `tar`
+above: never let a TTY sit between a binary stream and a redirect.
+
+Both commands are crash-consistent, not quiesced. That's fine for the SQL dump (`pg_dump` runs in a
+single transaction), but the `linkwarden_data` tar can catch a half-written archive file. For backups
+that actually matter, add `linkwarden_data` and `linkwarden_pgdata` to a **backrest** plan rather than
+relying on these one-liners — you get scheduling, dedup, and retention for free.
 
 Full reset (wipes everything):
 
@@ -1574,7 +1875,45 @@ The admin user is auto-created on first boot from the compose `environment:` blo
 docker compose -f compose.all.yml up -d archivebox
 ```
 
-To create or reset a user manually instead: `docker compose -f compose.all.yml run archivebox manage createsuperuser`.
+### Creating an admin user / resetting a password
+
+Upstream documents these as bare `archivebox` commands, run from inside the data folder:
+
+```
+cd data/   # run commands inside your data folder
+archivebox manage createsuperuser
+archivebox manage changepassword <username>
+```
+
+> Careful: the upstream docs show `createsuperuser <username>`, but that is wrong — these are Django management commands, and Django's `createsuperuser` takes the username as the `--username` flag, not a positional. Passing it positionally just prints the usage block. `changepassword` **does** take a positional username.
+
+Here ArchiveBox only exists inside the container, so run them through compose instead. The image's entrypoint is already `archivebox`, and `/data` is already the working directory, so the `cd data/` step and the leading `archivebox` both drop off:
+
+```
+docker compose -f compose.all.yml run --rm archivebox manage createsuperuser
+docker compose -f compose.all.yml run --rm archivebox manage changepassword <username>
+
+# non-interactive username, still prompts for email + password:
+docker compose -f compose.all.yml run --rm archivebox manage createsuperuser --username admin
+```
+
+Both prompt interactively, so run them from a real terminal — not with `-T`, which is only for piping stdin (as in the bulk `add` below).
+
+Or shell into the running container and use the upstream commands as written:
+
+```
+docker compose -f compose.all.yml exec archivebox bash
+# or, without compose (container_name is archivebox):
+docker exec -it archivebox bash
+
+# now you're in /data, with archivebox on PATH:
+archivebox manage createsuperuser                      # prompts for username, email, password
+archivebox manage createsuperuser --username admin     # or name it up front
+archivebox manage changepassword admin
+archivebox status
+```
+
+`exec` attaches to the container that's already running, so it needs `up -d` to have happened first — unlike `run`, which starts a throwaway one. Add `--user root` if you need to fix file ownership under `/data`.
 
 Add URLs from the CLI (or paste them in the Web UI):
 
@@ -1582,6 +1921,89 @@ Add URLs from the CLI (or paste them in the Web UI):
 docker compose -f compose.all.yml run archivebox add 'https://example.com'
 docker compose -f compose.all.yml run -T archivebox add < ~/bookmarks.txt
 ```
+
+### Exporting the index (HTML / JSON / CSV)
+
+`archivebox list` dumps the snapshot index to **stdout**. Upstream documents it as bare commands run from inside the data folder:
+
+```
+archivebox list --html --with-headers > index.html
+archivebox list --json --with-headers > index.json
+archivebox list --csv=timestamp,url,title > index.csv
+```
+
+`--with-headers` wraps the output in a full HTML page / adds the JSON metadata envelope (`copyright_info`, `last_run_cmd`, …) instead of emitting a bare fragment or array. It doesn't apply to `--csv`, which takes its column list inline.
+
+Same container caveat as above — `archivebox` only exists inside the container, so it has to run there. The catch is that `>` is interpreted by *whichever shell you typed it into*, so where the file lands depends on where you put the redirect.
+
+**Inside the container** (files land in `/data`, i.e. `~/docker-volumes/archivebox/` on the host):
+
+```
+docker exec -it archivebox bash
+
+# now in /data, with archivebox on PATH — upstream commands work verbatim:
+archivebox list --html --with-headers > index.html
+archivebox list --json --with-headers > index.json
+archivebox list --csv=timestamp,url,title > index.csv
+```
+
+**From the server shell**, redirect outside the container so the file lands in the current directory on the VM:
+
+```
+docker exec archivebox archivebox list --html --with-headers > index.html
+```
+
+`docker exec` bypasses the image's entrypoint, so `archivebox` has to be repeated as the command.
+
+### Running it from the MacBook over SSH
+
+Put the redirect on the *local* side of the SSH command and the file is written to your Mac, not the server — SSH just pipes the container's stdout back over the connection:
+
+```
+ssh logan@192.168.1.150 'docker exec archivebox archivebox list --html --with-headers' > index.html
+ssh logan@192.168.1.150 'docker exec archivebox archivebox list --json --with-headers' > index.json
+ssh logan@192.168.1.150 'docker exec archivebox archivebox list --csv=timestamp,url,title' > index.csv
+```
+
+Single quotes matter: they keep the remote command intact so the local shell doesn't try to expand anything in it, and they keep `>` local. Moving the `>` inside the quotes (`ssh host 'archivebox list ... > index.html'`) writes the file on the server instead.
+
+The compose form works the same way, it just needs a `cd` first since `-f compose.all.yml` is a relative path — and `-T` to suppress TTY allocation, otherwise the stream comes back with CRLF line endings baked in:
+
+```
+ssh logan@192.168.1.150 'cd ~/homelab/docker && docker compose -f compose.all.yml run --rm -T archivebox list --json --with-headers' > index.json
+```
+
+`docker exec` is the cheaper option here — it reuses the already-running container, while `run --rm` spins up a throwaway one for each invocation.
+
+One cosmetic thing: `archivebox list` prints a `Listed N snapshots` progress line to **stderr**, so it shows up in your terminal but never contaminates the redirected file. Append `2>/dev/null` inside the quotes if you want it silenced.
+
+### Backing up the data folder to the MacBook
+
+Same idea as above — the redirect stays local, so the tarball lands on the Mac and nothing is written on the server:
+
+```
+mkdir -p ~/backups && \
+ssh logan@192.168.1.150 'docker stop archivebox >/dev/null && tar czf - -C ~/docker-volumes archivebox; docker start archivebox >/dev/null' \
+  > ~/backups/archivebox-$(date +%Y%m%d-%H%M%S).tar.gz
+```
+
+Stops the container, streams a gzipped tar of the whole `/data` folder straight to the Mac, then restarts it — the `;` before `docker start` means the restart runs even if the transfer fails. Downtime is a few seconds at the current ~19M.
+
+The container is stopped because the index is SQLite: a hot copy can catch `index.sqlite3` mid-write with unmerged `-wal`/`-shm` files. Drop the `docker stop`/`docker start` parts for a zero-downtime copy — the `archive/` snapshots are immutable so they copy fine hot, but the index may be inconsistent. `sudo` isn't needed; the files are owned by UID 911 but world-readable.
+
+Verify and restore:
+
+```
+# check the archive
+tar tzf ~/backups/archivebox-*.tar.gz | head
+
+# restore (wipes the current data dir)
+ssh logan@192.168.1.150 'docker stop archivebox && rm -rf ~/docker-volumes/archivebox'
+ssh logan@192.168.1.150 'tar xzf - -C ~/docker-volumes' < ~/backups/archivebox-20260816-XXXXXX.tar.gz
+ssh logan@192.168.1.150 'docker start archivebox'
+```
+
+Note that `backup-remote-volumes.sh` doesn't cover this — it only walks named Docker volumes, and `/data` here is a bind mount.
 
 Notes:
 
@@ -1735,11 +2157,21 @@ A bind mount resolves its source once, at container-create time. If the containe
 sudo mkdir -p /mnt/ssd
 ```
 
+First find the device — `/dev/sdb1` below is the typical answer, not a given:
+
 ```
-lsblk -f /dev/sdb1          # note FSTYPE + UUID
+sudo dmesg | tail -20       # right after the USB passthrough: "[sdb] Attached SCSI disk"
+lsblk -o NAME,SIZE,TYPE,TRAN,MODEL,FSTYPE,LABEL,MOUNTPOINTS
 ```
 
-Add a line to `/etc/fstab` (`sudo vim /etc/fstab`), keyed by **UUID** — `/dev/sdb1` can shift between boots:
+`sda` is the VM's virtual boot disk (blank or `sata` under `TRAN`, model `QEMU HARDDISK`) — leave it alone. The SSD is the row with `TRAN=usb` and a size matching the physical drive; the indented rows under it are its partitions. Whatever disk name that row shows in the `NAME` column — `sdb`, `sdc`, whatever it happens to be — is what goes in the next command:
+
+```
+lsblk -f /dev/<disk-from-NAME-above>   # e.g. lsblk -f /dev/sdb
+                                       # whole disk: note FSTYPE + UUID per partition
+```
+
+Add a line to `/etc/fstab` (`sudo vim /etc/fstab`), keyed by **UUID** — the `sdb` letter is assigned in detection order and can shift between boots:
 
 ```
 # ext4:
@@ -1753,6 +2185,7 @@ UUID=<uuid>  /mnt/ssd  hfsplus  ro,nofail                                0 0
 Or skip the editor and append:
 
 ```
+# substitute the partition you identified above for /dev/sdb1
 echo "UUID=$(sudo blkid -s UUID -o value /dev/sdb1)  /mnt/ssd  ext4  defaults,nofail  0 2" | sudo tee -a /etc/fstab
 ```
 
@@ -1787,6 +2220,19 @@ Two caveats:
 
 - `navidrome/.env` is git-tracked and shared with the Mac, so setting `/mnt/ssd` there breaks the Mac side. If you run Navidrome in both places, that file wants to be gitignored with a `.env.example` committed instead.
 - If the drive is ext4 owned by root with restrictive permissions you'll need `chown`/`chmod` on it, or leave the container running as root (the `user: "1000:1000"` line stays commented).
+
+**Unmounting and remounting the SSD while the container runs**
+
+If you `umount /mnt/ssd` and mount it again — swapping the drive, a `mount -a` after an fstab edit, the SSD dropping off and coming back — the running container does **not** follow. Its bind mount is attached to the filesystem that was there when the container started, and Docker mounts it `rprivate`, so a new mount landing on `/mnt/ssd` afterwards doesn't propagate into the container's mount namespace. Navidrome keeps looking at the old, now-detached filesystem and `/music` goes empty or stale mid-scan.
+
+Restart to re-resolve it:
+
+```
+docker compose -f compose.all.yml restart navidrome
+docker exec navidrome ls /music | head    # confirm it's back
+```
+
+This is the one case where `restart` is the right tool. Everywhere else in this section it isn't — restart reuses the existing container config, so it silently ignores `.env` and compose changes, which is why step 3 needs `up -d --force-recreate`. Here the config hasn't changed at all; the container just has to redo the mount against whatever is on `/mnt/ssd` now. Verify the host side is actually mounted first (`findmnt /mnt/ssd` prints a row), or the restart just re-binds the empty mountpoint.
 
 ### Access from your phone (or any LAN device)
 
@@ -1850,6 +2296,24 @@ This throws away the admin account, play counts, ratings and playlists — you'l
 >
 > `/data` must say `volume`. If it says `bind`, that's the bug.
 
+### Running it standalone (outside the homelab stack)
+
+Navidrome doesn't depend on anything else in the stack — no Caddy, no Pi-hole, no `main-network`. If the repo isn't checked out, or you just want it on some other machine, one `docker run` is the whole install:
+
+```
+docker run -d --name navidrome --restart unless-stopped \
+  -p 4533:4533 -e TZ=America/Chicago \
+  -v navidrome_data:/data \
+  -v /Volumes/Elements/Music:/music:ro \
+  deluan/navidrome:latest
+
+docker exec navidrome ls /music | head
+```
+
+Swap `/Volumes/Elements/Music` for wherever the library actually is on that host. The same rules from the rest of this section still apply: `/data` has to be the named volume (not a bind mount) or the SQLite DB breaks mid-scan, the music mount stays `:ro`, and the drive has to be mounted *before* the container is created or Docker silently binds an empty directory. Reach it at http://localhost:4533 and create the admin account on first load.
+
+Note the volume is plain `navidrome_data` here, not the `docker_navidrome_data` that Compose creates — the project prefix only comes from `compose.all.yml`. So a standalone run gets its own separate database, and the reinstall commands above won't touch it.
+
 ## Backrest
 
 [Backrest](https://github.com/garethgeorge/backrest) is a web UI over [restic](https://restic.net). restic does the actual work — deduplicated, encrypted, incremental snapshots — and Backrest adds the parts the CLI doesn't have: cron-scheduled backups, automatic repo maintenance (`prune`, `check`, `forget`), a file browser for restores, and notification hooks. The restic CLI is still there underneath if you need it.
@@ -1907,6 +2371,8 @@ Notes:
 - Backrest's own state lives on bind mounts, and `backup-remote-volumes.sh` only tars **named** volumes — so its config and oplog are not covered by that script. `docker/backrest/config/config.json` is the one file worth keeping if you want your repos and plans back.
 - `docker/backrest/config/` and `docker/backrest/data/` are **committed to this repo**, live SQLite files and secrets included. This instance is for testing, so that's deliberate — but it means a fresh clone inherits an existing admin user and JWT secret rather than starting clean. Don't treat this as a template for a real deployment.
 - `docker/backrest/data/` is stale. It's left over from November 2025, when `/data` was mapped there; compose now maps `/data` to `~/docker-volumes/backrest/data`, so nothing reads those tracked files anymore.
+
+### Backup process
 
 ### Reinstall / start fresh
 
@@ -2000,6 +2466,10 @@ https://github.com/huginn/huginn/blob/master/doc/docker/install.md
 https://crazymax.dev/diun/usage/command-line/
 
 https://github.com/crowdsecurity/crowdsec
+
+https://github.com/morpheus65535/bazarr && https://github.com/sonarr/sonarr && https://github.com/Radarr/Radarr
+
+https://github.com/rcourtman/pulse
 
 open claw
 
