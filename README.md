@@ -347,6 +347,10 @@ This tells Tailscale to route `*.homelab` DNS queries through Pi-hole, which res
 * **`context canceled` during login** — Usually caused by an invalid auth key or the container restart-looping. Check `docker logs` for the underlying error.
 * **Duplicate `TS_EXTRA_ARGS`** — Docker only keeps the last value of a duplicate environment variable. Merge all flags into a single `TS_EXTRA_ARGS` line.
 
+# Home Assistant
+
+Reach the VM's console through Proxmox: **Datacenter > pve > console**
+
 # Estimating Docker image download size
 
 Figure out how much `docker compose -f docker/compose.all.yml up -d` would download from a clean Docker state, without pulling anything. Registries report the compressed size of every layer in the image manifest, and `docker manifest inspect` works without the daemon running.
