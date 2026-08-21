@@ -144,19 +144,6 @@ services:
       - main-network
       - kafka-network
   
-  gatus:
-    image: twinproduction/gatus:latest
-    # Resolve *.homelab via Pi-hole (port 53 published on the host). Docker's
-    # embedded DNS forwards to the host's upstream resolvers, which don't know
-    # the .homelab zone, so without this every check fails DNS.
-    dns: 192.168.1.150
-    ports:
-      - 8082:8080
-    volumes:
-      - ./gatus/config:/config
-    networks:
-      - main-network
-
   dozzle:
     container_name: dozzle
     image: amir20/dozzle:latest
@@ -165,23 +152,6 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock
     # ports: # don't need ports because caddy proxies to the container ports for us
     #   - 8083:8080
-    networks:
-      - main-network
-
-  cadvisor:
-    image: ghcr.io/google/cadvisor:v0.60.5
-    container_name: cadvisor
-    restart: unless-stopped
-    privileged: true
-    ports: # don't need ports because caddy proxies to the container ports for us
-      - "8089:8080"
-    volumes:
-      - /:/rootfs:ro
-      - /var/run:/var/run:ro
-      - /sys:/sys:ro
-      - /var/lib/docker/:/var/lib/docker:ro
-      - /dev/disk/:/dev/disk:ro
-      - /var/run/docker.sock:/var/run/docker.sock
     networks:
       - main-network
 
@@ -210,91 +180,6 @@ services:
     networks:
       - main-network
 
-
-  prometheus:
-    image: prom/prometheus:v3.14.0
-    container_name: prometheus
-    # ports: # don't need ports because caddy proxies to the container ports for us
-    #   - "9090:9090"
-    volumes:
-      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
-      - ./prometheus/rules:/etc/prometheus/rules
-      - prometheus_data:/prometheus
-    command:
-      - '--config.file=/etc/prometheus/prometheus.yml'
-      - '--storage.tsdb.path=/prometheus'
-      - '--web.console.libraries=/etc/prometheus/console_libraries'
-      - '--web.console.templates=/etc/prometheus/consoles'
-      - '--storage.tsdb.retention.time=200h'
-      - '--web.enable-lifecycle'
-      - '--web.enable-admin-api'
-      - '--web.enable-remote-write-receiver'
-    networks:
-      - main-network
-    restart: unless-stopped
-
-  loki:
-    image: grafana/loki:3.6.0
-    container_name: loki
-    user: "0"
-    # ports: # don't need ports because caddy proxies to the container ports for us
-    #   - "3100:3100"
-    volumes:
-      - ./loki/loki.yml:/etc/loki/local-config.yaml
-      - loki_data:/loki
-    command: -config.file=/etc/loki/local-config.yaml
-    networks:
-      - main-network
-    restart: unless-stopped
-
-
-  alloy:
-    image: grafana/alloy:v1.18.1
-    container_name: alloy
-    ports:
-      - "12345:12345"  # Alloy UI
-    user: "0"
-    volumes:
-      - ./alloy/config.alloy:/etc/alloy/config.alloy
-      - /var/log:/var/log:ro
-      - /var/lib/docker/containers:/var/lib/docker/containers:ro
-      - /var/run/docker.sock:/var/run/docker.sock
-      - /proc:/host/proc:ro
-      - /sys:/host/sys:ro
-      - /:/rootfs:ro
-    command:
-      - run
-      - /etc/alloy/config.alloy
-      - --server.http.listen-addr=0.0.0.0:12345
-      - --storage.path=/var/lib/alloy/data
-    environment:
-      - HOSTNAME
-    networks:
-      - main-network
-    restart: unless-stopped
-    depends_on:
-      - prometheus
-      - loki
-
-  grafana:
-    image: grafana/grafana:13.2.0
-    container_name: grafana
-    # ports: # don't need ports because caddy proxies to the container ports for us
-    #   - "3000:3000"
-    volumes:
-      - ./grafana/provisioning:/etc/grafana/provisioning
-      - ./grafana/grafana.ini:/etc/grafana/grafana.ini
-      - grafana_data:/var/lib/grafana
-    environment:
-      - GF_SECURITY_ADMIN_USER=admin
-      - GF_SECURITY_ADMIN_PASSWORD=admin123
-      - GF_USERS_ALLOW_SIGN_UP=false
-    networks:
-      - main-network
-    restart: unless-stopped
-    depends_on:
-      - prometheus
-      - loki
 
   metabase:
     image: metabase/metabase:latest
@@ -372,20 +257,6 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
-    networks:
-      - main-network
-  homepage:
-    image: ghcr.io/gethomepage/homepage:latest
-    container_name: homepage
-    # ports: # don't need ports because caddy proxies to the container ports for us
-    #   - "3001:3000" # Grafana uses 3000 on host
-    volumes:
-      - ./homepage/config:/app/config # Ensure this local dir exists
-      - ~/docker-volumes/homepage-logs:/app/config/logs # don't want logs to be committed into the repo
-      - /var/run/docker.sock:/var/run/docker.sock # Optional: for Docker integrations
-    environment:
-      HOMEPAGE_ALLOWED_HOSTS: localhost:3001,homepage.homelab
-    restart: unless-stopped
     networks:
       - main-network
   cronmaster:
@@ -819,23 +690,6 @@ services:
     networks:
       - main-network
 
-  glance:
-    container_name: glance
-    image: glanceapp/glance
-    restart: unless-stopped
-    volumes:
-      - ./glance/config:/app/config
-      - ./glance/assets:/app/assets
-      - /etc/localtime:/etc/localtime:ro
-      # Optionally, also mount docker socket if you want to use the docker containers widget
-      # - /var/run/docker.sock:/var/run/docker.sock:ro
-    # ports: # don't need ports because caddy proxies to the container ports for us
-    #   - 8084:8080
-    environment:
-      - MY_SECRET_TOKEN=123456
-    networks:
-      - main-network
-
 
   flame:
     image: pawelmalak/flame
@@ -948,9 +802,6 @@ volumes:
   kafka-data:
   db_storage:
   n8n_storage:
-  prometheus_data:
-  loki_data:
-  grafana_data:
   pihole_etc:
   uptime_kuma_data:
   metabase-db-data:
