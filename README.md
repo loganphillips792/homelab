@@ -295,6 +295,18 @@ and point the libraries at `/media/music` and `/media/movies`.
 
 Notes:
 
+- Bind Mounts are needed to pass folders from the host OS to the container OS
+  whereas volumes are maintained by Docker and can be considered easier to
+  backup and control by external programs. For a simple setup, it's considered
+  easier to use Bind Mounts instead of volumes. Multiple media libraries can be
+  bind mounted if needed:
+
+  ```sh
+  --mount type=bind,source=/mnt/ssd/music,target=/media/music,readonly \
+  --mount type=bind,source=/mnt/ssd/movies,target=/media/movies,readonly \
+  --mount type=bind,source=/mnt/ssd/shows,target=/media/shows,readonly
+  ```
+
 - `/mnt/ssd/music` and `/mnt/ssd/movies` are the values of `JELLYFIN_MUSIC_DIR` /
   `JELLYFIN_MOVIES_DIR` in `docker/.env` -- substitute your own paths. Add more
   libraries by repeating `--mount` with a different `target=/media/<name>`.
