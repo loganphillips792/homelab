@@ -2933,7 +2933,7 @@ docker ps -a --filter status=exited --filter status=created --filter status=rest
 | docker-tailscale-1 | Exited (1) | expired auth key |
 | docker-live-auction-1 | Exited (255) | SQLite schema drift |
 | matomo-app / matomo-cron | Created | host port 8080 already taken by drawio |
-| komodo | no containers | never deployed — no compose file in the repo |
+| komodo | commented out | MongoDB 5+ needs AVX; VM 100's vCPU lacks it |
 
 ### archivebox — deliberately disabled
 
@@ -3019,11 +3019,19 @@ Fix by giving matomo a different host port (e.g. `8083:80`) or by dropping the h
 reaching it through Caddy — note matomo has no Caddy site block today, so removing the port binding
 means adding one. `matomo-db` (mariadb) is running normally and still holds the data.
 
-### komodo — never deployed on this host
+### komodo — disabled 2026-08-13 (MongoDB needs AVX)
 
-Komodo appears in the service tables above, but `docker/komodo/` contains only `compose.env` — there
-is no compose file, and `compose.all.yml` does not reference it. No komodo containers exist on the
-VM. Treat those table rows as aspirational until a compose definition is added.
+The komodo stack is commented out in `docker-compose.yml` (~line 503), not missing. MongoDB 5+
+requires AVX instructions and VM 100's default QEMU vCPU model does not expose them, so
+`komodo-mongo` died with SIGILL in a permanent crash-restart loop. `komodo-core` depends on it, so
+the whole stack was commented out together.
+
+`komodo-mongo-data` and `komodo-mongo-config` are deliberately left declared in the `volumes:` block
+so the data survives — they look like orphans but are not; do not prune them.
+
+To re-enable: with the VM powered off, run `qm set 100 --cpu host` on the Proxmox host, then
+uncomment the block. Fallback if the CPU type can't be changed: pin `mongo:4.4`, the last release
+that runs without AVX. `docker/komodo/compose.env` is still there for whenever it comes back.
 
 
 # Install PopOS & Access Proxmox GUI outside of home network (Tailscale on Proxmox host)
