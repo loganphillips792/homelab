@@ -54,7 +54,11 @@ services:
       # crash-loops with AccessDeniedException. This flag makes the image's entrypoint
       # chown the data dir to 1000:0 before starting ES.
       - TAKE_FILE_OWNERSHIP=true
-      - ES_JAVA_OPTS=-Xms1g -Xmx1g
+      # Heap capped at 512m (was 1g). The container was sitting at ~1.5 GB RSS: the 1g
+      # heap plus JVM overhead (metaspace, thread stacks, direct buffers, GC structures),
+      # which the -Xmx flag does not cover. This is a single-node ES backing one
+      # TubeArchivist index, so 512m is ample and keeps total RSS near 800 MB.
+      - ES_JAVA_OPTS=-Xms512m -Xmx512m
       - xpack.security.enabled=true
       - discovery.type=single-node
       - path.repo=/usr/share/elasticsearch/data/snapshot

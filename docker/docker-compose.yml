@@ -534,21 +534,29 @@ services:
       - ~/docker-volumes/beszel/beszel_socket:/beszel_socket
     networks:
       - main-network
-  # Runs on each system you want to monitor and communicates system metrics to the hub
-  beszel-agent:
-    image: henrygd/beszel-agent:latest
-    container_name: beszel-agent
-    restart: unless-stopped
-    network_mode: host
-    volumes:
-      - ~/docker-volumes/beszel/beszel_agent_data:/var/lib/beszel-agent
-      - ~/docker-volumes/beszel/beszel_socket:/beszel_socket
-      - /var/run/docker.sock:/var/run/docker.sock:ro
-    environment:
-      LISTEN: /beszel_socket/beszel.sock
-      HUB_URL: http://localhost:8090
-      TOKEN: ${BESZEL_TOKEN}
-      KEY: ${BESZEL_KEY}
+  ## Runs on each system you want to monitor and communicates system metrics to the hub.
+  ## DISABLED 2026-08-20 — the agent had never once connected and was in a permanent
+  ## crash-restart loop (9235 restarts): `failed to parse key: changeMe`.
+  ## The hub had never been set up either — its data.db has zero rows in users,
+  ## systems, fingerprints and universal_tokens, so no TOKEN could ever have existed.
+  ## BESZEL_KEY in .env is now the hub's real public key (recovered from its private
+  ## key on disk), but BESZEL_TOKEN is still changeMe.
+  ## To re-enable: browse to http://beszel.homelab:8090, create the admin user, then
+  ## Add System -> copy the generated token into BESZEL_TOKEN, then uncomment.
+  # beszel-agent:
+  #   image: henrygd/beszel-agent:latest
+  #   container_name: beszel-agent
+  #   restart: unless-stopped
+  #   network_mode: host
+  #   volumes:
+  #     - ~/docker-volumes/beszel/beszel_agent_data:/var/lib/beszel-agent
+  #     - ~/docker-volumes/beszel/beszel_socket:/beszel_socket
+  #     - /var/run/docker.sock:/var/run/docker.sock:ro
+  #   environment:
+  #     LISTEN: /beszel_socket/beszel.sock
+  #     HUB_URL: http://localhost:8090
+  #     TOKEN: ${BESZEL_TOKEN}
+  #     KEY: ${BESZEL_KEY}
 
   karakeep-web:
     image: ghcr.io/karakeep-app/karakeep:${KARAKEEP_VERSION:-release}

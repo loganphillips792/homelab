@@ -173,6 +173,14 @@ http://linkwarden.homelab {
   reverse_proxy linkwarden:3000
 }
 
+# Container name is matomo-app (the compose service is `matomo`), serving on :80.
+# Matomo pins trusted_hosts[] during installation to whichever hostname you first
+# complete setup on, and rejects other Host headers afterwards — so run the installer
+# via matomo.homelab, not the published localhost port, or it will lock to the wrong name.
+http://matomo.homelab {
+  reverse_proxy matomo-app:80
+}
+
 # Wildcard also matches the subdomain-routing hosts (admin./web./api./snap-*.)
 # used by SERVER_SECURITY_MODE=safe-subdomains-fullreplay. ArchiveBox routes by
 # the Host header internally, so every label proxies to the same container.
