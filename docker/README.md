@@ -1690,6 +1690,23 @@ Password: changeme
 - You might see this error in the Mongo logs that will prevent the app from working: _WARNING: MongoDB 5.0+ requires a CPU with AVX support, and your current system does not appear to have that!_
   - To fix this, go to the Hardware settings of the VM, Edit the Processors and select `x86-64-v3` as the `Type`. Restart the VM
 
+**Currently disabled.** The whole komodo stack is commented out in
+`docker/docker-compose.yml` (since 2026-08-13) because the VM's vCPU still has no AVX,
+so `komodo-mongo` dies on startup and `komodo-core` follows it down. On 2026-08-20 the
+three containers were still running as compose *orphans* — `docker compose up -d` does
+not remove containers that have been deleted from the compose file — and had racked up
+15,397 (`komodo-core`) and 9,706 (`komodo-mongo`) restarts. They were removed with:
+
+```
+docker rm -f komodo-core komodo-mongo komodo-periphery
+```
+
+The `docker_komodo-mongo-data` / `docker_komodo-mongo-config` volumes are untouched, so
+the database survives. To re-enable, change the vCPU type as above (or pin `mongo:4.4`,
+the last non-AVX release) and uncomment the block. Pass `--remove-orphans` when bringing
+the stack up after commenting a service out, or leftovers keep running and restarting
+invisibly.
+
 [Backup and Restore | Komodo](https://komo.do/docs/setup/backup)
 
 ## Karakeep
@@ -2418,6 +2435,82 @@ docker exec -it immich-server immich-admin change-media-location
 ```
 
 `-it` matters for `reset-admin-password` — it prompts for the new password interactively.
+
+
+## Tube Archivist
+
+Tube Archivist is `tubearchivist` + `archivist-es` (Elasticsearch 8) + `archivist-redis`.
+If the web UI is down or search returns nothing, check `archivist-es` first — the app
+container depends on it and will crash-loop on its own if ES never comes up.
+
+### `archivist-es` crash-loop: "failed to obtain node locks"
+
+Symptom: `docker ps` shows `archivist-es` Restarting, `tubearchivist` Restarting behind
+it, and the restart counter is in the thousands:
+
+```
+docker inspect archivist-es --format 'Status={{.State.Status}} Restarts={{.RestartCount}}'
+```
+
+The logs end with a fatal boot exception every ~20s:
+
+```
+fatal exception while booting Elasticsearch
+java.lang.IllegalStateException: failed to obtain node locks, tried
+  [/usr/share/elasticsearch/data]; maybe these locations are not writable or
+  multiple nodes were started on the same data path?
+Caused by: java.nio.file.NoSuchFileException: /usr/share/elasticsearch/data/node.lock
+  Suppressed: java.nio.file.AccessDeniedException: /usr/share/elasticsearch/data/node.lock
+```
+
+The message is misleading — it is **not** two nodes sharing a data path. Read the
+*suppressed* `AccessDeniedException`: ES could not create `node.lock` at all. The
+Elasticsearch image runs as uid **1000**, gid **0**, and the bind-mount source on the
+host was owned `root:root 0755`, so uid 1000 had no write permission:
+
+```
+$ ls -ld ~/docker-volumes/tubearchivist/es
+drwxr-xr-x 2 root root 4096 Jun 18 23:50 /home/logan/docker-volumes/tubearchivist/es
+```
+
+Fix — chown the bind-mount source to the uid/gid the container runs as, then restart:
+
+```
+sudo chown -R 1000:0 ~/docker-volumes/tubearchivist/es
+docker compose -f docker/compose.all.yml restart archivist-es tubearchivist
+```
+
+Verify it actually came up — ES writes `node.lock` and its data dirs on first
+successful boot, and cluster health should reach GREEN:
+
+```
+$ ls ~/docker-volumes/tubearchivist/es
+_state  indices  node.lock  nodes  snapshot  snapshot_cache
+
+docker logs --tail 20 archivist-es | grep -i 'health status changed'
+# ... Cluster health status changed from [YELLOW] to [GREEN]
+```
+
+Confirm the restart counter has stopped climbing (run it twice, a minute apart).
+
+### Why this is worth catching early
+
+The ES JVM is started with `-Xms1g -XX:+AlwaysPreTouch`, so **every** failed boot
+allocates and physically touches a full 1 GB of heap before dying. A container looping
+every ~20s therefore burns ~1.2 GB of RSS continuously and hammers the disk re-reading
+the image, while never once serving a request. This went unnoticed from 2026-06-18 to
+2026-08-20 and reached **29,000+ restarts** — it was a large share of the host sitting
+at 97% memory with a load average near 100.
+
+When a service looks "up" in `docker ps` but is useless, check restart counts across the
+whole stack, not just memory:
+
+```
+for c in $(docker ps --format '{{.Names}}'); do
+  r=$(docker inspect "$c" --format '{{.RestartCount}}')
+  [ "$r" -gt 0 ] && echo "$r  $c"
+done | sort -rn
+```
 
 
 # DNS Process Explained
