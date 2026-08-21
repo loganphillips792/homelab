@@ -351,6 +351,10 @@ This tells Tailscale to route `*.homelab` DNS queries through Pi-hole, which res
 
 Reach the VM's console through Proxmox: **Datacenter > pve > console**
 
+Once the community script is done running, go to **VM > Summary > Copy IP** and open that address in your browser to finish the installation.
+
+## Backup
+
 # Estimating Docker image download size
 
 Figure out how much `docker compose -f docker/compose.all.yml up -d` would download from a clean Docker state, without pulling anything. Registries report the compressed size of every layer in the image manifest, and `docker manifest inspect` works without the daemon running.
