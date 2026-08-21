@@ -4,7 +4,11 @@ include:
   - tubearchivist/docker-compose.yml
   - matomo/docker-compose.yml
   - hermes-agent/docker-compose.yml
-  - archivebox/docker-compose.yml
+  # archivebox disabled 2026-08-21 — largest memory consumer on the host (~1.8 GB RSS;
+  # it runs a headless Chrome for page snapshotting) while the VM was thrashing: swap
+  # fully exhausted, load average 127. Re-enable by uncommenting the include below; the
+  # service definition and the ~/docker-volumes/archivebox data are left untouched.
+  # - archivebox/docker-compose.yml
   - redis-pubsub/docker-compose.yml
   - path: penpot/docker-compose.yml
     env_file: penpot/.env

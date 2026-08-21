@@ -216,6 +216,12 @@ endpoints:
     interval: 60s
     conditions:
       - "[STATUS] == 200"
+  - name: Matomo
+    group: data-and-ai
+    url: http://matomo.homelab
+    interval: 60s
+    conditions:
+      - "[STATUS] == 200"
   - name: Ollama
     group: data-and-ai
     url: http://ollama.homelab

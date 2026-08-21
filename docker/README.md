@@ -766,6 +766,132 @@ docker compose down && docker compose up -d --build
 Backup N8N Database: `ssh logan@10.0.0.33 'cd ~/homelab/docker && docker compose exec -T postgres pg_dump -U changeUser n8n' > n8n-postgres-backup_$(date +%F).sql`
 Backup N8N Volume: `ssh logan@10.0.0.33 'docker run --rm -v n8n_storage:/volume alpine sh -c "cd /volume && tar -czf - ."' > n8n-storage-backup.tar.gz`
 
+## Adding a new service
+
+Every file a new service touches. Steps 1-4 are required for anything you want reachable at
+`<name>.homelab`; skip 3 and 4 for backing services (databases, brokers) with no web UI.
+
+Matomo is the cautionary example — it got step 1 and nothing else, so it collided on a host port,
+never started, had no `.homelab` URL, and never showed up in monitoring.
+
+### 1. Compose definition
+
+Either add the service to the shared `docker/docker-compose.yml`, or give it its own
+`docker/<name>/docker-compose.yml` and add an `include:` entry to `docker/compose.all.yml`. Use a
+subdirectory when the service brings its own env file or several containers.
+
+The rest of the stack depends on these three keys:
+
+```yaml
+services:
+  <name>:
+    container_name: <name>       # Caddy addresses the container by this name
+    restart: unless-stopped
+    networks:
+      - main-network             # Caddy can only reach containers on this network
+```
+
+**Check the host port before publishing one.** Caddy reaches the container over `main-network`, so a
+`ports:` entry is only needed for direct host access. To see what is already claimed:
+
+```bash
+grep -rhoE '^[[:space:]]+- "?[0-9]{2,5}:' --include='*.yml' docker \
+  | grep -oE '[0-9]{2,5}' | sort -n | uniq -d
+```
+
+Any duplicate is a collision, except `53` (pihole binds tcp+udp) and `443` (caddy binds tcp+udp),
+which are one service claiming both protocols. A real collision leaves the container in `created`
+with `Bind for 0.0.0.0:<port> failed: port is already allocated` — note that this does **not** appear
+as an exited container, so it is easy to miss. See
+[Stopped / not running](#stopped--not-running) for the matomo case.
+
+### 2. DNS record
+
+In `docker/pihole/etc-dnsmasq.d/10-homelab.conf`:
+
+```
+host-record=<name>.homelab,10.0.0.32
+```
+
+Every Caddy host needs one — there is no wildcard covering `*.homelab`. (The `address=` line for
+archivebox is a special case, needed for its per-snapshot subdomains.)
+
+### 3. Caddy route
+
+In `docker/caddy/Caddyfile`:
+
+```
+http://<name>.homelab {
+  reverse_proxy <container_name>:<internal_port>
+}
+```
+
+That port is the **container's** internal port, not the published host port.
+
+### 4. Gatus monitor
+
+In `docker/gatus/config/config.yaml`, under the group that fits — `infrastructure`, `monitoring`,
+`apps`, `data-and-ai`, or `projects`:
+
+```yaml
+  - name: <Name>
+    group: <group>
+    url: http://<name>.homelab
+    interval: 60s
+    conditions:
+      - "[STATUS] == 200"
+```
+
+Use a real health endpoint where the service offers one (`/api/health`, `/healthz`,
+`/api/heartbeat` are all in use already). Gatus follows redirects, so a plain `GET /` that 302s to a
+login page still passes.
+
+### 5. README tables
+
+Add a row to [Applications](#applications) or
+[Backing / infrastructure services](#backing--infrastructure-services). If the service bakes its
+public URL in at startup, also add it to
+[Services requiring URL change](#services-requiring-url-change-between-localhost-and-homelab).
+
+### 6. Secrets
+
+Shared variables live in `docker/.env`. Services with their own use `docker/<name>/.env` (wired up
+via `env_file:` in the include) or `<name>/docker-compose.env`. Naming an `env_file` **replaces** the
+default `.env` lookup, so a service that also needs `${TZ}` has to list both files — see the
+navidrome entry in `compose.all.yml` for the worked example.
+
+### 7. Deploy and verify
+
+Commit and push on the Mac, pull on the server, then:
+
+```bash
+docker compose -f docker/compose.all.yml up -d <name>
+docker compose -f docker/compose.all.yml exec pihole pihole reloaddns
+docker compose -f docker/compose.all.yml restart caddy gatus
+```
+
+Verify one layer at a time, so a failure points at the layer that broke:
+
+```bash
+dig +short <name>.homelab @192.168.1.150     # DNS resolves
+docker ps --filter name=<name>               # container is actually up
+curl -sI http://<name>.homelab               # full path: DNS -> Caddy -> container
+```
+
+Then confirm the monitor registered and is passing:
+
+```bash
+curl -s http://localhost:8082/api/v1/endpoints/statuses \
+  | python3 -c "import json,sys; [print(e['name'], e['results'][-1]['success']) for e in json.load(sys.stdin)]"
+```
+
+### Not currently required
+
+Neither dashboard needs a per-service edit today: `homepage/config/services.yaml` is still the stock
+example config, and `glance/config/home.yml` uses widgets rather than a service list. If either gets
+customized, they become step 8.
+
+
 # Services
 
 ## Kafka
@@ -1690,6 +1816,23 @@ Password: changeme
 - You might see this error in the Mongo logs that will prevent the app from working: _WARNING: MongoDB 5.0+ requires a CPU with AVX support, and your current system does not appear to have that!_
   - To fix this, go to the Hardware settings of the VM, Edit the Processors and select `x86-64-v3` as the `Type`. Restart the VM
 
+**Currently disabled.** The whole komodo stack is commented out in
+`docker/docker-compose.yml` (since 2026-08-13) because the VM's vCPU still has no AVX,
+so `komodo-mongo` dies on startup and `komodo-core` follows it down. On 2026-08-20 the
+three containers were still running as compose *orphans* — `docker compose up -d` does
+not remove containers that have been deleted from the compose file — and had racked up
+15,397 (`komodo-core`) and 9,706 (`komodo-mongo`) restarts. They were removed with:
+
+```
+docker rm -f komodo-core komodo-mongo komodo-periphery
+```
+
+The `docker_komodo-mongo-data` / `docker_komodo-mongo-config` volumes are untouched, so
+the database survives. To re-enable, change the vCPU type as above (or pin `mongo:4.4`,
+the last non-AVX release) and uncomment the block. Pass `--remove-orphans` when bringing
+the stack up after commenting a service out, or leftovers keep running and restarting
+invisibly.
+
 [Backup and Restore | Komodo](https://komo.do/docs/setup/backup)
 
 ## Karakeep
@@ -2420,6 +2563,82 @@ docker exec -it immich-server immich-admin change-media-location
 `-it` matters for `reset-admin-password` — it prompts for the new password interactively.
 
 
+## Tube Archivist
+
+Tube Archivist is `tubearchivist` + `archivist-es` (Elasticsearch 8) + `archivist-redis`.
+If the web UI is down or search returns nothing, check `archivist-es` first — the app
+container depends on it and will crash-loop on its own if ES never comes up.
+
+### `archivist-es` crash-loop: "failed to obtain node locks"
+
+Symptom: `docker ps` shows `archivist-es` Restarting, `tubearchivist` Restarting behind
+it, and the restart counter is in the thousands:
+
+```
+docker inspect archivist-es --format 'Status={{.State.Status}} Restarts={{.RestartCount}}'
+```
+
+The logs end with a fatal boot exception every ~20s:
+
+```
+fatal exception while booting Elasticsearch
+java.lang.IllegalStateException: failed to obtain node locks, tried
+  [/usr/share/elasticsearch/data]; maybe these locations are not writable or
+  multiple nodes were started on the same data path?
+Caused by: java.nio.file.NoSuchFileException: /usr/share/elasticsearch/data/node.lock
+  Suppressed: java.nio.file.AccessDeniedException: /usr/share/elasticsearch/data/node.lock
+```
+
+The message is misleading — it is **not** two nodes sharing a data path. Read the
+*suppressed* `AccessDeniedException`: ES could not create `node.lock` at all. The
+Elasticsearch image runs as uid **1000**, gid **0**, and the bind-mount source on the
+host was owned `root:root 0755`, so uid 1000 had no write permission:
+
+```
+$ ls -ld ~/docker-volumes/tubearchivist/es
+drwxr-xr-x 2 root root 4096 Jun 18 23:50 /home/logan/docker-volumes/tubearchivist/es
+```
+
+Fix — chown the bind-mount source to the uid/gid the container runs as, then restart:
+
+```
+sudo chown -R 1000:0 ~/docker-volumes/tubearchivist/es
+docker compose -f docker/compose.all.yml restart archivist-es tubearchivist
+```
+
+Verify it actually came up — ES writes `node.lock` and its data dirs on first
+successful boot, and cluster health should reach GREEN:
+
+```
+$ ls ~/docker-volumes/tubearchivist/es
+_state  indices  node.lock  nodes  snapshot  snapshot_cache
+
+docker logs --tail 20 archivist-es | grep -i 'health status changed'
+# ... Cluster health status changed from [YELLOW] to [GREEN]
+```
+
+Confirm the restart counter has stopped climbing (run it twice, a minute apart).
+
+### Why this is worth catching early
+
+The ES JVM is started with `-Xms1g -XX:+AlwaysPreTouch`, so **every** failed boot
+allocates and physically touches a full 1 GB of heap before dying. A container looping
+every ~20s therefore burns ~1.2 GB of RSS continuously and hammers the disk re-reading
+the image, while never once serving a request. This went unnoticed from 2026-06-18 to
+2026-08-20 and reached **29,000+ restarts** — it was a large share of the host sitting
+at 97% memory with a load average near 100.
+
+When a service looks "up" in `docker ps` but is useless, check restart counts across the
+whole stack, not just memory:
+
+```
+for c in $(docker ps --format '{{.Names}}'); do
+  r=$(docker inspect "$c" --format '{{.RestartCount}}')
+  [ "$r" -gt 0 ] && echo "$r  $c"
+done | sort -rn
+```
+
+
 # DNS Process Explained
 
 1. Set Wifi DNS on mac to IP address of Mac (ipconfig getifaddr en0)
@@ -2633,6 +2852,116 @@ No web UI; listed for completeness.
 | penpot-valkey | N/A | N/A | N/A |
 | tailscale | N/A | N/A | N/A |
 
+
+
+## Stopped / not running
+
+Snapshot taken 2026-08-21: 68 of 73 containers running. Everything below is either deliberately
+disabled or broken, so check here before assuming a service went missing. Re-list current state with:
+
+```bash
+docker ps -a --filter status=exited --filter status=created --filter status=restarting \
+  --format "{{.Names}}\t{{.Status}}"
+```
+
+| Service | State | Reason |
+|-|-|-|
+| archivebox | Exited (0) | deliberately disabled — memory |
+| paperless-ngx-webserver | Restarting (1) | crash loop — `PAPERLESS_SECRET_KEY` unset |
+| docker-tailscale-1 | Exited (1) | expired auth key |
+| docker-live-auction-1 | Exited (255) | SQLite schema drift |
+| matomo-app / matomo-cron | Created | host port 8080 already taken by drawio |
+| komodo | no containers | never deployed — no compose file in the repo |
+
+### archivebox — deliberately disabled
+
+Disabled 2026-08-21. It was the single largest memory consumer on the VM (~1.8 GB RSS; it runs a
+headless Chrome to snapshot pages) while the host was thrashing — 20 GB fully used, swap exhausted,
+load average 127, and the kernel reporting *all* tasks stalled on memory 45% of the time. Stopping it
+recovered ~1.9 GB and brought load down to ~6.
+
+The `include:` line in `compose.all.yml` is commented out. The service definition in
+`archivebox/docker-compose.yml` and the `~/docker-volumes/archivebox` data are untouched.
+
+Re-enable by uncommenting the include, then:
+
+```bash
+docker compose -f compose.all.yml up -d archivebox
+```
+
+Because archivebox is no longer in the rendered config, `up -d --remove-orphans` will *delete* the
+stopped container. That is harmless — the data is a bind mount — but you would then need `up -d`
+rather than `docker start` to bring it back.
+
+### paperless-ngx-webserver — crash loop, needs a secret key
+
+`Restarting (1)`, with a restart count past 15,000 and still climbing. Newer paperless-ngx images
+refuse to boot when the secret key is unset or left at the default:
+
+```
+django.core.exceptions.ImproperlyConfigured: PAPERLESS_SECRET_KEY is not set or is the
+default 'change-me' value.
+```
+
+`PAPERLESS_SECRET_KEY` is commented out in `paperless-ngx/docker-compose.env`. Generate one and set it:
+
+```bash
+python3 -c "import secrets; print(secrets.token_urlsafe(64))"
+# write the result into paperless-ngx/docker-compose.env as PAPERLESS_SECRET_KEY=<value>
+docker compose -f compose.all.yml up -d paperless-ngx-webserver
+```
+
+Worth fixing promptly — a tight restart loop burns CPU continuously. `paperless-ngx-db` and
+`paperless-ngx-broker` are up and healthy, so only the web tier is down.
+
+### docker-tailscale-1 — expired auth key
+
+`Exited (1)`; last attempt 2026-08-20 04:46.
+
+```
+backend error: invalid key: unable to validate API key
+boot: failed to auth tailscale: tailscale up failed: exit status 1
+```
+
+The `TS_AUTHKEY` expired — Tailscale auth keys last 90 days at most, so this recurs on a schedule.
+See [Updating the auth key](#updating-the-auth-key) for the full procedure. The short version: mint a
+new key in the admin console, replace it in the env file, then recreate the container with `up -d`
+rather than `restart`, since the key is only read at boot.
+
+### docker-live-auction-1 — SQLite schema drift
+
+`Exited (255)`, 10 days before the snapshot.
+
+```
+sqlalchemy.exc.OperationalError: (sqlite3.OperationalError) no such column: users.timezone
+ERROR:    Application startup failed. Exiting.
+```
+
+The image gained a `users.timezone` column but the existing SQLite volume was never migrated, so
+startup queries select a column the database does not have. Either apply the upstream migration
+against the volume or wipe the database and start fresh — the latter loses existing auction data.
+
+### matomo-app / matomo-cron — host port conflict
+
+Both stuck in `created` and never started, since 2026-08-11:
+
+```
+failed to set up container networking: driver failed programming external connectivity
+on endpoint matomo-app: Bind for 0.0.0.0:8080 failed: port is already allocated
+```
+
+`matomo/docker-compose.yml` publishes `8080:80`, but drawio already owns host port 8080
+(`docker-compose.yml:718`). `matomo-cron` is stuck only because it depends on `matomo-app`.
+
+Fix by giving matomo a different host port (e.g. `8083:80`) or by dropping the host publish and
+reaching it through Caddy — note matomo has no Caddy site block today, so removing the port binding
+means adding one. `matomo-db` (mariadb) is running normally and still holds the data.
+
+### komodo — never deployed on this host
+
+Komodo appears in the service tables above, but `docker/komodo/` contains only `compose.env` — there
+is no compose file, and `compose.all.yml` does not reference it. No komodo containers exist on the
+VM. Treat those table rows as aspirational until a compose definition is added.
 
 
 # Install PopOS & Access Proxmox GUI outside of home network (Tailscale on Proxmox host)
