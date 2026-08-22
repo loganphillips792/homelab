@@ -2,6 +2,7 @@ services:
   tubearchivist:
     container_name: tubearchivist
     image: bbilly1/tubearchivist
+    mem_limit: 1000m
     restart: unless-stopped
     ports:
       - "8000:8000"
@@ -46,6 +47,7 @@ services:
   archivist-es:
     container_name: archivist-es
     image: docker.elastic.co/elasticsearch/elasticsearch:8.18.2
+    mem_limit: 1500m   # 512m heap + JVM overhead + room for Lucene page cache
     restart: unless-stopped
     environment:
       - ELASTIC_PASSWORD=${TA_ELASTIC_PASSWORD}

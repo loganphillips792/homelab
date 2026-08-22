@@ -61,6 +61,10 @@ services:
       - main-network
   kafka:
     image: apache/kafka:4.0.0
+    # mem_limit added 2026-08-21 — before this, no container had a limit, so a single
+    # leak could take the whole 20 GB VM into swap-thrash (load 127 on 8/21). With a
+    # limit the runaway is OOM-killed and restart:unless-stopped brings it back.
+    mem_limit: 1600m   # image pins -Xmx1G; leaves ~600m for JVM overhead
     container_name: kafka
     restart: unless-stopped
     ports:
@@ -126,9 +130,12 @@ services:
   
   akhq:
     image: tchiotludo/akhq:latest
+    mem_limit: 1g
     container_name: akhq
     restart: unless-stopped
     environment:
+      # Pinned for the same reason as metabase — see the note there.
+      JAVA_OPTS: -Xmx512m
       AKHQ_CONFIGURATION: |
         akhq:
           connections:
@@ -183,10 +190,15 @@ services:
 
   metabase:
     image: metabase/metabase:latest
+    mem_limit: 2g
     container_name: metabase
     hostname: metabase
     # Do not publish host ports; Caddy will proxy internally
     environment:
+      # Pinned because mem_limit is set: a container-aware JVM defaults to
+      # MaxRAMPercentage=25%, which would size max heap at ~512m of the 2g limit —
+      # far below metabase's observed ~1.1 GB working set. Set explicitly instead.
+      JAVA_OPTS: -Xmx1200m
       MB_DB_TYPE: postgres
       MB_DB_DBNAME: metabaseappdb
       MB_DB_PORT: 5432
@@ -474,6 +486,7 @@ services:
 
   netdata:
     image: netdata/netdata:latest
+    mem_limit: 1400m
     container_name: netdata
     pid: host
     restart: unless-stopped
@@ -625,6 +638,7 @@ services:
 
   ollama-webui:
     image: ghcr.io/open-webui/open-webui:main
+    mem_limit: 800m
     container_name: ollama-webui
     # ports:
     #   - "8080:8080"  # Exposed via Caddy; internal only

@@ -605,6 +605,68 @@ Check what's currently set with:
 ssh root@192.168.1.98 "qm config 100 | grep -E 'memory|onboot|balloon'"
 ```
 
+### Container memory limits
+
+Set 2026-08-21. Before this, **no container had a limit** — every `memory.max` read `max` — so a
+single leaking container could climb through the whole 20 GB and take the VM into swap-thrash
+(load 127, swap fully exhausted, kernel reporting all tasks stalled on memory 45% of the time). With
+a limit the runaway is OOM-killed instead and `restart: unless-stopped` brings it back: one service
+blips rather than the whole box degrading.
+
+| Service | Limit | Observed when set | File |
+|-|-|-|-|
+| metabase | 2g | 1165M | `docker-compose.yml` |
+| alloy | 1600m | 965M–1359M | `observability/docker-compose.yml` |
+| kafka | 1600m | 919M | `docker-compose.yml` |
+| archivist-es | 1500m | 922M | `tubearchivist/docker-compose.yml` |
+| netdata | 1400m | 1077M | `docker-compose.yml` |
+| penpot-backend | 1200m | 879M | `penpot/docker-compose.yml` |
+| akhq | 1g | 515M | `docker-compose.yml` |
+| immich-server | 1000m | 632M | `immich/docker-compose.yml` |
+| tubearchivist | 1000m | 674M | `tubearchivist/docker-compose.yml` |
+| ollama-webui | 800m | 507M | `docker-compose.yml` |
+
+Limits are deliberately generous (~1.3-1.5× observed). alloy alone swung 965M→1359M inside an hour,
+so a limit set at the instantaneous reading would kill healthy services. Sum of limits exceeding
+physical RAM is fine — a limit caps a container, it does not reserve memory for it.
+
+#### The JVM trap
+
+**Setting `mem_limit` on a JVM container silently reconfigures its heap.** Java 11+ is container-aware:
+with no limit it sizes max heap at 25% of *host* RAM (5 GB here); add a 2g limit and that becomes
+~512m — usually far below the working set, so the service starts GC-thrashing or dies.
+
+So any JVM service needs an explicit heap set *alongside* the limit:
+
+- `metabase` → `JAVA_OPTS: -Xmx1200m` (had no heap flags)
+- `akhq` → `JAVA_OPTS: -Xmx512m` (had no heap flags)
+- `kafka` → already pinned by the image at `-Xmx1G`, limit sized to clear it
+- `archivist-es` → already `ES_JAVA_OPTS=-Xms512m -Xmx512m`
+
+Related trap, same family: `-Xmx` does **not** cover JVM overhead — metaspace, thread stacks, direct
+buffers, GC structures. `archivist-es` sat at 1.5 GB RSS on a 1g heap for exactly this reason. Budget
+roughly 400-600m above the heap when picking a container limit.
+
+#### Checking and tuning
+
+See what is actually set, and how close each container is running to its ceiling:
+
+```bash
+ssh logan@192.168.1.150 'for d in /sys/fs/cgroup/system.slice/docker-*.scope; do
+  m=$(cat $d/memory.max); [ "$m" = "max" ] && continue
+  a=$(awk "\$1==\"anon\"{print \$2}" $d/memory.stat)
+  echo "$((a*100/m))% $((a/1048576))M/$((m/1048576))M $(basename $d)"
+done | sort -rn | head'
+```
+
+Anything sustained above ~85% wants a higher limit. To find services killed for exceeding one:
+
+```bash
+docker ps -a --filter "status=exited" --format "{{.Names}}\t{{.Status}}" | grep 137
+```
+
+Exit code 137 is SIGKILL, which for a limited container almost always means the OOM killer.
+
 # Backup strategy
 
 - Backup: `./docker/backup-remote-volumes.sh`
