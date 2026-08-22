@@ -1,0 +1,23 @@
+# Glance — widget dashboard. Config in ./config (glance.yml includes home.yml).
+#
+# Paths are relative to THIS directory — Compose resolves relative paths in an
+# included file against the included file's own location, not docker/.
+# main-network is declared in ../docker-compose.yml and merges project-wide.
+
+services:
+  glance:
+    container_name: glance
+    image: glanceapp/glance
+    restart: unless-stopped
+    volumes:
+      - ./config:/app/config
+      - ./assets:/app/assets
+      - /etc/localtime:/etc/localtime:ro
+      # Optionally, also mount docker socket if you want to use the docker containers widget
+      # - /var/run/docker.sock:/var/run/docker.sock:ro
+    # ports: # don't need ports because caddy proxies to the container ports for us
+    #   - 8084:8080
+    environment:
+      - MY_SECRET_TOKEN=123456
+    networks:
+      - main-network

@@ -4,6 +4,12 @@ include:
   - tubearchivist/docker-compose.yml
   - matomo/docker-compose.yml
   - hermes-agent/docker-compose.yml
+  # Observability stack (prometheus, loki, alloy, grafana, cadvisor) — comment out
+  # this one line to disable the whole stack; config lives in observability/.
+  - observability/docker-compose.yml
+  - gatus/docker-compose.yml
+  - glance/docker-compose.yml
+  - homepage/docker-compose.yml
   # archivebox disabled 2026-08-21 — largest memory consumer on the host (~1.8 GB RSS;
   # it runs a headless Chrome for page snapshotting) while the VM was thrashing: swap
   # fully exhausted, load average 127. Re-enable by uncommenting the include below; the

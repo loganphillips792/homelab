@@ -491,7 +491,7 @@ docker compose -f docker/compose.all.yml up -d archivebox
 
 Interpolation runs before hashing, so this holds for `${VAR}` values pulled from `.env` too — the resolved value is what gets hashed, not the literal `${VAR}`.
 
-`--force-recreate` exists for the case where the hash *doesn't* change but the running process is still stale: you edited a bind-mounted file like `caddy/Caddyfile` or `prometheus/prometheus.yml`, which compose can't see into. Nothing in the YAML moved, so `up -d` considers the container current and leaves it running with the old config in memory.
+`--force-recreate` exists for the case where the hash *doesn't* change but the running process is still stale: you edited a bind-mounted file like `caddy/Caddyfile` or `observability/prometheus/prometheus.yml`, which compose can't see into. Nothing in the YAML moved, so `up -d` considers the container current and leaves it running with the old config in memory.
 
 ```bash
 docker compose -f docker/compose.all.yml up -d --force-recreate caddy
@@ -766,6 +766,66 @@ docker compose down && docker compose up -d --build
 Backup N8N Database: `ssh logan@10.0.0.33 'cd ~/homelab/docker && docker compose exec -T postgres pg_dump -U changeUser n8n' > n8n-postgres-backup_$(date +%F).sql`
 Backup N8N Volume: `ssh logan@10.0.0.33 'docker run --rm -v n8n_storage:/volume alpine sh -c "cd /volume && tar -czf - ."' > n8n-storage-backup.tar.gz`
 
+## Repository layout
+
+`compose.all.yml` is the entrypoint — it does nothing but `include:` one file per service or service
+group. Run everything with:
+
+```bash
+docker compose -f docker/compose.all.yml up -d
+```
+
+```
+docker/
+  compose.all.yml           <- entrypoint: the include list, nothing else
+  docker-compose.yml        <- shared file, still ~35 single-container services
+  observability/            <- prometheus, loki, alloy, grafana, cadvisor
+    docker-compose.yml         + their config: alloy/ grafana/ prometheus/ loki/
+  gatus/  glance/  homepage/  <- compose file sits next to its config/ dir
+  immich/ penpot/ planka/ navidrome/ linkwarden/ matomo/ tubearchivist/
+  hermes-agent/ redis-pubsub/ archivebox/   <- multi-container or own env file
+  caddy/ pihole/            <- config only; services defined in docker-compose.yml
+```
+
+### The one rule that matters
+
+**Relative paths inside an included file resolve against that file's own directory, not `docker/`.**
+
+So `observability/docker-compose.yml` mounts `./prometheus/prometheus.yml`, which resolves to
+`docker/observability/prometheus/prometheus.yml`. This is why a service's config directory should move
+with its compose file — do that and the paths need no editing at all.
+
+Verify what any path actually resolved to:
+
+```bash
+docker compose -f docker/compose.all.yml config | grep 'source:'
+```
+
+### What stays shared across all included files
+
+Everything merges into a single Compose project named `docker`, which has three consequences:
+
+- **Networks** are declared once (`main-network`, `kafka-network` in `docker-compose.yml`) and
+  referenced everywhere else without redeclaring.
+- **Named volumes** keep the `docker_` project prefix regardless of which file declares them — so
+  moving a volume declaration between included files never renames or recreates it.
+- **Service names** must be unique project-wide, and each one becomes a DNS alias on its network.
+  That is what `caddy/Caddyfile` targets (`reverse_proxy grafana:3000`), so a service can move
+  between files without touching Caddy.
+
+### Disabling a stack
+
+Comment out its include. The observability stack is the useful case — it is roughly 3 GB of RSS:
+
+```yaml
+  # - observability/docker-compose.yml
+```
+
+Note that a commented-out service is no longer in the rendered config, so
+`up -d --remove-orphans` will remove its containers. Named volumes and bind mounts survive, but you
+need `up -d` rather than `docker start` to bring it back. See
+[Stopped / not running](#stopped--not-running) for what is currently disabled and why.
+
 ## Adding a new service
 
 Every file a new service touches. Steps 1-4 are required for anything you want reachable at
@@ -776,9 +836,11 @@ never started, had no `.homelab` URL, and never showed up in monitoring.
 
 ### 1. Compose definition
 
-Either add the service to the shared `docker/docker-compose.yml`, or give it its own
-`docker/<name>/docker-compose.yml` and add an `include:` entry to `docker/compose.all.yml`. Use a
-subdirectory when the service brings its own env file or several containers.
+Give the service its own `docker/<name>/docker-compose.yml` and add an `include:` entry to
+`docker/compose.all.yml` — that is the dominant pattern now (see
+[Repository layout](#repository-layout)) and it keeps the compose file next to the config it mounts.
+Adding to the shared `docker/docker-compose.yml` still works and is fine for a single container with
+no config directory of its own.
 
 The rest of the stack depends on these three keys:
 
@@ -986,7 +1048,7 @@ docker compose -f docker/compose.all.yml up -d grafana
 
 **This deletes real state.** `grafana_data` is mounted at `/var/lib/grafana` (`docker-compose.yml:287`), so the wipe destroys `grafana.db`: dashboards created in the UI, alert rules added in the UI, annotations, API keys, and any users beyond admin. If there's anything in there you care about, export it before running the `rm` — a crash-looping Grafana can't export, so this is a decision you make once and can't take back.
 
-**What returns on its own.** `./grafana/provisioning` and `grafana.ini` are bind mounts, not part of the volume, so they survive untouched: the datasources and the four provisioned dashboards (`overview.json`, `homelab.json`, `y0neis-dashboard.json`, `observability/logs-dashboard.json`) reload at boot, and the admin login is recreated from `GF_SECURITY_ADMIN_USER` / `GF_SECURITY_ADMIN_PASSWORD` in compose. A stack whose dashboards all live in `provisioning/` loses nothing but the SQLite DB.
+**What returns on its own.** `./observability/grafana/provisioning` and `grafana.ini` are bind mounts, not part of the volume, so they survive untouched: the datasources and the four provisioned dashboards (`overview.json`, `homelab.json`, `y0neis-dashboard.json`, `observability/logs-dashboard.json`) reload at boot, and the admin login is recreated from `GF_SECURITY_ADMIN_USER` / `GF_SECURITY_ADMIN_PASSWORD` in compose. A stack whose dashboards all live in `provisioning/` loses nothing but the SQLite DB.
 
 ## N8N
 
@@ -2871,7 +2933,7 @@ docker ps -a --filter status=exited --filter status=created --filter status=rest
 | docker-tailscale-1 | Exited (1) | expired auth key |
 | docker-live-auction-1 | Exited (255) | SQLite schema drift |
 | matomo-app / matomo-cron | Created | host port 8080 already taken by drawio |
-| komodo | no containers | never deployed — no compose file in the repo |
+| komodo | commented out | MongoDB 5+ needs AVX; VM 100's vCPU lacks it |
 
 ### archivebox — deliberately disabled
 
@@ -2957,11 +3019,19 @@ Fix by giving matomo a different host port (e.g. `8083:80`) or by dropping the h
 reaching it through Caddy — note matomo has no Caddy site block today, so removing the port binding
 means adding one. `matomo-db` (mariadb) is running normally and still holds the data.
 
-### komodo — never deployed on this host
+### komodo — disabled 2026-08-13 (MongoDB needs AVX)
 
-Komodo appears in the service tables above, but `docker/komodo/` contains only `compose.env` — there
-is no compose file, and `compose.all.yml` does not reference it. No komodo containers exist on the
-VM. Treat those table rows as aspirational until a compose definition is added.
+The komodo stack is commented out in `docker-compose.yml` (~line 503), not missing. MongoDB 5+
+requires AVX instructions and VM 100's default QEMU vCPU model does not expose them, so
+`komodo-mongo` died with SIGILL in a permanent crash-restart loop. `komodo-core` depends on it, so
+the whole stack was commented out together.
+
+`komodo-mongo-data` and `komodo-mongo-config` are deliberately left declared in the `volumes:` block
+so the data survives — they look like orphans but are not; do not prune them.
+
+To re-enable: with the VM powered off, run `qm set 100 --cpu host` on the Proxmox host, then
+uncomment the block. Fallback if the CPU type can't be changed: pin `mongo:4.4`, the last release
+that runs without AVX. `docker/komodo/compose.env` is still there for whenever it comes back.
 
 
 # Install PopOS & Access Proxmox GUI outside of home network (Tailscale on Proxmox host)
