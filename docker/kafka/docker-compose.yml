@@ -1,0 +1,140 @@
+# Kafka testing stack — a single-broker KRaft cluster, two UIs (kafka-ui and
+# akhq, both reverse-proxied by Caddy), and a Python consumer on scan.commands.
+#
+# `name: docker` pins the Compose project name. It normally defaults to the
+# directory of the compose file, so a standalone run from here would land in a
+# project called "kafka" — a second, empty docker_kafka-data twin with none of
+# your topics, and a container_name collision with the fleet's containers.
+# Pinning it means a standalone run attaches to the same cluster instead.
+#
+# Whole fleet:   docker compose -f docker/compose.all.yml up -d
+# Just this stack:
+#   docker compose -f docker/compose.all.yml up -d kafka kafka-ui akhq kafka-consumer
+#
+# Use that rather than `cd docker/kafka && docker compose up -d`. Both work and
+# both land in project `docker`, but running from in here means Compose cannot
+# see the rest of the fleet, so it calls those containers "orphans" — and a
+# stray --remove-orphans would then delete all of them.
+#
+# Topic, producer, and consumer commands live in ../README.md under "## Kafka Testing Stack".
+
+name: docker
+
+services:
+  kafka:
+    image: apache/kafka:4.0.0
+    container_name: kafka
+    restart: unless-stopped
+    ports:
+      - "9092:9092"
+      - "29092:29092"
+    environment:
+      # Unique ID for this broker
+      KAFKA_NODE_ID: 1
+
+      # Cluster ID (generate once: `uuidgen`)
+      KAFKA_CLUSTER_ID: "q1Sh-8BCRyKf-9pgaJ0Z2w"
+
+      # Listeners - Separate listeners for internal and external access
+      KAFKA_LISTENERS: PLAINTEXT://:29092,PLAINTEXT_HOST://:9092,CONTROLLER://:9093
+      
+      # Advertised listeners - Internal for container communication, External for localhost
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092
+
+      # Storage directories (logs = Kafka data, not app logs)
+      KAFKA_LOG_DIRS: /var/lib/kafka/data
+
+      # KRaft mode settings - Fixed controller quorum voters
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+
+      # Inter-broker listener - Use PLAINTEXT for container communication
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+
+      # Security settings for controller
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+
+      # Auto-create topics settings
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+    volumes:
+      - kafka-data:/var/lib/kafka/data
+    networks:
+      - kafka-network
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --list"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+  kafka-ui:
+    container_name: kafka-ui
+    image: provectuslabs/kafka-ui:latest
+    restart: unless-stopped
+    # ports: # don't need ports because caddy proxies to the container ports for us
+    #   - 8080:8080
+    environment:
+      KAFKA_CLUSTERS_0_NAME: local-kafka
+      # Use internal listener for container-to-container communication
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:29092
+    depends_on:
+      kafka:
+        condition: service_healthy
+    networks:
+      - kafka-network
+      - main-network
+  
+  akhq:
+    image: tchiotludo/akhq:latest
+    container_name: akhq
+    restart: unless-stopped
+    environment:
+      AKHQ_CONFIGURATION: |
+        akhq:
+          connections:
+            homelab-kafka:
+              properties:
+                # Use existing Kafka broker from the main stack
+                bootstrap.servers: "kafka:29092"
+              # Uncomment if you later add Schema Registry
+              # schema-registry:
+              #   url: "http://schema-registry:8085"
+    # No host ports; Caddy will reverse-proxy
+    networks:
+      - main-network
+      - kafka-network
+
+  # The one built image in the repo; everything else is a prebuilt tag. A plain
+  # `git pull && docker compose up -d` will NOT rebuild it after a consumer.py
+  # change — see ../README.md under "## Kafka Testing Stack".
+  kafka-consumer:
+    build: ./consumer
+    container_name: kafka-consumer
+    restart: unless-stopped
+    environment:
+      KAFKA_BOOTSTRAP: kafka:29092
+      KAFKA_TOPIC: scan.commands
+      KAFKA_GROUP: scan-workers
+      # earliest: the first run of a new group replays the topic from the start.
+      KAFKA_AUTO_OFFSET_RESET: earliest
+      # Only used if the consumer has to create the topic itself.
+      KAFKA_TOPIC_PARTITIONS: 3
+    depends_on:
+      kafka:
+        condition: service_healthy
+    networks:
+      - kafka-network
+
+volumes:
+  kafka-data:
+
+# Both networks are also declared in ../docker-compose.yml. The definitions are
+# identical, so they merge to a no-op when this file is included from
+# compose.all.yml; they are repeated here only so a standalone run has them.
+networks:
+  kafka-network:
+    driver: bridge
+  main-network:
+    driver: bridge
