@@ -19,6 +19,25 @@ services:
     privileged: true
     ports: # don't need ports because caddy proxies to the container ports for us
       - "8089:8080"
+    # Added 2026-08-22 to bound cAdvisor's kernel slab growth. cAdvisor stat()s the whole
+    # cgroup + sysfs tree on every housekeeping pass and each call pins a dentry, so on a host
+    # with ~68 containers its reclaimable dentry/inode cache climbed to 2.7 GB (73% of all slab
+    # on the VM, 13% of its RAM) at roughly 300-400 MB/hour. It is reclaimable and never caused
+    # pressure — PSI stayed at 0.00 — but every memory gauge counts it as used.
+    #
+    # --housekeeping_interval: 10s instead of the 1s default, a 10x cut in stat() frequency.
+    #   Kept BELOW alloy's 15s scrape_interval so every scrape still gets fresh data; raising
+    #   it above the scrape interval yields duplicate samples and flat rate() output.
+    # --disable_metrics: collectors nothing queries. Verified against every dashboard panel and
+    #   prometheus rule first — none of these touch cpu, memory, network, disk, or the
+    #   container_label_* series the dashboards use.
+    #
+    # NOT set: --docker_only=true. It would skip non-docker cgroups (a further ~30% of the
+    # tree) but drops the root cgroup, breaking the "Network traffic on instance" panel in
+    # general/y0neis-dashboard.json, which queries container_network_*_bytes_total{id="/"}.
+    command:
+      - --housekeeping_interval=10s
+      - --disable_metrics=percpu,sched,tcp,udp,advtcp,process,hugetlb,referenced_memory,cpu_topology,resctrl
     volumes:
       - /:/rootfs:ro
       - /var/run:/var/run:ro
