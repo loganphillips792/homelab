@@ -59,91 +59,6 @@ services:
         condition: service_healthy
     networks:
       - main-network
-  kafka:
-    image: apache/kafka:4.0.0
-    container_name: kafka
-    restart: unless-stopped
-    ports:
-      - "9092:9092"
-      - "29092:29092"
-    environment:
-      # Unique ID for this broker
-      KAFKA_NODE_ID: 1
-
-      # Cluster ID (generate once: `uuidgen`)
-      KAFKA_CLUSTER_ID: "q1Sh-8BCRyKf-9pgaJ0Z2w"
-
-      # Listeners - Separate listeners for internal and external access
-      KAFKA_LISTENERS: PLAINTEXT://:29092,PLAINTEXT_HOST://:9092,CONTROLLER://:9093
-      
-      # Advertised listeners - Internal for container communication, External for localhost
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092
-
-      # Storage directories (logs = Kafka data, not app logs)
-      KAFKA_LOG_DIRS: /var/lib/kafka/data
-
-      # KRaft mode settings - Fixed controller quorum voters
-      KAFKA_PROCESS_ROLES: broker,controller
-      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
-      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
-
-      # Inter-broker listener - Use PLAINTEXT for container communication
-      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
-
-      # Security settings for controller
-      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
-
-      # Auto-create topics settings
-      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
-      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
-      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
-      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
-    volumes:
-      - kafka-data:/var/lib/kafka/data
-    networks:
-      - kafka-network
-    healthcheck:
-      test: ["CMD-SHELL", "/opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --list"]
-      interval: 30s
-      timeout: 10s
-      retries: 5
-  kafka-ui:
-    container_name: kafka-ui
-    image: provectuslabs/kafka-ui:latest
-    restart: unless-stopped
-    # ports: # don't need ports because caddy proxies to the container ports for us
-    #   - 8080:8080
-    environment:
-      KAFKA_CLUSTERS_0_NAME: local-kafka
-      # Use internal listener for container-to-container communication
-      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:29092
-    depends_on:
-      kafka:
-        condition: service_healthy
-    networks:
-      - kafka-network
-      - main-network
-  
-  akhq:
-    image: tchiotludo/akhq:latest
-    container_name: akhq
-    restart: unless-stopped
-    environment:
-      AKHQ_CONFIGURATION: |
-        akhq:
-          connections:
-            homelab-kafka:
-              properties:
-                # Use existing Kafka broker from the main stack
-                bootstrap.servers: "kafka:29092"
-              # Uncomment if you later add Schema Registry
-              # schema-registry:
-              #   url: "http://schema-registry:8085"
-    # No host ports; Caddy will reverse-proxy
-    networks:
-      - main-network
-      - kafka-network
-  
   dozzle:
     container_name: dozzle
     image: amir20/dozzle:latest
@@ -319,7 +234,11 @@ services:
     volumes:
       - redis_data:/data
     networks:
-      - kafka-network
+      # main-network, not kafka-network: nothing here is Kafka-related. The
+      # kafka-network assignment was a bulk-edit artifact that left redis and
+      # redisinsight on disjoint networks, so redisinsight's pre-seeded
+      # RI_REDIS_HOST=redis had no path to resolve.
+      - main-network
 
   redisinsight:
     image: redis/redisinsight:latest
@@ -799,7 +718,6 @@ services:
 
 
 volumes:
-  kafka-data:
   db_storage:
   n8n_storage:
   pihole_etc:

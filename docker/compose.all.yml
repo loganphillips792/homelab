@@ -15,6 +15,7 @@ include:
   # fully exhausted, load average 127. Re-enable by uncommenting the include below; the
   # service definition and the ~/docker-volumes/archivebox data are left untouched.
   # - archivebox/docker-compose.yml
+  - kafka/docker-compose.yml
   - redis-pubsub/docker-compose.yml
   - path: penpot/docker-compose.yml
     env_file: penpot/.env

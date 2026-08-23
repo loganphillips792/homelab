@@ -784,6 +784,8 @@ docker/
   gatus/  glance/  homepage/  <- compose file sits next to its config/ dir
   immich/ penpot/ planka/ navidrome/ linkwarden/ matomo/ tubearchivist/
   hermes-agent/ redis-pubsub/ archivebox/   <- multi-container or own env file
+  kafka/                    <- broker + kafka-ui + akhq + a built Python consumer.
+                               The repo's only Dockerfile.
   caddy/ pihole/            <- config only; services defined in docker-compose.yml
 ```
 
@@ -805,8 +807,10 @@ docker compose -f docker/compose.all.yml config | grep 'source:'
 
 Everything merges into a single Compose project named `docker`, which has three consequences:
 
-- **Networks** are declared once (`main-network`, `kafka-network` in `docker-compose.yml`) and
-  referenced everywhere else without redeclaring.
+- **Networks** are declared in `docker-compose.yml` (`main-network`, `kafka-network`) and
+  referenced everywhere else without redeclaring. The one exception is
+  `kafka/docker-compose.yml`, which repeats both definitions verbatim so it can also run
+  standalone; identical definitions merge to a no-op.
 - **Named volumes** keep the `docker_` project prefix regardless of which file declares them — so
   moving a volume declaration between included files never renames or recreates it.
 - **Service names** must be unique project-wide, and each one becomes a DNS alias on its network.
@@ -956,7 +960,45 @@ customized, they become step 8.
 
 # Services
 
-## Kafka
+## Kafka Testing Stack
+
+Four services, defined in `docker/kafka/docker-compose.yml`: the `kafka` broker, the `kafka-ui`
+and `akhq` web UIs, and `kafka-consumer` (see [Consumer](#consumer) below).
+
+### Running just this stack
+
+Name the four services on the normal `compose.all.yml` command:
+
+```bash
+docker compose -f docker/compose.all.yml up -d kafka kafka-ui akhq kafka-consumer
+```
+
+Only those four start. Everything else in the fleet is left exactly as it was — not started, not
+stopped, not recreated. Stop them the same way:
+
+```bash
+docker compose -f docker/compose.all.yml stop kafka kafka-ui akhq kafka-consumer
+```
+
+To bring the observability stack up alongside it, add its five services:
+
+```bash
+docker compose -f docker/compose.all.yml up -d kafka kafka-ui akhq kafka-consumer \
+  cadvisor prometheus loki alloy grafana
+```
+
+Alloy discovers every running container, so this is what puts `kafka-consumer`'s output into Loki
+and makes it queryable in Grafana rather than only via `docker logs`. Note that Prometheus has no
+Kafka scrape job configured, so this gives you logs, not broker metrics.
+
+`--build` is not needed the first time; Compose builds `kafka-consumer` automatically when its
+image is missing. See the deploy note under [Consumer](#consumer) for when you *do* need it.
+
+Prefer this over `cd docker/kafka && docker compose up -d`. Both work and both land in the same
+Compose project — the file pins `name: docker` precisely so they do. The difference is what
+Compose knows about: the `-f` form loads the whole project, so the unselected services are simply
+not selected. From inside `kafka/` they are invisible, so Compose calls them **orphans** and warns
+about them — and a stray `--remove-orphans` there would delete the entire fleet.
 
 Create Topics
 
@@ -1015,6 +1057,84 @@ Check consumer groups
 ```
 docker exec kafka /opt/kafka/bin/kafka-consumer-groups.sh --list \
   --bootstrap-server localhost:9092
+```
+
+### Consumer
+
+`kafka-consumer` is a small Python service (`docker/kafka/consumer/`) that subscribes to
+`scan.commands` as group `scan-workers`, logs each message, and commits offsets explicitly.
+Put real work in `handle()` in `consumer.py` — it runs *before* the commit, so a crash there
+re-delivers the message instead of silently dropping it.
+
+```bash
+docker logs -f kafka-consumer          # watch it
+```
+
+Because the group is a real consumer group, its lag shows up in kafka-ui under **Consumer
+Groups -> scan-workers** and in akhq, which the console consumer never did.
+
+If the topic does not exist yet, the consumer creates it with 3 partitions on startup. That is
+deliberate: the broker has auto-create on, so subscribing to a missing topic would otherwise make
+it with a *single* partition, and the `--partitions 3` create command above would then fail with
+`TopicExistsException`.
+
+**This is the only built image in the repo** — every other service uses a prebuilt tag. So
+`git pull && docker compose -f docker/compose.all.yml up -d` will start it the first time but will
+**not** pick up later edits to `consumer.py`. After changing the code:
+
+```bash
+docker compose -f docker/compose.all.yml up -d --build kafka-consumer
+```
+
+Config lives in `environment:` in `docker/kafka/docker-compose.yml` — `KAFKA_TOPIC`,
+`KAFKA_GROUP`, `KAFKA_BOOTSTRAP`, `KAFKA_AUTO_OFFSET_RESET`.
+
+### Loki queries
+
+Run these in Grafana -> Explore against the Loki datasource. They need the observability stack
+running (see [Running just this stack](#running-just-this-stack)) — Alloy is what ships container
+stdout to Loki.
+
+Alloy labels every container stream with `job` (always `docker`), `container`, `container_id`,
+`image`, `service` (the Compose service name), and `stack` (the Compose project). The relabel rules
+are in `observability/alloy/`.
+
+All consumer logs — `service` is the Compose service name, `container` the container name. Both are
+`kafka-consumer`, so these two are equivalent:
+
+```logql
+{job="docker", service="kafka-consumer"}
+{job="docker", container="kafka-consumer"}
+```
+
+Errors only:
+
+```logql
+{job="docker", container="kafka-consumer"} |= "ERROR"
+```
+
+Just the consumed-message lines, skipping startup and rebalance noise:
+
+```logql
+{job="docker", container="kafka-consumer"} |~ `p\d+@\d+`
+```
+
+Rebalances — when partitions are assigned to or revoked from this consumer:
+
+```logql
+{job="docker", container="kafka-consumer"} |~ "assigned:|revoked:"
+```
+
+Messages consumed per second (a metric query, so it works as a Grafana panel):
+
+```logql
+sum(rate({job="docker", container="kafka-consumer"} |~ `p\d+@\d+` [5m]))
+```
+
+The whole Kafka stack in one view:
+
+```logql
+{job="docker", container=~"kafka.*|akhq"}
 ```
 
 ## Kafka UI
@@ -1353,6 +1473,8 @@ To ssh into VM:
 - Pihole - DNS server that resolves *.homelab domains to 10.0.0.32 (your Docker host)
 - Caddy - Reverse proxy listening on ports 80/443, routes requests based on hostname to the appropriate container
 - `main-network` connects most services; Caddy bridges default, main-network, and kafka-network
+- `kafka-network` carries only the Kafka stack (`kafka`, `kafka-ui`, `akhq`, `kafka-consumer`)
+  plus Caddy, which reverse-proxies the two UIs
 
 
 ## Test Postgres
