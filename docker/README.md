@@ -932,8 +932,19 @@ Commit and push on the Mac, pull on the server, then:
 
 ```bash
 docker compose -f docker/compose.all.yml up -d <name>
+docker compose -f docker/compose.all.yml up -d --force-recreate pihole caddy gatus homepage
+```
+
+The second line is what picks up the bind-mounted config edits from steps 2-4 (DNS record, Caddy
+site block, Gatus endpoint) plus the Homepage tile — `--force-recreate` makes those four processes
+come up fresh and re-read their files. Prefer it over `restart caddy gatus`, which reuses the
+existing container config; see
+[Why `--force-recreate` is only sometimes needed](#why---force-recreate-is-only-sometimes-needed).
+Recreating pihole reloads its dnsmasq config, so a separate `pihole reloaddns` is not needed —
+run that only when you edited the DNS record alone and want to skip the recreate:
+
+```bash
 docker compose -f docker/compose.all.yml exec pihole pihole reloaddns
-docker compose -f docker/compose.all.yml restart caddy gatus
 ```
 
 Verify one layer at a time, so a failure points at the layer that broke:
@@ -2143,6 +2154,92 @@ docker volume rm docker_linkwarden_data docker_linkwarden_pgdata docker_linkward
 docker compose -f docker/compose.all.yml up -d linkwarden
 ```
 
+## Forgejo
+
+Self-hosted git forge (a Gitea fork) at http://forgejo.homelab. Hosts private repos locally,
+with git over both HTTP and SSH.
+
+One container, defined in `forgejo/docker-compose.yml` and included from `compose.all.yml`:
+
+| Container | Purpose | Named volume |
+|-|-|-|
+| `forgejo` | the forge, plus its embedded SSH server | `forgejo_data` (`/data`) |
+
+No database container. With no `FORGEJO__database__*` variables set, Forgejo falls back to
+SQLite, which lives inside the same volume as the repos and config — so one volume is the
+entire service.
+
+**No web port is published.** Host 3000 is linkwarden's, and Caddy reaches the container over
+`main-network` at `forgejo:3000` anyway. SSH is different: git clients connect to the host
+directly rather than through Caddy, so `222:22` is published. 222 was free.
+
+`FORGEJO__server__SSH_PORT=222` in the compose file is what makes the UI advertise the
+reachable port; without it Forgejo prints clone URLs on 22, which nothing outside the
+container can reach. The `FORGEJO__<section>__<KEY>` variables are re-rendered into
+`/data/gitea/conf/app.ini` on every start, so they stay authoritative even after the install
+wizard writes that file once.
+
+**Deploy** (on the server, after `git pull` — edits on the Mac are inert until pulled):
+
+```
+docker compose -f docker/compose.all.yml up -d forgejo
+docker compose -f docker/compose.all.yml up -d --force-recreate pihole caddy gatus homepage
+```
+
+The second line picks up the bind-mounted config edits (DNS record, Caddy site block, Gatus
+endpoint, Homepage tile). `--force-recreate` is what makes those processes re-read their files.
+
+**First run:** open http://forgejo.homelab and complete the install wizard — it creates the
+admin account. The database section should already read SQLite3 and the URL fields should be
+prefilled from the compose env vars; leave both alone. To close signups afterwards, add
+`FORGEJO__service__DISABLE_REGISTRATION=true` to `forgejo/docker-compose.yml` and
+`docker compose -f docker/compose.all.yml up -d forgejo` (not `restart`, which ignores env
+changes).
+
+**Admin password**, from the CLI — the way back in when the wizard's account is locked out.
+Run as `git`, not root, or Forgejo complains about ownership of the files it touches:
+
+```
+docker exec -u git forgejo forgejo admin user list
+docker exec -u git forgejo forgejo admin user change-password \
+  --username <admin-username> --password '<new-password>'
+```
+
+If the admin account is gone entirely, mint a new one instead:
+
+```
+docker exec -u git forgejo forgejo admin user create --admin \
+  --username <name> --password '<pw>' --email <you@example.com>
+```
+
+Both put the password in shell history — prefix with a space, or change it again from the UI
+afterwards (avatar → Settings → Account).
+
+**SSH**, once a key is added under user settings:
+
+```
+ssh -F /dev/null -T git@forgejo.homelab -p 222   # expect the Forgejo greeting, not a shell
+git clone ssh://git@forgejo.homelab:222/<user>/<repo>.git
+```
+
+Backup — one volume covers repos, config and the database:
+
+```
+ssh logan@10.0.0.32 "docker run --rm -v docker_forgejo_data:/data -v \$HOME:/backup alpine sh -c 'tar czf /backup/forgejo-data-\$(date +%Y%m%d-%H%M%S).tar.gz -C /data .'"
+```
+
+`backup-remote-volumes.sh` stops the stack before it tars, because a live SQLite database and
+in-flight git operations do not tar consistently. Run the one-liner above against a stopped
+container for the same reason if the repos are busy.
+
+Full reset (wipes everything):
+
+```
+docker compose -f docker/compose.all.yml rm -fsv forgejo
+docker volume rm docker_forgejo_data
+docker compose -f docker/compose.all.yml up -d forgejo
+```
+
 ## C Advisor
 
 [Failure to get data in Prometheus on latest Docker · Issue #3749 · google/cadvisor](https://github.com/google/cadvisor/issues/3749)
@@ -2586,6 +2683,18 @@ curl --max-time 5 -o /dev/null -w '%{http_code}\n' http://<ip>:4533/app/   # wan
 
 macOS's firewall can also block this even when the port is bound correctly — check with `/usr/libexec/ApplicationFirewall/socketfilterfw --getglobalstate`.
 
+### Feishin (desktop client)
+
+[Feishin](https://github.com/jeffvli/feishin) is a desktop Subsonic/Navidrome client — a nicer full-screen player than the web UI on a laptop. Point it at the server and sign in with the Navidrome account:
+
+```
+Server:    http://navidrome.homelab
+Username:  admin
+Password:  password
+```
+
+Use `http://<host-ip>:4533` instead of the `.homelab` name anywhere DNS doesn't resolve it (see the phone-access section above).
+
 ### Reinstall / start fresh
 
 Wipes the database and rebuilds from scratch.
@@ -2949,6 +3058,7 @@ These services bake their public URL into the frontend at startup — they only 
 | linkwarden | `NEXTAUTH_URL` | `linkwarden/.env` | `http://localhost:3000/api/v1/auth` | `http://linkwarden.homelab/api/v1/auth` |
 | tubearchivist | `TA_HOST` | `docker/.env` | `http://localhost:8000` | `http://tubearchivist.homelab` |
 | archivebox | `BASE_URL` | `archivebox/docker-compose.yml` | `http://archivebox.localhost:8010` | `http://archivebox.homelab` |
+| forgejo | `FORGEJO__server__ROOT_URL` | `forgejo/docker-compose.yml` | N/A (no web port published) | `http://forgejo.homelab/` |
 
 ## Applications
 
@@ -2983,6 +3093,7 @@ These services bake their public URL into the frontend at startup — they only 
 | netdata | N/A | http://netdata.homelab | N/A |
 | karakeep | N/A | http://karakeep.homelab | set on first run (signup) |
 | linkwarden | http://localhost:3000 | http://linkwarden.homelab | set on first run (first user is admin) |
+| forgejo | N/A | http://forgejo.homelab | set on first run (install wizard creates the admin) |
 | beszel | http://localhost:8090 | http://beszel.homelab | set on first run |
 | backrest | N/A | http://backrest.homelab | set on first run |
 | paperless-ngx | N/A | http://paperless.homelab | admin / changeMe |
