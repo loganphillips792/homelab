@@ -23,6 +23,9 @@ docker compose --env-file docker/immich/docker-compose.env -f docker/immich/dock
 docker compose --env-file docker/.env -f docker/tubearchivist/docker-compose.yml down
 # Stop Planka so its Postgres volume is copied consistently (not mid-write)
 docker compose --env-file docker/planka/.env -f docker/planka/docker-compose.yml down
+# Same for Forgejo: its SQLite database and the git repos share one volume, and neither
+# tars consistently mid-write. --env-file is needed for ${TZ}, as with tubearchivist.
+docker compose --env-file docker/.env -f docker/forgejo/docker-compose.yml down
 
 echo "Ensuring backup directory exists at $BACKUP_DIR..."
 mkdir -p "$BACKUP_DIR"
@@ -47,6 +50,7 @@ docker compose -f docker/docker-compose.yml up -d
 docker compose --env-file docker/immich/docker-compose.env -f docker/immich/docker-compose.yml up -d
 docker compose --env-file docker/.env -f docker/tubearchivist/docker-compose.yml up -d
 docker compose --env-file docker/planka/.env -f docker/planka/docker-compose.yml up -d
+docker compose --env-file docker/.env -f docker/forgejo/docker-compose.yml up -d
 
 echo "All stacks started again."
 EOF

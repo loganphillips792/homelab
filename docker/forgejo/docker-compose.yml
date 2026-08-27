@@ -1,0 +1,49 @@
+# Forgejo (self-hosted git forge, a Gitea fork) at http://forgejo.homelab.
+#
+# One container, no database container: with no FORGEJO__database__* variables set,
+# Forgejo falls back to SQLite, which lives inside the same /data volume as the repos
+# and config. That keeps the whole service to a single named volume to back up.
+#
+# Storage differs from upstream: the docs bind-mount ./forgejo:/data, but this repo uses
+# named volumes -- backup-remote-volumes.sh tars named volumes and would skip a bind mount
+# entirely. Upstream's /etc/localtime:/etc/localtime:ro mount is likewise replaced by the
+# shared ${TZ} from docker/.env.
+#
+# No web port is published. Host 3000 is already linkwarden's, and Caddy reaches this
+# container over main-network anyway (forgejo:3000). SSH does need a real host port,
+# since git clients connect to the host directly rather than through Caddy.
+#
+# main-network is declared in the root docker-compose.yml, not here -- like the other
+# per-service files in this repo, this only comes up via compose.all.yml:
+#   docker compose -f compose.all.yml up -d forgejo
+# No forgejo/.env: with SQLite there are no secrets to hold.
+# Docs: https://forgejo.org/docs/latest/admin/installation/installation-docker/
+
+services:
+  forgejo:
+    image: codeberg.org/forgejo/forgejo:16
+    container_name: forgejo
+    restart: unless-stopped
+    environment:
+      # Ownership of /data inside the container; the entrypoint chowns to match.
+      - USER_UID=1000
+      - USER_GID=1000
+      - TZ=${TZ}
+      # FORGEJO__<section>__<KEY> variables are rendered into /data/gitea/conf/app.ini on
+      # every start, so these stay authoritative even after the install wizard writes it.
+      - FORGEJO__server__DOMAIN=forgejo.homelab
+      - FORGEJO__server__ROOT_URL=http://forgejo.homelab/
+      - FORGEJO__server__SSH_DOMAIN=forgejo.homelab
+      # The reachable host port, not the container's 22. Without it Forgejo advertises
+      # clone URLs on 22, which nothing can reach.
+      - FORGEJO__server__SSH_PORT=222
+    ports:
+      - "222:22" # git-over-SSH; no web port -- 3000 is linkwarden's, Caddy proxies instead
+    volumes:
+      # Repos, config and the SQLite database all live under here.
+      - forgejo_data:/data
+    networks:
+      - main-network
+
+volumes:
+  forgejo_data:

@@ -173,6 +173,12 @@ http://linkwarden.homelab {
   reverse_proxy linkwarden:3000
 }
 
+# Web UI only. Git-over-SSH bypasses Caddy entirely -- clients hit the published
+# host port 222 directly (see forgejo/docker-compose.yml).
+http://forgejo.homelab {
+  reverse_proxy forgejo:3000
+}
+
 # Container name is matomo-app (the compose service is `matomo`), serving on :80.
 # Matomo pins trusted_hosts[] during installation to whichever hostname you first
 # complete setup on, and rejects other Host headers afterwards — so run the installer
