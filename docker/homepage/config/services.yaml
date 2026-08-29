@@ -185,6 +185,10 @@
         icon: forgejo
         href: http://forgejo.homelab
         description: Self-hosted git forge
+    - Dockhand:
+        icon: docker
+        href: http://dockhand.homelab
+        description: Docker container management UI
     - Excalidraw:
         icon: https://cdn.jsdelivr.net/gh/walkxcode/dashboard-icons@master/svg/excalidraw.svg
         href: http://excalidraw.homelab
