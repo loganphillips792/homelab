@@ -1,0 +1,27 @@
+# Dynacat — widget dashboard (a Glance fork). Config in ./config (dynacat.yml includes home.yml).
+#
+# Paths are relative to THIS directory — Compose resolves relative paths in an
+# included file against the included file's own location, not docker/.
+# main-network is declared in ../docker-compose.yml and merges project-wide.
+#
+# No host port, same as glance: Caddy reaches the container over main-network at
+# dynacat:8080. 8085 is free if you ever want direct access for testing.
+#
+# No ./assets mount, unlike glance. Nothing here uses assets-path, custom-css-file,
+# dynawidgets caching or server-side to-do storage, and glance's assets dir does not
+# actually exist in the repo — Docker just creates it root-owned on the host.
+
+services:
+  dynacat:
+    container_name: dynacat
+    image: panonim/dynacat:latest
+    restart: unless-stopped
+    environment:
+      # From the shared docker/.env, as elsewhere in the repo. Glance bind-mounts
+      # /etc/localtime instead; this is the more common convention here, and the
+      # calendar and clock widgets both depend on it.
+      - TZ=${TZ}
+    volumes:
+      - ./config:/app/config
+    networks:
+      - main-network

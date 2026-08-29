@@ -102,6 +102,14 @@ endpoints:
     interval: 60s
     conditions:
       - "[STATUS] == 200"
+  - name: Dynacat
+    group: dashboards
+    # / returns 303 to /login when signed out; gatus follows redirects and the
+    # login page is a 200, so this checks the app is serving, not that auth works.
+    url: http://dynacat.homelab
+    interval: 60s
+    conditions:
+      - "[STATUS] == 200"
   - name: Flame
     group: dashboards
     url: http://flame.homelab

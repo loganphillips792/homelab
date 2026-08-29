@@ -9,6 +9,7 @@ include:
   - observability/docker-compose.yml
   - gatus/docker-compose.yml
   - glance/docker-compose.yml
+  - dynacat/docker-compose.yml
   - homepage/docker-compose.yml
   # archivebox disabled 2026-08-21 — largest memory consumer on the host (~1.8 GB RSS;
   # it runs a headless Chrome for page snapshotting) while the VM was thrashing: swap
