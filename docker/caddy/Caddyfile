@@ -58,6 +58,12 @@ http://glance.homelab {
   reverse_proxy glance:8080
 }
 
+# Second dashboard, alongside glance. No host port is published — Caddy is the only
+# way in, which is also what makes server.proxied: true necessary in dynacat.yml.
+http://dynacat.homelab {
+  reverse_proxy dynacat:8080
+}
+
 http://uptime-kuma.homelab {
   reverse_proxy uptime-kuma:3001
 }

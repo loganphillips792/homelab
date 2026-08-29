@@ -1,0 +1,30 @@
+# Dynacat's main config. The page lives in home.yml, included below — same split as
+# glance/config/. Dynacat watches these files and reloads on save, so edits take effect
+# without restarting the container. An invalid config on an already-running instance is
+# logged and the previous config keeps serving; an invalid config at startup exits outright.
+
+server:
+  # Caddy terminates the connection, so without this Dynacat sees Caddy's container IP as
+  # the client on every request. Its brute-force lockout (5 failed logins in 5 minutes)
+  # would then lock out everyone at once on one person's typos. Reads X-Forwarded-For.
+  proxied: true
+
+auth:
+  # Signs session cookies. Generated with: docker run --rm panonim/dynacat secret:make
+  secret-key: "w1hPRql4VXY4V1f4yW2nvso0mkpDUBqZideCPlAg+z6/pDscKaqqSXKwHuot/hF2LRneaOnNXeLJ9W7K5qDsnA=="
+  users:
+    admin:
+      # Plain text on purpose, consistent with the rest of this repo committing real
+      # credentials. Dynacat also accepts password-hash: (bcrypt), produced by
+      #   docker run --rm panonim/dynacat password:hash <password>
+      password: mysecretpassword
+
+theme:
+  # Tucan
+  background-color: 50 1 6
+  primary-color: 24 97 58
+  negative-color: 209 88 54
+  # positive-color left unset — it falls back to primary-color.
+
+pages:
+  - $include: home.yml

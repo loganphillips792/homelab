@@ -962,11 +962,13 @@ curl -s http://localhost:8082/api/v1/endpoints/statuses \
   | python3 -c "import json,sys; [print(e['name'], e['results'][-1]['success']) for e in json.load(sys.stdin)]"
 ```
 
-### Not currently required
+### Step 8: the dashboards
 
-Neither dashboard needs a per-service edit today: `homepage/config/services.yaml` is still the stock
-example config, and `glance/config/home.yml` uses widgets rather than a service list. If either gets
-customized, they become step 8.
+`homepage/config/services.yaml` now carries real tiles (forgejo and dynacat were both added to it),
+so adding a service means adding a tile there too — group it with the services it belongs next to.
+
+`glance/config/home.yml` and `dynacat/config/home.yml` are the exception: both use widgets rather
+than a service list, so neither needs a per-service edit.
 
 
 # Services
@@ -1259,6 +1261,65 @@ docker exec pihole tail -n 100 -f /var/log/pihole/pihole.log
 http://homepage.homela
 
 After making any changes: `docker compose up -d --build homepage`
+
+## Dynacat
+
+Second widget dashboard at http://dynacat.homelab, running alongside Glance rather than replacing
+it. Dynacat is a Glance fork, so the config model is identical — `server` / `theme` / `pages`,
+columns of widgets, HSL colors — and anything you learn tuning one applies to the other.
+
+One container, defined in `dynacat/docker-compose.yml` and included from `compose.all.yml`:
+
+| Container | Purpose | Config |
+|-|-|-|
+| `dynacat` | the dashboard | `dynacat/config/` (bind mount, not a volume) |
+
+Config is split the same way as Glance's: `config/dynacat.yml` holds server, auth and theme and
+pulls the page in with `$include: home.yml`. An included file's values start at the top level with
+no extra indentation — `$include` adds the right amount based on where the directive sits.
+
+**Credentials:** `admin` / `mysecretpassword`. The `auth.secret-key` next to it signs session
+cookies and was generated with `docker run --rm panonim/dynacat secret:make` — it is not a value
+to invent. Passwords can also be stored hashed (`password-hash:`, from
+`docker run --rm panonim/dynacat password:hash <password>`) if you would rather not have the plain
+one in git.
+
+**`server.proxied: true` is load-bearing.** Dynacat locks out an IP after 5 failed logins in 5
+minutes. No host port is published, so every request arrives via Caddy — without `proxied` the
+client IP is always Caddy's container address, and one person's typos would lock out everyone.
+With it set, Dynacat reads `X-Forwarded-For` instead.
+
+**Theme** is Tucan, one of the upstream presets:
+
+```yaml
+theme:
+  background-color: 50 1 6
+  primary-color: 24 97 58
+  negative-color: 209 88 54
+```
+
+Colors are `hue saturation lightness`, space-separated, no `%`. `positive-color` is unset and falls
+back to `primary-color`.
+
+**Editing the page:** config changes hot-reload on save — no restart, no recreate. Edit
+`dynacat/config/home.yml` and the change is live. Two caveats: a reload clears the widget cache, so
+don't do it in a tight loop against rate-limited APIs; and if the new config is invalid, Dynacat
+logs the error and keeps serving the old one, so check `docker logs dynacat` rather than assuming a
+silent save worked. Edits made directly on the server need committing back or the next deploy
+overwrites them.
+
+To check a config before it goes anywhere near the server:
+
+```bash
+docker run --rm -v "$PWD/docker/dynacat/config:/app/config" panonim/dynacat config:print
+```
+
+That resolves `$include` and prints the merged result. Worth doing, because YAML errors inside an
+included file report misleading line numbers — inclusion happens before parsing.
+
+Unlike Glance, no `./assets` directory is mounted. Nothing in this config needs one, and
+`glance/docker-compose.yml` mounts a directory that does not exist in the repo, which just leaves a
+root-owned empty dir on the host.
 
 ## Uptime Kuma
 
@@ -3076,6 +3137,7 @@ These services bake their public URL into the frontend at startup — they only 
 | drawio | http://localhost:8080 | http://drawio.homelab | N/A |
 | dozzle | N/A | http://dozzle.homelab | N/A |
 | glance | N/A | http://glance.homelab | N/A |
+| dynacat | N/A | http://dynacat.homelab | admin / mysecretpassword |
 | uptime-kuma | N/A | http://uptime-kuma.homelab | set on first run, but set it to admin / password123 |
 | jellyfin | N/A | http://jellyfin.homelab | set on first run |
 | n8n | N/A | http://n8n.homelab | set on first run (/setup) |
