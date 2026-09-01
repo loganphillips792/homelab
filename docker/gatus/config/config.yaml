@@ -166,6 +166,12 @@ endpoints:
     interval: 60s
     conditions:
       - "[STATUS] == 200"
+  - name: Dockhand
+    group: apps
+    url: http://dockhand.homelab
+    interval: 60s
+    conditions:
+      - "[STATUS] == 200"
   - name: Planka
     group: apps
     url: http://planka.homelab

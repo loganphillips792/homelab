@@ -179,6 +179,12 @@ http://forgejo.homelab {
   reverse_proxy forgejo:3000
 }
 
+# Container port stays 3000 even though the host publishes 3001 -- Caddy talks to the
+# container over main-network, so the host mapping is irrelevant here.
+http://dockhand.homelab {
+  reverse_proxy dockhand:3000
+}
+
 # Container name is matomo-app (the compose service is `matomo`), serving on :80.
 # Matomo pins trusted_hosts[] during installation to whichever hostname you first
 # complete setup on, and rejects other Host headers afterwards — so run the installer

@@ -64,10 +64,21 @@ services:
       - kafka-data:/var/lib/kafka/data
     networks:
       - kafka-network
+    # This probe spawns a whole JVM (kafka-topics.sh), which costs ~2-4s idle but blew
+    # past a 10s timeout during a fleet-wide `up -d` (load average 20 on 8 cores). With
+    # no start_period the retries were also being burned during Kafka's own ~100s KRaft
+    # boot, so the broker was marked unhealthy at ~150s and everything with
+    # `depends_on: service_healthy` (kafka-ui, kafka-consumer) was torn down -- even
+    # though the broker came up fine seconds later. Hence the long start_period.
+    #
+    # start_interval only applies inside start_period; it is kept well above the probe's
+    # own cost so the JVM spawns do not add load during the window that is already busy.
     healthcheck:
       test: ["CMD-SHELL", "/opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --list"]
-      interval: 30s
-      timeout: 10s
+      interval: 60s
+      timeout: 30s
+      start_period: 180s
+      start_interval: 15s
       retries: 5
   kafka-ui:
     container_name: kafka-ui

@@ -18,6 +18,7 @@ include:
   - kafka/docker-compose.yml
   - redis-pubsub/docker-compose.yml
   - forgejo/docker-compose.yml
+  - dockhand/docker-compose.yml
   - path: penpot/docker-compose.yml
     env_file: penpot/.env
   - path: planka/docker-compose.yml

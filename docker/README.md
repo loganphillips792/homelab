@@ -2240,6 +2240,95 @@ docker volume rm docker_forgejo_data
 docker compose -f docker/compose.all.yml up -d forgejo
 ```
 
+## Dockhand
+
+Docker container management UI at http://dockhand.homelab — start, stop, recreate and inspect
+containers from the browser. Overlaps with Dozzle (which is logs-only) rather than replacing it.
+
+One container, defined in `dockhand/docker-compose.yml` and included from `compose.all.yml`:
+
+| Container | Purpose | Named volume |
+|-|-|-|
+| `dockhand` | the UI and its own state | `dockhand_data` (`/app/data`) |
+
+**Published on host 3001, not 3000.** Upstream's compose file uses `3000:3000`, but host 3000 is
+linkwarden's, so that would fail to bind. 3001 was free. The container still listens on 3000
+internally and Caddy reaches it over `main-network` at `dockhand:3000` — the host mapping exists
+only for direct testing, the same reason linkwarden publishes its own port.
+
+**The docker socket is mounted read-write.** Unlike cadvisor and netdata, which get
+`/var/run/docker.sock:ro`, Dockhand has to write to the socket to start and stop things. That
+means anyone who reaches the UI has root-equivalent control of the host: there is no auth in front
+of it beyond being on the LAN. The same is already true of cronmaster and homepage, so this does
+not change the trust boundary — but do not expose `dockhand.homelab` through Tailscale funnel or
+any port forward.
+
+### First run — create the admin user and an environment
+
+The image ships with an empty database: **no users and no environments**. Until both exist the UI
+loads normally but lists nothing — no containers, no environments, no error. That is the expected
+cold-start state, not a broken socket. It is one-time setup and lives in `dockhand_data`, so it
+survives restarts, recreates and image updates.
+
+**None of this can be seeded from compose.** Every `process.env.*` the app reads was checked and
+there is no admin-bootstrap or environment-seed variable — nothing equivalent to `ADMIN_USERNAME`
+or `ENVIRONMENTS_JSON`. The Docker-related variables that do exist (`DOCKER_HOST`, `DOCKER_SOCKET`,
+`HOST_DOCKER_SOCKET`, `DOCKER_API_VERSION`) only change how an environment connects once its row
+exists; they do not create one. `DOCKHAND_HOSTNAME` and `DOCKHAND_HOST_IP` are display labels only.
+Users and environments are rows in `/app/data/db/dockhand.db`.
+
+1. Open http://dockhand.homelab. With zero users in the database it starts at account creation —
+   the first account created is the admin. `/login` redirects there until that account exists.
+2. Add an environment. **Take the defaults**: the table defaults are already
+   `connection_type = 'socket'` and `socket_path = '/var/run/docker.sock'`, which is exactly the
+   socket bind-mounted in `dockhand/docker-compose.yml`. It only needs a name. Do not set a host
+   or port — those are for remote daemons over TCP.
+3. Containers appear immediately once the environment is saved.
+
+Confirm setup actually completed, rather than inferring it from the UI:
+
+```
+docker exec dockhand sqlite3 /app/data/db/dockhand.db \
+  'select (select count(*) from users) as users, (select count(*) from environments) as envs;'
+```
+
+`0|0` means setup was never finished — that, not the socket, is the usual reason the container
+list is empty. Check the socket independently before suspecting it:
+
+```
+docker exec dockhand curl -s --unix-socket /var/run/docker.sock http://localhost/_ping   # -> OK
+```
+
+If `_ping` returns `OK`, Docker access is fine and the problem is setup state. (Dockhand reads the
+socket through its own Go collector, not the image store, so the containerd-snapshotter problem
+described under [C Advisor](#c-advisor) does not apply to it.)
+
+**Automating it** is possible but only through the API, not configuration. Per the embedded
+OpenAPI spec, `POST /api/users` is "allowed without auth only during initial setup, before any
+admin exists" — so a script can create the admin unauthenticated, authenticate as it, then
+`POST /api/environments` with `{"name": "...", "connectionType": "socket"}`. Worth writing only if
+you expect to rebuild from an empty volume; otherwise the two UI steps above are faster.
+
+Backup:
+
+```
+ssh logan@10.0.0.32 "docker run --rm -v docker_dockhand_data:/data -v \$HOME:/backup alpine sh -c 'tar czf /backup/dockhand-data-\$(date +%Y%m%d-%H%M%S).tar.gz -C /data .'"
+```
+
+`backup-remote-volumes.sh` picks up `docker_dockhand_data` automatically — its loop iterates every
+named volume. It does *not* stop dockhand first, unlike planka and forgejo, and it should:
+`/app/data/db/dockhand.db` is SQLite (with `-wal` and `-shm` alongside it), so a live tar can catch
+a half-written database. Add a `down`/`up` pair to that script, or back this volume up with
+**backrest** instead.
+
+Full reset (wipes everything):
+
+```
+docker compose -f docker/compose.all.yml rm -fsv dockhand
+docker volume rm docker_dockhand_data
+docker compose -f docker/compose.all.yml up -d dockhand
+```
+
 ## C Advisor
 
 [Failure to get data in Prometheus on latest Docker · Issue #3749 · google/cadvisor](https://github.com/google/cadvisor/issues/3749)
@@ -3094,6 +3183,7 @@ These services bake their public URL into the frontend at startup — they only 
 | karakeep | N/A | http://karakeep.homelab | set on first run (signup) |
 | linkwarden | http://localhost:3000 | http://linkwarden.homelab | set on first run (first user is admin) |
 | forgejo | N/A | http://forgejo.homelab | set on first run (install wizard creates the admin) |
+| dockhand | http://localhost:3001 | http://dockhand.homelab | set on first run |
 | beszel | http://localhost:8090 | http://beszel.homelab | set on first run |
 | backrest | N/A | http://backrest.homelab | set on first run |
 | paperless-ngx | N/A | http://paperless.homelab | admin / changeMe |
