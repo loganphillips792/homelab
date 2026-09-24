@@ -141,6 +141,10 @@
         icon: glance
         href: http://glance.homelab
         description: Personal dashboard
+    - Dynacat:
+        icon: mdi-view-dashboard
+        href: http://dynacat.homelab
+        description: Widget dashboard
     - Flame:
         icon: flame
         href: http://flame.homelab
