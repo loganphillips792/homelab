@@ -1,0 +1,36 @@
+# Dockhand (Docker container management UI) at http://dockhand.homelab.
+#
+# Host port 3001, not the upstream 3000 -- 3000 is linkwarden's. Caddy reaches the container
+# over main-network at dockhand:3000 regardless; 3001 is published only for direct testing,
+# the same reason linkwarden publishes its own port.
+#
+# Named volume rather than a bind mount under ~/docker-volumes: backup-remote-volumes.sh tars
+# named volumes and would skip a bind mount entirely.
+#
+# The docker.sock mount is read-write on purpose -- Dockhand starts/stops/recreates containers,
+# so a :ro socket (as cadvisor and netdata use) would break it. That grants root-equivalent
+# control of the host to anything reaching the UI; same trade-off already made for cronmaster
+# and homepage.
+#
+# main-network is declared in the root docker-compose.yml, not here -- like the other
+# per-service files in this repo, this only comes up via compose.all.yml:
+#   docker compose -f compose.all.yml up -d dockhand
+# No dockhand/.env: TZ comes from the shared docker/.env, which is the default lookup.
+
+services:
+  dockhand:
+    image: fnsys/dockhand:latest
+    container_name: dockhand
+    restart: unless-stopped
+    ports:
+      - "3001:3000" # 3000 is linkwarden's; caddy also proxies internally
+    environment:
+      - TZ=${TZ}
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - dockhand_data:/app/data
+    networks:
+      - main-network
+
+volumes:
+  dockhand_data:
