@@ -65,8 +65,8 @@ services:
     restart: unless-stopped
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
-    # ports: # don't need ports because caddy proxies to the container ports for us
-    #   - 8083:8080
+    ports:
+      - "8083:8080"   # direct access for testing (also proxied by Caddy at dozzle.homelab)
     networks:
       - main-network
 

@@ -212,6 +212,20 @@
         href: http://komodo.homelab
         description: Docker fleet management
 
+- Storage:
+    - Silo:
+        icon: minio
+        href: http://silo.homelab
+        description: S3 object storage (MinIO fork)
+    - VaultS3:
+        icon: mdi-bucket
+        href: http://vaults3.homelab/dashboard/
+        description: Lightweight S3 object storage
+    - RustFS:
+        icon: mdi-bucket-outline
+        href: http://rustfs.homelab
+        description: S3 object storage in Rust
+
 # AI
 - AI:
     - Open WebUI:

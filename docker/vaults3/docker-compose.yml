@@ -1,0 +1,41 @@
+# VaultS3 — lightweight S3-compatible object storage with a built-in web dashboard.
+#
+# One port for everything: the S3 API is served at / and the dashboard at /dashboard/,
+# both on 9000. Log in to the dashboard with the access key / secret key pair.
+#
+# Credentials come from vaults3/.env. Without them VaultS3 generates a secret on first
+# run and prints it to the log once — easy to lose, so they're set explicitly.
+#
+# The image runs as a non-root user (UID 1000). Docker creates missing bind-mount
+# directories as root, which that user can't write to, so vaults3-init chowns them
+# before the server starts. It's a no-op on every run after the first.
+
+services:
+  vaults3-init:
+    container_name: vaults3-init
+    image: alpine
+    command: chown -R 1000:1000 /data /metadata
+    volumes:
+      - ~/docker-volumes/vaults3/data:/data
+      - ~/docker-volumes/vaults3/metadata:/metadata
+    restart: "no"
+
+  vaults3:
+    container_name: vaults3
+    image: eniz1806/vaults3:latest
+    restart: unless-stopped
+    depends_on:
+      vaults3-init:
+        condition: service_completed_successfully
+    environment:
+      - VAULTS3_ACCESS_KEY=${VAULTS3_ACCESS_KEY}
+      - VAULTS3_SECRET_KEY=${VAULTS3_SECRET_KEY}
+    ports:
+      - "9020:9000"   # S3 API + /dashboard/ (also proxied by Caddy at vaults3.homelab)
+    volumes:
+      # Objects and the BoltDB metadata index are kept apart upstream so they can sit on
+      # different disks; both live under the same volume dir here.
+      - ~/docker-volumes/vaults3/data:/data
+      - ~/docker-volumes/vaults3/metadata:/metadata
+    networks:
+      - main-network

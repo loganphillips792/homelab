@@ -1,0 +1,28 @@
+# Silo — S3-compatible object storage, a community-maintained MinIO fork (pgsty/silo).
+# Same binary, flags and MINIO_* env vars as upstream MinIO, so MinIO docs apply as-is.
+#
+# Two ports inside the container: 9000 is the S3 API, 9001 the web console. Caddy
+# proxies both (silo.homelab = console, silo-s3.homelab = API); the host ports are
+# for direct access when testing and are offset because every S3 server here wants 9000.
+#
+# Credentials come from silo/.env. The root password must be at least 8 characters
+# or the server refuses to start.
+
+services:
+  silo:
+    container_name: silo
+    image: pgsty/silo:latest
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      - MINIO_ROOT_USER=${SILO_ROOT_USER}
+      - MINIO_ROOT_PASSWORD=${SILO_ROOT_PASSWORD}
+      # Console links and login redirects point here instead of the container address.
+      - MINIO_BROWSER_REDIRECT_URL=http://silo.homelab
+    ports:
+      - "9010:9000"   # S3 API (also proxied by Caddy at silo-s3.homelab)
+      - "9011:9001"   # console (also proxied by Caddy at silo.homelab)
+    volumes:
+      - ~/docker-volumes/silo/data:/data
+    networks:
+      - main-network

@@ -254,6 +254,25 @@ endpoints:
     interval: 60s
     conditions:
       - "[STATUS] == 200"
+  # Object storage: each server's own liveness endpoint on the S3 API hostname.
+  - name: Silo
+    group: data-and-ai
+    url: http://silo-s3.homelab/minio/health/live
+    interval: 60s
+    conditions:
+      - "[STATUS] == 200"
+  - name: VaultS3
+    group: data-and-ai
+    url: http://vaults3.homelab/health
+    interval: 60s
+    conditions:
+      - "[STATUS] == 200"
+  - name: RustFS
+    group: data-and-ai
+    url: http://rustfs-s3.homelab/health
+    interval: 60s
+    conditions:
+      - "[STATUS] == 200"
   - name: Kafka UI
     group: data-and-ai
     url: http://kafka-ui.homelab

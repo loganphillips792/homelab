@@ -476,6 +476,7 @@ Name the service to limit `up` to just it:
 ```bash
 docker compose -f docker/compose.all.yml up -d gatus
 docker compose -f docker/compose.all.yml up -d dynacat
+docker compose -f docker/compose.all.yml up -d silo vaults3 rustfs gatus homepage dockhand dozzle
 ```
 
 None of the extra flags from the full-update command are needed: `up -d` already recreates the container when its compose config changed. If you only edited a bind-mounted config file (nothing in the YAML), add `--force-recreate` so the process comes up fresh and re-reads it. Avoid `docker compose restart <service>` after YAML/env changes — restart reuses the existing container config and silently ignores them.
@@ -3221,7 +3222,7 @@ These services bake their public URL into the frontend at startup — they only 
 |-|-|-|-|
 | grafana | N/A | http://grafana.homelab | admin / admin123 |
 | cadvisor | http://localhost:8089 | http://cadvisor.homelab | N/A |
-| homepage | N/A | http://homepage.homelab | N/A |
+| homepage | http://localhost:3002 | http://homepage.homelab | N/A |
 | cronmaster | http://localhost:40123 | http://cronmaster.homelab | password: very_strong_password |
 | pihole | N/A | http://pihole.homelab | password: changeme |
 | kafka-ui | N/A | http://kafka-ui.homelab | N/A |
@@ -3229,7 +3230,7 @@ These services bake their public URL into the frontend at startup — they only 
 | gatus | http://localhost:8082 | http://gatus.homelab | N/A |
 | excalidraw | N/A | http://excalidraw.homelab | N/A |
 | drawio | http://localhost:8080 | http://drawio.homelab | N/A |
-| dozzle | N/A | http://dozzle.homelab | N/A |
+| dozzle | http://localhost:8083 | http://dozzle.homelab | N/A |
 | glance | N/A | http://glance.homelab | N/A |
 | dynacat | http://localhost:8085 | http://dynacat.homelab | admin / mysecretpassword |
 | uptime-kuma | N/A | http://uptime-kuma.homelab | set on first run, but set it to admin / password123 |
@@ -3263,6 +3264,9 @@ These services bake their public URL into the frontend at startup — they only 
 | archivebox | http://localhost:8010 | http://archivebox.homelab | admin / changeme |
 | navidrome | http://localhost:4533 | http://navidrome.homelab | set on first run (first user is admin) |
 | penpot | http://localhost:9001 | http://penpot.homelab | set on first run (registration) |
+| silo | http://localhost:9011 (API: 9010) | http://silo.homelab (API: silo-s3.homelab) | admin / changeMe123 |
+| vaults3 | http://localhost:9020/dashboard/ | http://vaults3.homelab/dashboard/ | admin / changeMe123 |
+| rustfs | http://localhost:9031/rustfs/console/ (API: 9030) | http://rustfs.homelab (API: rustfs-s3.homelab) | admin / changeMe123 |
 | planka | http://localhost:1337 | http://planka.homelab | created via `npm run db:create-admin-user` |
 | penpot-mailcatch | http://localhost:1080 | N/A (no Caddy block) | N/A |
 | matomo | http://localhost:8080 | N/A (no Caddy block) | set on first run; DB pass changeMe |

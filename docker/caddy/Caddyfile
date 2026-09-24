@@ -199,6 +199,32 @@ http://matomo.homelab {
   reverse_proxy matomo-app:80
 }
 
+# Object storage. Silo and RustFS serve the S3 API and the console on separate
+# container ports, so each gets two hostnames; VaultS3 serves both on one port
+# (dashboard under /dashboard/). S3 clients must use path-style addressing through
+# these names — virtual-host style would need a wildcard DNS record per server.
+http://silo.homelab {
+  reverse_proxy silo:9001
+}
+
+http://silo-s3.homelab {
+  reverse_proxy silo:9000
+}
+
+http://vaults3.homelab {
+  reverse_proxy vaults3:9000
+}
+
+# The console is served under /rustfs/console/; the bare root is a 403.
+http://rustfs.homelab {
+  redir / /rustfs/console/ 302
+  reverse_proxy rustfs:9001
+}
+
+http://rustfs-s3.homelab {
+  reverse_proxy rustfs:9000
+}
+
 # Wildcard also matches the subdomain-routing hosts (admin./web./api./snap-*.)
 # used by SERVER_SECURITY_MODE=safe-subdomains-fullreplay. ArchiveBox routes by
 # the Host header internally, so every label proxies to the same container.

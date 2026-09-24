@@ -1,0 +1,45 @@
+# RustFS — S3-compatible distributed object storage written in Rust. Run here as a
+# single node with a single data directory.
+#
+# Two ports inside the container: 9000 is the S3 API, 9001 the web console. Caddy
+# proxies both (rustfs.homelab = console, rustfs-s3.homelab = API); the host ports are
+# for direct access when testing and are offset because every S3 server here wants 9000.
+#
+# Credentials come from rustfs/.env; the console login is the same access/secret key pair.
+#
+# The image runs as UID/GID 10001. Docker creates missing bind-mount directories as
+# root, which that user can't write to, so rustfs-init chowns them before the server
+# starts — the same approach as upstream's docker-compose-simple.yml.
+
+services:
+  rustfs-init:
+    container_name: rustfs-init
+    image: alpine
+    command: chown -R 10001:10001 /data
+    volumes:
+      - ~/docker-volumes/rustfs/data:/data
+    restart: "no"
+
+  rustfs:
+    container_name: rustfs
+    image: rustfs/rustfs:latest
+    restart: unless-stopped
+    depends_on:
+      rustfs-init:
+        condition: service_completed_successfully
+    security_opt:
+      - "no-new-privileges:true"
+    environment:
+      - RUSTFS_VOLUMES=/data
+      - RUSTFS_ADDRESS=0.0.0.0:9000
+      - RUSTFS_CONSOLE_ADDRESS=0.0.0.0:9001
+      - RUSTFS_CONSOLE_ENABLE=true
+      - RUSTFS_ACCESS_KEY=${RUSTFS_ACCESS_KEY}
+      - RUSTFS_SECRET_KEY=${RUSTFS_SECRET_KEY}
+    ports:
+      - "9030:9000"   # S3 API (also proxied by Caddy at rustfs-s3.homelab)
+      - "9031:9001"   # console (also proxied by Caddy at rustfs.homelab)
+    volumes:
+      - ~/docker-volumes/rustfs/data:/data
+    networks:
+      - main-network
