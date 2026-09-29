@@ -3200,7 +3200,7 @@ https://github.com/AppFlowy-IO/AppFlowy
 
 # List of Services
 
-The tables below cover the Docker Compose + Caddy stack (`docker/`). Network URLs are served by Caddy at `*.homelab`. Localhost URLs only exist for services that publish a host port; most are reached via Caddy only. Most credentials are committed defaults/placeholders — change them.
+The tables below cover the Docker Compose + Caddy stack (`docker/`). Network URLs are served by Caddy at `*.homelab`. Every web UI also publishes a host port for localhost testing; the few N/A entries are disabled or have no web UI. Most credentials are committed defaults/placeholders — change them.
 
 ## Services requiring URL change between localhost and homelab
 
@@ -3210,56 +3210,57 @@ These services bake their public URL into the frontend at startup — they only 
 |-|-|-|-|-|
 | penpot | `PENPOT_PUBLIC_URI` | `penpot/.env` | `http://localhost:9001` | `http://penpot.homelab` |
 | planka | `PLANKA_BASE_URL` | env override at run time | `http://localhost:1337` | `http://planka.homelab` (unset = default) |
-| karakeep | `NEXTAUTH_URL` | `karakeep/.env` | `http://localhost:3000` | `http://karakeep.homelab` |
+| karakeep | `NEXTAUTH_URL` | `karakeep/.env` | `http://localhost:3012` | `http://karakeep.homelab` |
 | linkwarden | `NEXTAUTH_URL` | `linkwarden/.env` | `http://localhost:3000/api/v1/auth` | `http://linkwarden.homelab/api/v1/auth` |
 | tubearchivist | `TA_HOST` | `docker/.env` | `http://localhost:8000` | `http://tubearchivist.homelab` |
 | archivebox | `BASE_URL` | `archivebox/docker-compose.yml` | `http://archivebox.localhost:8010` | `http://archivebox.homelab` |
-| forgejo | `FORGEJO__server__ROOT_URL` | `forgejo/docker-compose.yml` | N/A (no web port published) | `http://forgejo.homelab/` |
+| forgejo | `FORGEJO_ROOT_URL` | env override at run time | `http://localhost:3014/` | `http://forgejo.homelab/` (unset = default) |
+| paperless-ngx | `PAPERLESS_URL` | env override at run time | `http://localhost:8001` | `http://paperless.homelab` (unset = default) |
 
 ## Applications
 
 | Service | Localhost URL | Network URL (Caddy) | Credentials |
 |-|-|-|-|
-| grafana | N/A | http://grafana.homelab | admin / admin123 |
+| grafana | http://localhost:3013 | http://grafana.homelab | admin / admin123 |
 | cadvisor | http://localhost:8089 | http://cadvisor.homelab | N/A |
 | homepage | http://localhost:3002 | http://homepage.homelab | N/A |
 | cronmaster | http://localhost:40123 | http://cronmaster.homelab | password: very_strong_password |
-| pihole | N/A | http://pihole.homelab | password: changeme |
-| kafka-ui | N/A | http://kafka-ui.homelab | N/A |
-| akhq | N/A | http://akhq.homelab | N/A |
+| pihole | http://localhost:8088 | http://pihole.homelab | password: changeme |
+| kafka-ui | http://localhost:8091 | http://kafka-ui.homelab | N/A |
+| akhq | http://localhost:8092 | http://akhq.homelab | N/A |
 | gatus | http://localhost:8082 | http://gatus.homelab | N/A |
-| excalidraw | N/A | http://excalidraw.homelab | N/A |
+| excalidraw | http://localhost:5080 | http://excalidraw.homelab | N/A |
 | drawio | http://localhost:8080 | http://drawio.homelab | N/A |
 | dozzle | http://localhost:8083 | http://dozzle.homelab | N/A |
-| glance | N/A | http://glance.homelab | N/A |
+| glance | http://localhost:8084 | http://glance.homelab | N/A |
 | dynacat | http://localhost:8085 | http://dynacat.homelab | admin / mysecretpassword |
-| uptime-kuma | N/A | http://uptime-kuma.homelab | set on first run, but set it to admin / password123 |
-| jellyfin | N/A | http://jellyfin.homelab | set on first run |
-| n8n | N/A | http://n8n.homelab | set on first run (/setup) |
-| flame | N/A | http://flame.homelab | password: changeMe |
-| redisinsight | N/A | http://redisinsight.homelab | N/A (connection pre-seeded) |
-| live-auction | N/A | http://live-auction.homelab | app-managed |
-| prometheus | N/A | http://prometheus.homelab | N/A |
-| loki | N/A | http://loki.homelab | N/A |
-| metabase | N/A | http://metabase.homelab | set on first run |
-| umami | N/A | http://umami.homelab | admin / umami |
-| ollama | N/A | http://ollama.homelab | N/A |
-| ollama-webui | N/A | http://ollama-webui.homelab | N/A (auth disabled) |
-| changedetection | N/A | http://changedetection.homelab | N/A |
+| uptime-kuma | http://localhost:3004 | http://uptime-kuma.homelab | set on first run, but set it to admin / password123 |
+| jellyfin | http://localhost:8096 | http://jellyfin.homelab | set on first run |
+| n8n | http://localhost:5678 | http://n8n.homelab | set on first run (/setup) |
+| flame | http://localhost:5005 | http://flame.homelab | password: changeMe |
+| redisinsight | http://localhost:5540 | http://redisinsight.homelab | N/A (connection pre-seeded) |
+| live-auction | http://localhost:8086 | http://live-auction.homelab | app-managed |
+| prometheus | http://localhost:9090 | http://prometheus.homelab | N/A |
+| loki | http://localhost:3100 | http://loki.homelab | N/A |
+| metabase | http://localhost:3010 | http://metabase.homelab | set on first run |
+| umami | http://localhost:3011 | http://umami.homelab | admin / umami |
+| ollama | http://localhost:7869 | http://ollama.homelab | N/A |
+| ollama-webui | http://localhost:8081 | http://ollama-webui.homelab | N/A (auth disabled) |
+| changedetection | http://localhost:5050 | http://changedetection.homelab | N/A |
 | komodo | http://localhost:9120 | http://komodo.homelab | admin / changeme |
-| netdata | N/A | http://netdata.homelab | N/A |
-| karakeep | N/A | http://karakeep.homelab | set on first run (signup) |
+| netdata | http://localhost:19999 | http://netdata.homelab | N/A |
+| karakeep | http://localhost:3012 | http://karakeep.homelab | set on first run (signup) |
 | linkwarden | http://localhost:3000 | http://linkwarden.homelab | set on first run (first user is admin) |
-| forgejo | N/A | http://forgejo.homelab | set on first run (install wizard creates the admin) |
+| forgejo | http://localhost:3014 | http://forgejo.homelab | set on first run (install wizard creates the admin) |
 | dockhand | http://localhost:3001 | http://dockhand.homelab | set on first run |
 | beszel | http://localhost:8090 | http://beszel.homelab | set on first run |
-| backrest | N/A | http://backrest.homelab | set on first run |
-| paperless-ngx | N/A | http://paperless.homelab | admin / changeMe |
+| backrest | http://localhost:9898 | http://backrest.homelab | set on first run |
+| paperless-ngx | http://localhost:8001 | http://paperless.homelab | admin / changeMe |
 | tubearchivist | http://localhost:8000 | http://tubearchivist.homelab | tubearchivist / changeMe |
-| pinchflat | N/A | http://pinchflat.homelab | N/A |
-| immich | N/A | http://immich.homelab | set on first run |
+| pinchflat | http://localhost:8945 | http://pinchflat.homelab | N/A |
+| immich | http://localhost:2283 | http://immich.homelab | set on first run |
 | jotty | http://localhost:1122 | http://jotty.homelab | N/A |
-| cta-map | N/A | http://cta-map.homelab | N/A |
+| cta-map | http://localhost:8087 | http://cta-map.homelab | N/A |
 | hermes | http://localhost:9119 | http://hermes.homelab | admin / changeMe |
 | archivebox | http://localhost:8010 | http://archivebox.homelab | admin / changeme |
 | navidrome | http://localhost:4533 | http://navidrome.homelab | set on first run (first user is admin) |
