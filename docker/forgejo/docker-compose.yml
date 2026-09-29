@@ -32,13 +32,16 @@ services:
       # FORGEJO__<section>__<KEY> variables are rendered into /data/gitea/conf/app.ini on
       # every start, so these stay authoritative even after the install wizard writes it.
       - FORGEJO__server__DOMAIN=forgejo.homelab
-      - FORGEJO__server__ROOT_URL=http://forgejo.homelab/
+      # Generated links/redirects use this. To test over localhost:3014:
+      #   FORGEJO_ROOT_URL=http://localhost:3014/ docker compose up -d forgejo
+      - FORGEJO__server__ROOT_URL=${FORGEJO_ROOT_URL:-http://forgejo.homelab/}
       - FORGEJO__server__SSH_DOMAIN=forgejo.homelab
       # The reachable host port, not the container's 22. Without it Forgejo advertises
       # clone URLs on 22, which nothing can reach.
       - FORGEJO__server__SSH_PORT=222
     ports:
-      - "222:22" # git-over-SSH; no web port -- 3000 is linkwarden's, Caddy proxies instead
+      - "222:22" # git-over-SSH
+      - "3014:3000" # web UI exposed on localhost for testing (3000 is linkwarden's); caddy also proxies internally
     volumes:
       # Repos, config and the SQLite database all live under here.
       - forgejo_data:/data

@@ -1154,11 +1154,11 @@ The whole Kafka stack in one view:
 
 ## Kafka UI
 
-localhost:8080
+localhost:8091 (AKHQ: localhost:8092)
 
 ## Grafana
 
-localhost:3000
+localhost:3013
 
 
 ### Upgrading the observability stack

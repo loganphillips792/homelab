@@ -32,8 +32,8 @@ services:
   prometheus:
     image: prom/prometheus:v3.14.0
     container_name: prometheus
-    # ports: # don't need ports because caddy proxies to the container ports for us
-    #   - "9090:9090"
+    ports:
+      - "9090:9090" # exposed on localhost for testing; caddy also proxies internally
     volumes:
       - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
       - ./prometheus/rules:/etc/prometheus/rules
@@ -55,8 +55,8 @@ services:
     image: grafana/loki:3.6.0
     container_name: loki
     user: "0"
-    # ports: # don't need ports because caddy proxies to the container ports for us
-    #   - "3100:3100"
+    ports:
+      - "3100:3100" # exposed on localhost for testing; caddy also proxies internally
     volumes:
       - ./loki/loki.yml:/etc/loki/local-config.yaml
       - loki_data:/loki
@@ -97,8 +97,8 @@ services:
   grafana:
     image: grafana/grafana:13.2.0
     container_name: grafana
-    # ports: # don't need ports because caddy proxies to the container ports for us
-    #   - "3000:3000"
+    ports:
+      - "3013:3000" # exposed on localhost for testing; caddy also proxies internally
     volumes:
       - ./grafana/provisioning:/etc/grafana/provisioning
       - ./grafana/grafana.ini:/etc/grafana/grafana.ini
