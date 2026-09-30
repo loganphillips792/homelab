@@ -15,8 +15,8 @@ services:
       - /etc/localtime:/etc/localtime:ro
       # Optionally, also mount docker socket if you want to use the docker containers widget
       # - /var/run/docker.sock:/var/run/docker.sock:ro
-    # ports: # don't need ports because caddy proxies to the container ports for us
-    #   - 8084:8080
+    ports:
+      - "8084:8080" # exposed on localhost for testing; caddy also proxies internally
     environment:
       - MY_SECRET_TOKEN=123456
     networks:

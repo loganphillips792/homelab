@@ -48,8 +48,8 @@ services:
       - DB_POSTGRESDB_PASSWORD=${POSTGRES_NON_ROOT_PASSWORD}
       - N8N_SECURE_COOKIE=False
       - N8N_ENFORCE_SETTINGS_FILE_PERMISSIONS=true
-    # ports: # don't need ports because caddy proxies to the container ports for us
-    #   - 5678:5678
+    ports:
+      - "5678:5678" # exposed on localhost for testing; caddy also proxies internally
     links:
       - postgres
     volumes:
@@ -76,8 +76,7 @@ services:
     ports:
       - "53:53/tcp"
       - "53:53/udp"
-      # - "80:80/tcp" commented out because caddy uses these
-      # - "443:443/tcp"
+      - "8088:80/tcp" # web UI exposed on localhost for testing; caddy also proxies internally; host 80/443 are caddy's
     environment:
       - TZ=${TZ}
       - FTLCONF_webserver_api_password=${PIHOLE_PASSWORD}
@@ -100,7 +99,8 @@ services:
     image: metabase/metabase:latest
     container_name: metabase
     hostname: metabase
-    # Do not publish host ports; Caddy will proxy internally
+    ports:
+      - "3010:3000" # exposed on localhost for testing; caddy also proxies internally
     environment:
       MB_DB_TYPE: postgres
       MB_DB_DBNAME: metabaseappdb
@@ -140,7 +140,8 @@ services:
       - main-network
   umami:
     image: ghcr.io/umami-software/umami:postgresql-latest
-    # Do not publish host port 3000 to avoid conflict with Grafana
+    ports:
+      - "3011:3000" # exposed on localhost for testing; caddy also proxies internally
     environment:
       DATABASE_URL: postgresql://umami:umami@umami-db:5432/umami
       DATABASE_TYPE: postgresql
@@ -216,8 +217,8 @@ services:
   uptime-kuma:
     image: louislam/uptime-kuma:2.0.2
     container_name: uptime-kuma
-    # ports: # don't need ports because caddy proxies to the container ports for us
-    #   - "3002:3001" # 3001 is used by homepage on host
+    ports:
+      - "3004:3001" # exposed on localhost for testing; caddy also proxies internally
     volumes:
       - uptime_kuma_data:/app/data
     restart: unless-stopped
@@ -244,8 +245,8 @@ services:
     image: redis/redisinsight:latest
     container_name: redisinsight
     restart: unless-stopped
-    # ports: # don't need ports because caddy proxies to the container ports for us
-    #   - "5540:5540"
+    ports:
+      - "5540:5540" # exposed on localhost for testing; caddy also proxies internally
     volumes:
       - redisinsight_data:/data
     environment:
@@ -299,8 +300,8 @@ services:
     depends_on:
       - paperless-ngx-db
       - paperless-ngx-broker
-    # ports:
-    #   - "8000:8000"  # Exposed via Caddy; internal only
+    ports:
+      - "8001:8000" # exposed on localhost for testing; caddy also proxies internally
     volumes:
       - paperless-ngx-data:/usr/src/paperless/data
       - paperless-ngx-media:/usr/src/paperless/media
@@ -310,6 +311,9 @@ services:
     environment:
       PAPERLESS_REDIS: redis://paperless-ngx-broker:6379
       PAPERLESS_DBHOST: paperless-ngx-db
+      # Paperless only accepts requests (and CSRF origins) for this host. To use localhost:8001:
+      #   PAPERLESS_URL=http://localhost:8001 docker compose up -d paperless-ngx-webserver
+      PAPERLESS_URL: ${PAPERLESS_URL:-http://paperless.homelab}
     networks:
       - main-network
 
@@ -352,6 +356,8 @@ services:
     image: ghcr.io/karakeep-app/karakeep:${KARAKEEP_VERSION:-release}
     container_name: karakeep-web
     restart: unless-stopped
+    ports:
+      - "3012:3000" # exposed on localhost for testing; caddy also proxies internally
     env_file:
       - ./karakeep/.env
     environment:
@@ -396,6 +402,8 @@ services:
     container_name: netdata
     pid: host
     restart: unless-stopped
+    ports:
+      - "19999:19999" # exposed on localhost for testing; caddy also proxies internally
     cap_add:
       - SYS_PTRACE
       - SYS_ADMIN
@@ -495,8 +503,8 @@ services:
     image: excalidraw/excalidraw:latest
     container_name: excalidraw
     restart: unless-stopped
-    # ports: # don't need ports because caddy proxies to the container ports for us
-    #   - "5000:80"
+    ports:
+      - "5080:80" # exposed on localhost for testing; caddy also proxies internally
     networks:
       - main-network
 
@@ -518,8 +526,8 @@ services:
   changedetection:
     image: dgtlmoon/changedetection.io:latest
     container_name: changedetection
-    # ports:
-    #   - "5000:5000"  # Exposed via Caddy; internal only
+    ports:
+      - "5050:5000" # exposed on localhost for testing; caddy also proxies internally
     volumes:
       - datastore-volume:/datastore
     restart: unless-stopped
@@ -529,8 +537,8 @@ services:
   ollama:
     image: docker.io/ollama/ollama:latest
     container_name: ollama
-    # ports:
-    #   - "7869:11434"  # Exposed via Caddy; internal only
+    ports:
+      - "7869:11434" # exposed on localhost for testing; caddy also proxies internally
     volumes:
       - ~/docker-volumes/ollama/ollama:/root/.ollama
     environment:
@@ -545,8 +553,8 @@ services:
   ollama-webui:
     image: ghcr.io/open-webui/open-webui:main
     container_name: ollama-webui
-    # ports:
-    #   - "8080:8080"  # Exposed via Caddy; internal only
+    ports:
+      - "8081:8080" # exposed on localhost for testing; caddy also proxies internally
     volumes:
       - ~/docker-volumes/ollama/ollama-webui:/app/backend/data
     depends_on:
@@ -589,8 +597,8 @@ services:
     # Optional - alternative address used for autodiscovery
     environment:
       - JELLYFIN_PublishedServerUrl=http://example.com
-    # ports: # don't need ports because caddy proxies to the container ports for us
-    #   - "8096:8096"
+    ports:
+      - "8096:8096" # exposed on localhost for testing; caddy also proxies internally
     networks:
       - main-network
 
@@ -601,8 +609,8 @@ services:
     restart: unless-stopped
     environment:
       - TZ=${TZ}
-    # ports: # don't need ports because caddy proxies to the container ports for us
-    #   - "8945:8945"
+    ports:
+      - "8945:8945" # exposed on localhost for testing; caddy also proxies internally
     volumes:
       - ~/docker-volumes/pinchflat/config:/config
       - ~/docker-volumes/pinchflat/downloads:/downloads
@@ -614,8 +622,8 @@ services:
     image: pawelmalak/flame
     container_name: flame
     restart: unless-stopped
-    # ports: # don't need ports because caddy proxies to the container ports for us
-    #   - "5005:5005"
+    ports:
+      - "5005:5005" # exposed on localhost for testing; caddy also proxies internally
     environment:
       - PASSWORD=${FLAME_PASSWORD}
     volumes:
@@ -644,8 +652,8 @@ services:
   live-auction:
     image: dockedupstream/live-auction:latest
     restart: unless-stopped
-    # ports: # don't need ports because caddy proxies to the container ports for us
-    #   - "80:80"
+    ports:
+      - "8086:80" # exposed on localhost for testing; caddy also proxies internally
     env_file:
       - path: live-auction/.env
         required: false
@@ -685,6 +693,8 @@ services:
     container_name: backrest
     hostname: backrest
     restart: unless-stopped
+    ports:
+      - "9898:9898" # exposed on localhost for testing; caddy also proxies internally
     environment:
       - BACKREST_DATA=/data
       - BACKREST_CONFIG=/config/config.json
@@ -706,6 +716,8 @@ services:
     image: dockedupstream/cta-map:latest
     container_name: cta-map
     restart: unless-stopped
+    ports:
+      - "8087:8080" # exposed on localhost for testing; caddy also proxies internally
     env_file:
       - path: ./cta-map/compose.env
         required: false

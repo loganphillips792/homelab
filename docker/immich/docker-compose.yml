@@ -9,8 +9,8 @@ services:
     depends_on:
       - immich-redis
       - database
-    # ports: # Exposed via Caddy on shared network; no host ports
-    #   - "2283:2283"
+    ports:
+      - "2283:2283" # exposed on localhost for testing; caddy also proxies internally
     volumes:
       - ${UPLOAD_LOCATION:-./library}:/data
       - /etc/localtime:/etc/localtime:ro
