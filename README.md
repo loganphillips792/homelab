@@ -106,78 +106,6 @@ journalctl -u pve-lxc@109
 
 pveversion --verbose
 
-# Terraform
-
-- On host machine (mac os)
-  - Install Teraform
-      - brew tap hashicorp/tap
-      - brew install hashicorp/tap/terraform
-
-
-> Datacenter > Permissions > API Tokens > Create new api token (Privlege Seperation should be unchecked)
-
-
-- cd homelab/proxmox/terraform
-- terraform init
-- terraform plan -out=tfplan
-- terraform apply tfplan
-
-- if problems with ssh
-    - eval "$(ssh-agent -s)"
-    - ssh-add ~/.ssh/id_rsa
-    - then run apply again
-
-
-
-terraform init -upgrade
-
-terraform destroy
-
-terraform state list
-
-# Ansible
-
-Activate virtual env python
-
-python3 -m pip install ansible
-
-Then you can run: ansible-playbook
-
-brew install sshpass - When using password-based authentication with Ansible over SSH, the sshpass utility must be installed on the machine that is running Ansible (the control node)
-
-
-
-ansible-playbook -i proxmox/ansible/grafana/inventory/hosts proxmox/ansible/grafana/linux_setup_grafana.yml -vvv
-
-ansible -i proxmox/ansible/grafana/inventory/hosts grafana -m service -a "name=grafana-server state=started"
-
-ansible -i proxmox/ansible/grafana/inventory/hosts grafana -m shell -a "journalctl -u grafana-server.service -n 50"
-
-
-
-ansible-playbook -i proxmox/ansible/homepage/inventory/hosts proxmox/ansible/homepage/linux_setup_homepage.yml -vvv
-
-
-ansible -i proxmox/ansible/homepage/inventory/hosts homepage -m shell -a 'cat /opt/homepage/package.json'
-
-
-ansible -i proxmox/ansible/homepage/inventory/hosts homepage -m shell -a 'systemctl status homepage.service'
-
-
-ansible -i proxmox/ansible/homepage/inventory/hosts homepage -m shell -a 'which pnpm'
-
-ansible-playbook linux_setup_pihole.yml -vvv 
-
-
-
-journalctl -u pihole-FTL -n 50
-
-pihole -d
-
-
-Run all playbooks: ansible-playbook -i proxmox/ansible/inventory.yml proxmox/ansible/run_all.yml
-
-
 # Using Terraform and Ansible to provision new VM
 
 Two steps, both run from the Mac:
@@ -394,47 +322,6 @@ ansible homelab -a "df -h /"
 
 Still manual: `docker login -u dockedupstream` on the VM, and `.env` files that aren't in git (e.g. `docker/live-auction/.env`). The deploy fails if the VM checkout isn't on `main` or if `git stash pop` conflicts. When that happens, SSH in and fix it by hand.
 
-# Pi hole
-
-for other devices in your homenetwork to use pihole DNS
-
-Configure your devices to use the Pi-hole as their DNS server using:
-IPv4: 10.0.0.47
-IPv6: Not Configured
-If you have not done so already, the above IP should be set to static.
-View the web interface at http://pi.hole/admin: 80 or http://10.0.0.47:80/admin
-Your Admin Webpage login password is XhvwK_95
-To allow your user to use all CLI functions without
-
-# Uptime Kuma
-
-ssh -i ~/.ssh/id_rsa_terraform root@10.0.0.50 "python3 --version"
-
-ansible-playbook -i inventory/hosts linux_setup_uptime_kuma.yml
-
-ssh -i ~/.ssh/id_rsa_terraform root@10.0.0.50 "systemctl status uptime-kuma && netstat -tulnp | grep node && ufw status"
-
- ssh -i ~/.ssh/id_rsa_terraform root@10.0.0.50 "pm2 list && ls -la /opt/uptime-kuma"
-
-ssh -i ~/.ssh/id_rsa_terraform root@10.0.0.50 "pm2 logs uptime-kuma --lines 50 && cd /opt/uptime-kuma && npm ls --depth=0"
-
-
-ssh -i ~/.ssh/id_rsa_terraform root@10.0.0.50 "netstat -tulnp | grep 3001"
-
-pm2 monit
-
-ssh -i ~/.ssh/id_rsa_terraform root@10.0.0.50 "pm2 logs uptime-kuma --lines 100"
-
-- Uptime kuma could only be configured through the web UI
-- Can import JSON file: Settings > Backup > Import
-
-# N8n
-
-ansible-playbook -i inventory/hosts linux_setup_n8n.yml
-
-
-ssh -i ~/.ssh/id_rsa_terraform root@10.0.0.51 "pm2 logs n8n --lines 100"
-
 # Apache kafka
 
 cd /Users/logan/repos/homelab/proxmox/ansible/kafka && ansible kafka -i inventory/hosts -m shell -a "systemctl status docker && docker --version && docker run hello-world && docker ps"
@@ -533,47 +420,6 @@ Notes:
 - Set `JELLYFIN_PublishedServerUrl` to the address clients actually use
   (e.g. `http://<vm-ip>:8096`); it is only an autodiscovery hint.
 - Check on it with `docker logs -f jellyfin` and `docker ps --filter name=jellyfin`.
-
-# Tailscale
-
-[Download | Tailscale](https://tailscale.com/download/linux)
-
-`ansible-playbook -i proxmox/ansible/inventory.yml proxmox/ansible/tailscale/linux_setup_tailscale.yml`
-
-`ssh root@10.0.0.54 -i ~/.ssh/id_rsa_terraform "sudo systemctl status tailscaled.service"`
-
-## Tailscale in Docker
-
-The Tailscale container runs as a subnet router, advertising the `10.0.0.0/24` LAN so devices on your tailnet can reach homelab services.
-
-### Setup
-
-1. **Define tags in ACL policy** — In the [Tailscale ACL editor](https://login.tailscale.com/admin/acls/file), add the `tag:container` tag:
-```json
-"tagOwners": {
-  "tag:container": ["autogroup:admin"]
-}
-```
-
-2. **Generate an auth key** — Go to [Tailscale Admin > Settings > Keys](https://login.tailscale.com/admin/settings/keys), click **Generate auth key**, check **Reusable**, and select the `tag:container` tag. Copy the key and set it as `TS_AUTHKEY` in the compose file or `.env`.
-
-3. **Approve subnet routes** — After the container starts, go to the [Machines page](https://login.tailscale.com/admin/machines), click the node, and approve the `10.0.0.0/24` subnet route.
-
-### Accessing `*.homelab` domains from your phone
-
-To resolve `*.homelab` DNS names (e.g., `homepage.homelab`) from a mobile device over Tailscale:
-
-1. Go to [Tailscale DNS settings](https://login.tailscale.com/admin/dns)
-2. Add a **custom nameserver** pointing to your Pi-hole's LAN IP (e.g., `10.0.0.54`)
-3. **Restrict** it to the `homelab` domain
-
-This tells Tailscale to route `*.homelab` DNS queries through Pi-hole, which resolves them to the correct LAN IP where Caddy handles the request.
-
-### Troubleshooting
-
-* **`invalid key: API key does not exist`** — The auth key is expired or deleted. Generate a new one.
-* **`context canceled` during login** — Usually caused by an invalid auth key or the container restart-looping. Check `docker logs` for the underlying error.
-* **Duplicate `TS_EXTRA_ARGS`** — Docker only keeps the last value of a duplicate environment variable. Merge all flags into a single `TS_EXTRA_ARGS` line.
 
 # Home Assistant
 
