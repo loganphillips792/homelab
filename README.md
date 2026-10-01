@@ -1,18 +1,12 @@
 # homelab
 
-https://www.tiktok.com/@sheluuvsxavier/video/7523501146523077943?_r=1&_t=ZP-8xqbBct8xMk
+# Install Proxmox
 
-https://github.com/azpha/homelab
+1. `brew install multipass`
+2. `multipass launch --name iso-builder --memory 4G --disk 20G debian:bookworm`
+3. `multipass mount "$(pwd)" iso-builder:/mnt/host`
 
-
-
-
-
-
-brew install multipass
-multipass launch --name iso-builder --memory 4G --disk 20G debian:bookworm
-multipass mount "$(pwd)" iso-builder:/mnt/host
-
+4.
 ```
 multipass exec iso-builder -- sudo -- bash -eux <<'EOF'
   # 1) Add the Proxmox repo (Debian Bookworm repo works)
@@ -35,25 +29,6 @@ multipass exec iso-builder -- sudo -- bash -eux <<'EOF'
   cp /var/tmp/auto-installer-*.iso /mnt/host/proxmox-autoinstall.iso
 EOF
 ```
-
-
-default username for lxc containers: root
-
-
-http://10.0.0.47:3000 - Grafana
-http://10.0.0.48:3000 - homepage
-http://10.0.0.49 - Pihole
-- Home assistant
-http://10.0.0.50:3001 - Uptime Kuma
-- Live Auction
-
-http://10.0.0.51:5678/setup - N8N
-http://10.0.0.52 - kafka
-http://10.0.0.53:8096/web - Jellyfin
-10.0.0.54 - Tailscale
-
-
-How to set up SSH if going from fresh install ?
 
 # Proxmox
 
@@ -431,7 +406,7 @@ Once the community script is done running, go to **VM > Summary > Copy IP** and 
 
 `terraform/homeassistant.tf` creates VM **160** running Home Assistant OS with 2 cores, 4 GiB RAM and a 32 GiB disk. It shares state with the docker VM, so set up `terraform/` first (see [Terraform](#terraform-1)).
 
-RAM: docker-vm (20 GiB) + Home Assistant (4 GiB) = 24 of the host's 28 GiB, which leaves ~4 GiB for Proxmox. Don't start anything else big alongside them (see [VM sizing](#vm-sizing-do-this-when-creating-the-vm)).
+RAM: docker-vm (20 GiB) + Home Assistant (4 GiB) = 24 of the host's 28 GiB, which leaves ~4 GiB for Proxmox. Don't start anything else big alongside them (see [VM sizing](#vm-sizing-do-this-when-creating-the-vm)). With the Kali and Pop!_OS VMs the total is 32 GiB, **more than the host has**, so never run all four at once (see [Running one VM at a time](#running-one-vm-at-a-time)).
 
 ```bash
 cd terraform
@@ -474,6 +449,72 @@ ssh root@192.168.1.98 lsusb
 4. HA should discover the device under **Settings > Devices & Services**.
 
 ## Backup
+
+# Kali Linux and Pop!_OS VMs
+
+`terraform/kali.tf` and `terraform/popos.tf` create two desktop VMs (4 cores, 4 GiB RAM, 64 GiB disk each). Terraform downloads the installer ISO and attaches it with an empty disk. You install the OS yourself from the Proxmox console.
+
+|VM|ID|MAC|ISO variable|
+|-|-|-|-|
+|Kali|170|`BC:24:11:4B:41:01`|`kali_iso_url`|
+|Pop!_OS|180|`BC:24:11:50:4F:01`|`popos_iso_url`|
+
+Like the other VMs they have `on_boot = true` and `started = true`. **A plain `terraform apply` therefore starts all four VMs (32 GiB on a 28 GiB host) and will freeze Proxmox.** Use the targeted commands below.
+
+## Installing
+
+1. Free up RAM and create one VM (see [Running one VM at a time](#running-one-vm-at-a-time)):
+
+```bash
+ssh root@192.168.1.98 "qm shutdown 150 && qm shutdown 160"
+cd terraform
+terraform apply -target=proxmox_virtual_environment_vm.kali   # or .popos
+```
+
+The first apply downloads the ISO to `/var/lib/vz/template/iso/` (Kali ~4.5 GB, Pop ~3.5 GB), so it takes a while.
+
+2. In Proxmox, open **pve > 170 (or 180) > Console** and run the graphical installer onto the 64 GiB disk.
+3. After the install reboots, the VM boots from disk. The ISO stays attached but is skipped because the disk comes first in the boot order.
+4. Reserve an IP for the VM's MAC on the router (`terraform output kali_mac_address` / `popos_mac_address`).
+5. Optional: so Proxmox can show the IP, run `sudo apt install qemu-guest-agent` in the guest, set `agent { enabled = true }` in the `.tf` file, then `terraform apply -target=...` again.
+
+To get a newer ISO, update `kali_iso_url` (from https://cdimage.kali.org/current/) or `popos_iso_url` (from `curl https://api.pop-os.org/builds/24.04/generic`). Changing an ISO URL replaces the download, and it may also recreate the VM, which **wipes the install**. Check `terraform plan` first.
+
+## Running one VM at a time
+
+|VM|ID|Terraform target|
+|-|-|-|
+|docker-vm|150|`proxmox_virtual_environment_vm.docker`|
+|Home Assistant|160|`proxmox_virtual_environment_vm.homeassistant`|
+|Kali|170|`proxmox_virtual_environment_vm.kali`|
+|Pop!_OS|180|`proxmox_virtual_environment_vm.popos`|
+
+Create or update just one VM. Terraform also pulls in that VM's dependencies, such as its image download:
+
+```bash
+cd terraform
+terraform plan  -target=proxmox_virtual_environment_vm.kali
+terraform apply -target=proxmox_virtual_environment_vm.kali
+```
+
+Start and stop VMs on the Proxmox host:
+
+```bash
+ssh root@192.168.1.98 qm list               # what's running
+ssh root@192.168.1.98 qm shutdown <id>      # clean ACPI shutdown
+ssh root@192.168.1.98 qm stop <id>          # hard stop if shutdown hangs
+ssh root@192.168.1.98 qm start <id>
+```
+
+Example: test only Kali, then go back to normal:
+
+```bash
+ssh root@192.168.1.98 "qm shutdown 150; qm shutdown 160; qm start 170"
+# ...test...
+ssh root@192.168.1.98 "qm shutdown 170; qm start 150; qm start 160"
+```
+
+Because every VM has `on_boot = true`, a Proxmox host reboot starts all four. After a reboot, shut down the ones you don't need, or turn off autostart for the desktop VMs with `qm set 170 --onboot 0` (Terraform will report this as drift).
 
 # Estimating Docker image download size
 

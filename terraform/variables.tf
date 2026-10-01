@@ -123,3 +123,65 @@ variable "ha_mac_address" {
   type    = string
   default = "BC:24:11:48:41:01"
 }
+
+# Kali and Pop!_OS desktop VMs. Changing an ISO URL re-downloads it.
+variable "kali_iso_url" {
+  type    = string
+  default = "https://cdimage.kali.org/kali-2026.2/kali-linux-2026.2-installer-amd64.iso"
+}
+
+variable "kali_vm_id" {
+  type    = number
+  default = 170
+}
+
+variable "kali_cores" {
+  type    = number
+  default = 4
+}
+
+variable "kali_memory_mb" {
+  type    = number
+  default = 4096
+}
+
+variable "kali_disk_gb" {
+  type    = number
+  default = 64
+}
+
+variable "kali_mac_address" {
+  type    = string
+  default = "BC:24:11:4B:41:01"
+}
+
+# Latest build: curl https://api.pop-os.org/builds/24.04/generic
+variable "popos_iso_url" {
+  type    = string
+  default = "https://iso.pop-os.org/24.04/amd64/generic/28/pop-os_24.04_amd64_generic_28.iso"
+}
+
+variable "popos_vm_id" {
+  type    = number
+  default = 180
+}
+
+variable "popos_cores" {
+  type    = number
+  default = 4
+}
+
+variable "popos_memory_mb" {
+  type    = number
+  default = 4096
+}
+
+variable "popos_disk_gb" {
+  type    = number
+  default = 64
+}
+
+variable "popos_mac_address" {
+  type    = string
+  default = "BC:24:11:50:4F:01"
+}
