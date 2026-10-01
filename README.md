@@ -30,27 +30,22 @@ multipass exec iso-builder -- sudo -- bash -eux <<'EOF'
 EOF
 ```
 
-# Proxmox
-
-
-
-    4. Install Ubunu image so that we can use it for LXE containers
-        1. Open console in Proxmox host
-        2. pveam update
-        3. pveam available
-        4. pveam update
-        5. pveam download local ubuntu-23.10-standard_23.10-1_amd64.tar.zst
-    5.  Setup Kali Linux
-    6.  Setup PopOS
-        1. Download Pop OS image
-        2. Datacenter > pve > local (pve) > ISO Images > Upload POP OS ISO file
-        3. Create VM
-            - General
-                - Node: PVE
-                - VM ID: 100
-            - OS
-                - Select PopOS ISO > Next
-    7. Set up Home Assistant
+  5. Install Ubunu image so that we can use it for LXE containers
+      1. Open console in Proxmox host
+      2. pveam update
+      3. pveam available
+      4. pveam update
+      5. pveam download local ubuntu-23.10-standard_23.10-1_amd64.tar.zst
+  6.  Setup Kali Linux
+  7.  Setup PopOS
+      1. Download Pop OS image
+      2. Datacenter > pve > local (pve) > ISO Images > Upload POP OS ISO file
+      3. Create VM
+          - General
+              - Node: PVE
+              - VM ID: 100
+          - OS
+              - Select PopOS ISO > Next
 
 ## VM sizing (do this when creating the VM)
 
