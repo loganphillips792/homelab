@@ -1,0 +1,50 @@
+# Garage — lightweight S3-compatible object storage from Deuxfleurs, built for
+# geo-distributed clusters. Run here as a single node (`--single-node` sets up the
+# cluster layout automatically) with `--default-bucket` creating a key and bucket
+# from garage/.env on startup.
+#
+# Garage ports: 3900 S3 API, 3901 RPC between nodes (internal only, nothing to talk
+# to on a single node), 3902 static website hosting, 3903 admin API + /metrics +
+# /health. Caddy proxies the S3 API at garage-s3.homelab.
+#
+# Garage has no built-in console, so garage-webui (a community UI that drives the
+# admin API) runs alongside it at garage.homelab. It reads admin_token from the same
+# garage.toml; its login comes from GARAGE_WEBUI_AUTH in garage/.env.
+
+services:
+  garage:
+    container_name: garage
+    image: dxflrs/garage:v2.3.0
+    restart: unless-stopped
+    command: ["/garage", "server", "--single-node", "--default-bucket"]
+    environment:
+      - GARAGE_DEFAULT_ACCESS_KEY=${GARAGE_DEFAULT_ACCESS_KEY}
+      - GARAGE_DEFAULT_SECRET_KEY=${GARAGE_DEFAULT_SECRET_KEY}
+      - GARAGE_DEFAULT_BUCKET=${GARAGE_DEFAULT_BUCKET}
+    ports:
+      - "3900:3900"   # S3 API (also proxied by Caddy at garage-s3.homelab)
+      - "3902:3902"   # static website hosting
+      - "3903:3903"   # admin API, /metrics, /health
+    volumes:
+      - ./garage.toml:/etc/garage.toml:ro
+      - ~/docker-volumes/garage/meta:/var/lib/garage/meta
+      - ~/docker-volumes/garage/data:/var/lib/garage/data
+    networks:
+      - main-network
+
+  garage-webui:
+    container_name: garage-webui
+    image: khairul169/garage-webui:latest
+    restart: unless-stopped
+    depends_on:
+      - garage
+    environment:
+      - API_BASE_URL=http://garage:3903
+      - S3_ENDPOINT_URL=http://garage:3900
+      - AUTH_USER_PASS=${GARAGE_WEBUI_AUTH}
+    ports:
+      - "3909:3909"   # web UI (also proxied by Caddy at garage.homelab)
+    volumes:
+      - ./garage.toml:/etc/garage.toml:ro
+    networks:
+      - main-network

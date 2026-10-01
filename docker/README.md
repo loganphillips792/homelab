@@ -3268,6 +3268,9 @@ These services bake their public URL into the frontend at startup — they only 
 | silo | http://localhost:9011 (API: 9010) | http://silo.homelab (API: silo-s3.homelab) | admin / changeMe123 |
 | vaults3 | http://localhost:9020/dashboard/ | http://vaults3.homelab/dashboard/ | admin / changeMe123 |
 | rustfs | http://localhost:9031/rustfs/console/ (API: 9030) | http://rustfs.homelab (API: rustfs-s3.homelab) | admin / changeMe123 |
+| garage | http://localhost:3900 (S3 API; admin API: 3903, web: 3902) | http://garage-s3.homelab | key/secret in docker/garage/.env |
+| garage-webui | http://localhost:3909 | http://garage.homelab | admin / changeMe123 |
+| seaweedfs | http://localhost:8888 (master: 9333, S3: 8333, WebDAV: 7333, volume: 8380) | http://seaweedfs.homelab (master: seaweedfs-master.homelab, S3: seaweedfs-s3.homelab, WebDAV: seaweedfs-webdav.homelab) | S3: admin / changeMe123 |
 | planka | http://localhost:1337 | http://planka.homelab | created via `npm run db:create-admin-user` |
 | penpot-mailcatch | http://localhost:1080 | N/A (no Caddy block) | N/A |
 | matomo | http://localhost:8093 | N/A (no Caddy block) | set on first run; DB pass changeMe |

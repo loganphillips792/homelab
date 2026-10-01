@@ -19,6 +19,8 @@ services:
       - MINIO_ROOT_PASSWORD=${SILO_ROOT_PASSWORD}
       # Console links and login redirects point here instead of the container address.
       - MINIO_BROWSER_REDIRECT_URL=http://silo.homelab
+      # Lets Prometheus scrape /minio/v2/metrics/cluster without a bearer token.
+      - MINIO_PROMETHEUS_AUTH_TYPE=public
     ports:
       - "9010:9000"   # S3 API (also proxied by Caddy at silo-s3.homelab)
       - "9011:9001"   # console (also proxied by Caddy at silo.homelab)

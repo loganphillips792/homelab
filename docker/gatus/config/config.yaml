@@ -273,6 +273,32 @@ endpoints:
     interval: 60s
     conditions:
       - "[STATUS] == 200"
+  # Garage's /health lives on the admin API (3903), which has no Caddy hostname, so
+  # this one goes to the container directly over main-network.
+  - name: Garage
+    group: data-and-ai
+    url: http://garage:3903/health
+    interval: 60s
+    conditions:
+      - "[STATUS] == 200"
+  - name: Garage WebUI
+    group: data-and-ai
+    url: http://garage.homelab
+    interval: 60s
+    conditions:
+      - "[STATUS] == 200"
+  - name: SeaweedFS
+    group: data-and-ai
+    url: http://seaweedfs-s3.homelab/healthz
+    interval: 60s
+    conditions:
+      - "[STATUS] == 200"
+  - name: SeaweedFS Master
+    group: data-and-ai
+    url: http://seaweedfs-master.homelab/cluster/status
+    interval: 60s
+    conditions:
+      - "[STATUS] == 200"
   - name: Kafka UI
     group: data-and-ai
     url: http://kafka-ui.homelab

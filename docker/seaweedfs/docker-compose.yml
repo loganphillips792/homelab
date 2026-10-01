@@ -1,0 +1,91 @@
+# SeaweedFS — distributed blob store with an S3 gateway, a filer (file-system view
+# + web file browser) and WebDAV. Adapted from upstream docker/seaweedfs-compose.yml:
+#
+#   - services renamed seaweedfs-* (upstream's master/volume/filer/s3 would be far
+#     too generic in the shared compose.all project); -ip/-master/-filer follow
+#   - upstream's bundled prometheus dropped — the observability stack's Prometheus
+#     scrapes the -metricsPort of each component over main-network instead
+#   - data persisted: upstream has no volumes. The image's entrypoint already passes
+#     -mdir=/data (master) and -dir=/data (volume), the filer keeps its leveldb store
+#     in its /data workdir, and the entrypoint chowns /data to the seaweed user
+#   - S3 gateway given admin credentials from seaweedfs/.env (upstream is anonymous)
+#
+# Web UIs: master cluster status on 9333 (seaweedfs-master.homelab), filer file
+# browser on 8888 (seaweedfs.homelab). S3 API on 8333 (seaweedfs-s3.homelab),
+# WebDAV on 7333 (seaweedfs-webdav.homelab). gRPC (port + 10000) and metrics ports
+# stay internal. The volume server's 8080 is published as 8380 since 8080 is taken.
+
+services:
+  seaweedfs-master:
+    container_name: seaweedfs-master
+    image: chrislusf/seaweedfs:latest
+    restart: unless-stopped
+    command: 'master -ip=seaweedfs-master -ip.bind=0.0.0.0 -metricsPort=9324'
+    ports:
+      - "9333:9333"   # master UI / API (also proxied by Caddy at seaweedfs-master.homelab)
+    volumes:
+      - ~/docker-volumes/seaweedfs/master:/data
+    networks:
+      - main-network
+
+  seaweedfs-volume:
+    container_name: seaweedfs-volume
+    image: chrislusf/seaweedfs:latest
+    restart: unless-stopped
+    command: 'volume -ip=seaweedfs-volume -master="seaweedfs-master:9333" -ip.bind=0.0.0.0 -port=8080 -metricsPort=9325'
+    depends_on:
+      - seaweedfs-master
+    ports:
+      - "8380:8080"   # volume server (host 8080 is taken)
+    volumes:
+      - ~/docker-volumes/seaweedfs/volume:/data
+    networks:
+      - main-network
+
+  seaweedfs-filer:
+    container_name: seaweedfs-filer
+    image: chrislusf/seaweedfs:latest
+    restart: unless-stopped
+    command: 'filer -ip=seaweedfs-filer -master="seaweedfs-master:9333" -ip.bind=0.0.0.0 -metricsPort=9326'
+    tty: true
+    stdin_open: true
+    depends_on:
+      - seaweedfs-master
+      - seaweedfs-volume
+    ports:
+      - "8888:8888"   # filer + file browser (also proxied by Caddy at seaweedfs.homelab)
+    volumes:
+      - ~/docker-volumes/seaweedfs/filer:/data
+    networks:
+      - main-network
+
+  seaweedfs-s3:
+    container_name: seaweedfs-s3
+    image: chrislusf/seaweedfs:latest
+    restart: unless-stopped
+    command: 's3 -filer="seaweedfs-filer:8888" -ip.bind=0.0.0.0 -metricsPort=9327'
+    environment:
+      - AWS_ACCESS_KEY_ID=${SEAWEEDFS_ACCESS_KEY}
+      - AWS_SECRET_ACCESS_KEY=${SEAWEEDFS_SECRET_KEY}
+    depends_on:
+      - seaweedfs-master
+      - seaweedfs-volume
+      - seaweedfs-filer
+    ports:
+      - "8333:8333"   # S3 API (also proxied by Caddy at seaweedfs-s3.homelab)
+    networks:
+      - main-network
+
+  seaweedfs-webdav:
+    container_name: seaweedfs-webdav
+    image: chrislusf/seaweedfs:latest
+    restart: unless-stopped
+    command: 'webdav -filer="seaweedfs-filer:8888"'
+    depends_on:
+      - seaweedfs-master
+      - seaweedfs-volume
+      - seaweedfs-filer
+    ports:
+      - "7333:7333"   # WebDAV (also proxied by Caddy at seaweedfs-webdav.homelab)
+    networks:
+      - main-network

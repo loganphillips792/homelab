@@ -20,7 +20,7 @@ include:
   - redis-pubsub/docker-compose.yml
   - forgejo/docker-compose.yml
   - dockhand/docker-compose.yml
-  # S3-compatible object storage, three implementations side by side to compare.
+  # S3-compatible object storage, five implementations side by side to compare.
   # Each reads only its own .env — none of them use the shared vars like ${TZ}.
   - path: silo/docker-compose.yml
     env_file: silo/.env
@@ -28,6 +28,10 @@ include:
     env_file: vaults3/.env
   - path: rustfs/docker-compose.yml
     env_file: rustfs/.env
+  - path: garage/docker-compose.yml
+    env_file: garage/.env
+  - path: seaweedfs/docker-compose.yml
+    env_file: seaweedfs/.env
   - path: penpot/docker-compose.yml
     env_file: penpot/.env
   - path: planka/docker-compose.yml

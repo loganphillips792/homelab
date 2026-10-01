@@ -201,7 +201,9 @@ http://matomo.homelab {
 
 # Object storage. Silo and RustFS serve the S3 API and the console on separate
 # container ports, so each gets two hostnames; VaultS3 serves both on one port
-# (dashboard under /dashboard/). S3 clients must use path-style addressing through
+# (dashboard under /dashboard/). Garage's console is the separate garage-webui
+# container; SeaweedFS gets one hostname per component (filer browser, master
+# UI, S3 gateway, WebDAV). S3 clients must use path-style addressing through
 # these names — virtual-host style would need a wildcard DNS record per server.
 http://silo.homelab {
   reverse_proxy silo:9001
@@ -223,6 +225,30 @@ http://rustfs.homelab {
 
 http://rustfs-s3.homelab {
   reverse_proxy rustfs:9000
+}
+
+http://garage.homelab {
+  reverse_proxy garage-webui:3909
+}
+
+http://garage-s3.homelab {
+  reverse_proxy garage:3900
+}
+
+http://seaweedfs.homelab {
+  reverse_proxy seaweedfs-filer:8888
+}
+
+http://seaweedfs-master.homelab {
+  reverse_proxy seaweedfs-master:9333
+}
+
+http://seaweedfs-s3.homelab {
+  reverse_proxy seaweedfs-s3:8333
+}
+
+http://seaweedfs-webdav.homelab {
+  reverse_proxy seaweedfs-webdav:7333
 }
 
 # Wildcard also matches the subdomain-routing hosts (admin./web./api./snap-*.)

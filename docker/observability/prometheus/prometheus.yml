@@ -36,6 +36,37 @@ scrape_configs:
       - targets: ['loki:3100']
     scrape_interval: 15s
 
+  # Object storage (docker/{silo,vaults3,garage,seaweedfs}). RustFS isn't listed: it
+  # has no Prometheus endpoint and only pushes OTLP (RUSTFS_OBS_ENDPOINT), which would
+  # need an OTLP receiver in alloy first.
+  # Silo is MinIO, so this needs MINIO_PROMETHEUS_AUTH_TYPE=public on the container.
+  - job_name: 'silo'
+    metrics_path: /minio/v2/metrics/cluster
+    static_configs:
+      - targets: ['silo:9000']
+    scrape_interval: 30s
+
+  - job_name: 'vaults3'
+    static_configs:
+      - targets: ['vaults3:9000']
+    scrape_interval: 30s
+
+  # Admin API; open because garage.toml sets no metrics_token.
+  - job_name: 'garage'
+    static_configs:
+      - targets: ['garage:3903']
+    scrape_interval: 30s
+
+  # Each component's -metricsPort (9324-9327, not published on the host).
+  - job_name: 'seaweedfs'
+    static_configs:
+      - targets:
+          - 'seaweedfs-master:9324'
+          - 'seaweedfs-volume:9325'
+          - 'seaweedfs-filer:9326'
+          - 'seaweedfs-s3:9327'
+    scrape_interval: 30s
+
   # Node exporter (if you add it later)
   - job_name: 'node-exporter'
     static_configs:

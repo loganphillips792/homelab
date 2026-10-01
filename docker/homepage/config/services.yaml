@@ -212,7 +212,7 @@
         href: http://komodo.homelab
         description: Docker fleet management
 
-- Storage:
+- Object Storage:
     - Silo:
         icon: minio
         href: http://silo.homelab
@@ -225,6 +225,14 @@
         icon: mdi-bucket-outline
         href: http://rustfs.homelab
         description: S3 object storage in Rust
+    - Garage:
+        icon: garage
+        href: http://garage.homelab
+        description: Lightweight geo-distributed S3 storage
+    - SeaweedFS:
+        icon: https://cdn.jsdelivr.net/gh/selfhst/icons/svg/seaweedfs.svg
+        href: http://seaweedfs.homelab
+        description: Distributed blob store with S3 gateway
 
 # AI
 - AI:

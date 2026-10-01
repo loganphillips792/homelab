@@ -1,0 +1,31 @@
+# Garage config, mounted into both garage and garage-webui (the web UI reads
+# admin_token from here to talk to the admin API).
+#
+# Single node, no replication. metadata_dir and data_dir are bind-mounted from
+# ~/docker-volumes/garage/ so the cluster survives container restarts.
+
+metadata_dir = "/var/lib/garage/meta"
+data_dir = "/var/lib/garage/data"
+db_engine = "lmdb"
+
+replication_factor = 1
+
+rpc_bind_addr = "[::]:3901"
+rpc_public_addr = "127.0.0.1:3901"
+rpc_secret = "dd8644230cfbb851ddb13211d5408dc5116d593648763eed3e1f61e32f994f2e"
+
+[s3_api]
+s3_region = "garage"
+api_bind_addr = "[::]:3900"
+root_domain = ".garage-s3.homelab"
+
+[s3_web]
+bind_addr = "[::]:3902"
+root_domain = ".garage-web.homelab"
+index = "index.html"
+
+[admin]
+api_bind_addr = "[::]:3903"
+admin_token = "Mn88Hv/aYRXp8ILdsX+CulzmrOS4r+qZkSGRV4rBPEA="
+# No metrics_token: /metrics on 3903 is left open so Prometheus can scrape it
+# over main-network without a bearer token.
