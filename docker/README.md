@@ -2402,7 +2402,7 @@ As a workaround, I had to turn off containerd-snapshotter and then restart docke
 
 Start it: `docker compose -f compose.all.yml up -d matomo` (Compose pulls in `matomo-db` and `matomo-cron` via `depends_on`).
 
-Open the web UI at http://localhost:8080 and walk through the setup wizard. Database details on the install screen:
+Open the web UI at http://localhost:8093 and walk through the setup wizard. Database details on the install screen:
 
 - Database server: `matomo-db`
 - Username: `matomo`
@@ -3270,7 +3270,7 @@ These services bake their public URL into the frontend at startup — they only 
 | rustfs | http://localhost:9031/rustfs/console/ (API: 9030) | http://rustfs.homelab (API: rustfs-s3.homelab) | admin / changeMe123 |
 | planka | http://localhost:1337 | http://planka.homelab | created via `npm run db:create-admin-user` |
 | penpot-mailcatch | http://localhost:1080 | N/A (no Caddy block) | N/A |
-| matomo | http://localhost:8080 | N/A (no Caddy block) | set on first run; DB pass changeMe |
+| matomo | http://localhost:8093 | N/A (no Caddy block) | set on first run; DB pass changeMe |
 | alloy | http://localhost:12345 | N/A (no Caddy block) | N/A |
 
 ## Backing / infrastructure services

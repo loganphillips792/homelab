@@ -1,0 +1,118 @@
+# Base setup for the Docker VM. Mirrors "Setting Up VM and Docker" in docker/README.md.
+# Safe to re-run: every task is idempotent and never touches an existing repo checkout.
+- name: Base setup for the Docker VM
+  hosts: homelab
+  become: true
+
+  # Skipped when passed with -e dockerhub_password=...
+  vars_prompt:
+    - name: dockerhub_password
+      prompt: Docker Hub password
+      private: true
+
+  tasks:
+    - name: Install base packages
+      ansible.builtin.apt:
+        name:
+          - ca-certificates
+          - curl
+          - git
+          - vim
+          - htop
+          - net-tools
+          - qemu-guest-agent
+          - python3-debian   # needed by deb822_repository
+          - python3-requests # needed by community.docker
+        update_cache: true
+
+    - name: Enable qemu-guest-agent
+      ansible.builtin.systemd_service:
+        name: qemu-guest-agent
+        state: started
+        enabled: true
+
+    - name: Add Docker apt repo
+      ansible.builtin.deb822_repository:
+        name: docker
+        types: deb
+        uris: https://download.docker.com/linux/ubuntu
+        suites: "{{ ansible_distribution_release }}"
+        components: stable
+        signed_by: https://download.docker.com/linux/ubuntu/gpg
+
+    - name: Install Docker
+      ansible.builtin.apt:
+        name:
+          - docker-ce
+          - docker-ce-cli
+          - containerd.io
+          - docker-buildx-plugin
+          - docker-compose-plugin
+        update_cache: true
+
+    - name: Add {{ ansible_user }} to the docker group
+      ansible.builtin.user:
+        name: "{{ ansible_user }}"
+        groups: docker
+        append: true
+
+    # Reconnect so the new group membership applies to the tasks below
+    - name: Reset SSH connection
+      ansible.builtin.meta: reset_connection
+
+    # Private images (dockedupstream/live-auction) can't be pulled anonymously.
+    # Logs in as {{ ansible_user }}, since deploy.yml runs compose as that user.
+    - name: Log in to Docker Hub
+      become: false
+      community.docker.docker_login:
+        username: "{{ dockerhub_username }}"
+        password: "{{ dockerhub_password }}"
+      no_log: true
+
+    - name: Create ~/docker-volumes
+      ansible.builtin.file:
+        path: "/home/{{ ansible_user }}/docker-volumes"
+        state: directory
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
+        mode: "0755"
+
+    - name: Clone the homelab repo (only if missing)
+      become: false
+      ansible.builtin.git:
+        repo: "{{ repo_url }}"
+        dest: "{{ repo_dir }}"
+        version: "{{ repo_branch }}"
+        update: false
+
+    # The repo ships 10.0.0.32 as a placeholder. Swap in the VM's real IP (the
+    # source address of its default route, same as `ip route get 1.1.1.1`).
+    # A no-op once replaced; deploy.yml's stash/pop keeps the local edit.
+    - name: Point Pi-hole local DNS records at this VM
+      become: false
+      ansible.builtin.replace:
+        path: "{{ repo_dir }}/docker/pihole/etc-dnsmasq.d/10-homelab.conf"
+        regexp: '10\.0\.0\.32'
+        replace: "{{ ansible_default_ipv4.address }}"
+
+    # Free port 53 so Pi-hole can bind it
+    - name: Disable the systemd-resolved stub listener
+      ansible.builtin.lineinfile:
+        path: /etc/systemd/resolved.conf
+        regexp: '^#?DNSStubListener='
+        line: DNSStubListener=no
+      notify: Restart systemd-resolved
+
+    - name: Point /etc/resolv.conf at the real upstream servers
+      ansible.builtin.file:
+        src: /run/systemd/resolve/resolv.conf
+        dest: /etc/resolv.conf
+        state: link
+        force: true
+      notify: Restart systemd-resolved
+
+  handlers:
+    - name: Restart systemd-resolved
+      ansible.builtin.systemd_service:
+        name: systemd-resolved
+        state: restarted

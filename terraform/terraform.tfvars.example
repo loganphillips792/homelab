@@ -1,0 +1,6 @@
+# Copy to terraform.tfvars (gitignored) and fill in.
+proxmox_api_token = "root@pam!terraform=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+
+# Override any default from variables.tf, e.g.:
+# vm_id   = 150
+# ip_cidr = "192.168.1.150/24"

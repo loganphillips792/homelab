@@ -1,0 +1,16 @@
+repo_url: https://github.com/loganphillips792/homelab.git
+repo_dir: /home/logan/homelab
+repo_branch: main
+
+# Docker Hub login for private images. setup.yml prompts for the password.
+dockerhub_username: dockedupstream
+
+# Relative to {{ repo_dir }}/docker
+compose_files:
+  - compose.all.yml
+
+# Empty = every service. Override with -e '{"deploy_services":["gatus","caddy"]}'
+deploy_services: []
+
+# auto = recreate only when the compose config changed; always = like --force-recreate
+recreate: auto

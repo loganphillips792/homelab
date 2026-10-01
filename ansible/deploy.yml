@@ -1,0 +1,69 @@
+# Pull the latest pushed commits on the VM and bring the stack up.
+# Mirrors "Deploying" in docker/README.md. Code comes from GitHub, never from the Mac,
+# so push before running this.
+- name: Deploy the Docker stack
+  hosts: homelab
+
+  tasks:
+    # backrest runs as root and rewrites its tracked config.json as root:root 0600,
+    # which `git stash` (running as {{ ansible_user }}) can't read.
+    - name: Give backrest config back to {{ ansible_user }}
+      become: true
+      ansible.builtin.file:
+        path: "{{ repo_dir }}/docker/backrest/config"
+        state: directory
+        recurse: true
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
+
+    # Same flow as the manual `git stash && git pull && git stash pop`. Tracked files
+    # that change at runtime (e.g. backrest sqlite) are stashed and restored.
+    - name: Pull latest changes
+      ansible.builtin.shell: |
+        set -euo pipefail
+        cd {{ repo_dir }}
+        branch=$(git rev-parse --abbrev-ref HEAD)
+        if [ "$branch" != "{{ repo_branch }}" ]; then
+          echo "VM checkout is on '$branch', expected '{{ repo_branch }}'" >&2
+          exit 1
+        fi
+        before=$(git rev-parse HEAD)
+        stashed=0
+        if ! git diff --quiet || ! git diff --cached --quiet; then
+          git stash push -m "ansible-deploy"
+          stashed=1
+        fi
+        git pull --ff-only origin {{ repo_branch }}
+        if [ "$stashed" = 1 ]; then
+          git stash pop
+        fi
+        after=$(git rev-parse HEAD)
+        if [ "$before" != "$after" ]; then
+          echo "HEAD_MOVED $before -> $after"
+          git log --oneline "$before..$after"
+        fi
+      args:
+        executable: /bin/bash
+      register: git_pull
+      changed_when: "'HEAD_MOVED' in git_pull.stdout"
+
+    - name: Show new commits
+      ansible.builtin.debug:
+        msg: "{{ git_pull.stdout_lines }}"
+      when: git_pull is changed
+
+    - name: Pull images and bring the stack up
+      community.docker.docker_compose_v2:
+        project_src: "{{ repo_dir }}/docker"
+        project_name: docker # keeps the existing docker_ volume prefix
+        files: "{{ compose_files }}"
+        services: "{{ deploy_services }}"
+        pull: always
+        recreate: "{{ recreate }}"
+        remove_orphans: true
+      register: compose
+
+    - name: Containers that changed
+      ansible.builtin.debug:
+        msg: "{{ compose.actions | default([]) | map(attribute='id') | unique | list }}"
+      when: compose is changed

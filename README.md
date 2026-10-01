@@ -178,6 +178,222 @@ pihole -d
 Run all playbooks: ansible-playbook -i proxmox/ansible/inventory.yml proxmox/ansible/run_all.yml
 
 
+# Using Terraform and Ansible to provision new VM
+
+Two steps, both run from the Mac:
+
+1. **Terraform** (`terraform/`) creates the Ubuntu VM on Proxmox from the Ubuntu cloud image. Cloud-init sets the `logan` user, your SSH key, a static IP and qemu-guest-agent.
+2. **Ansible** (`ansible/`) installs Docker and the base setup on that VM, clones this repo and brings the stack up.
+
+This is separate from the older `proxmox/terraform/` and `proxmox/ansible/` setups above.
+
+## Terraform
+
+`terraform/` creates one VM with the bpg/proxmox provider. The defaults are in `terraform/variables.tf`:
+
+|setting|default|
+|-|-|
+|VM ID / name|`150` / `docker-vm`|
+|IP|`192.168.1.150/24`, gateway `192.168.1.1`|
+|CPU / RAM / disk|8 cores (`host` type), 20 GiB, 256 GB on `local-lvm`|
+|OS|Ubuntu 24.04 cloud image|
+|User|`logan`, key from `~/.ssh/id_ed25519.pub`, passwordless sudo|
+
+The new VM takes over the current VM's IP (`192.168.1.150`), so everything that points at `.150` keeps working. The VM ID differs (`150` vs the current `100`), so both can exist, but **don't run both at once**: they'd fight over the IP, and two VMs with 20 GiB each exceed the host's 28 GiB and freeze Proxmox (see [VM sizing](#vm-sizing-do-this-when-creating-the-vm)). Stop VM 100 before `terraform apply`.
+
+### One-time setup
+
+1. Create an API token in Proxmox: Datacenter > Permissions > API Tokens > Add, user `root@pam`, token ID `terraform`. Copy the secret; it's only shown once.
+   - If **Privilege Separation** is checked, the token has no permissions of its own, and `terraform apply` fails with `403 Permission check failed`. Keep separation and grant the token a role. In the UI, go to Datacenter > Permissions > Add > **API Token Permission**, then set:
+     - Path: `/`
+     - API Token: `root@pam!terraform`
+     - Role: `Administrator`
+     - Propagate: checked
+
+     Or run this in the Proxmox host shell:
+
+     ```bash
+     pveum acl modify / --tokens 'root@pam!terraform' --roles Administrator
+     ```
+2. Put it in `terraform/terraform.tfvars` (gitignored):
+
+```bash
+cd terraform && cp terraform.tfvars.example terraform.tfvars
+```
+
+   Check the token from inside `terraform/`. You should get a JSON list of files; a 401 means a wrong token or secret, and a 403 means missing permissions (see step 1):
+
+```bash
+curl -sk -H "Authorization: PVEAPIToken=$(sed -nE 's/.*proxmox_api_token *= *"([^"]*)".*/\1/p' terraform.tfvars)" https://192.168.1.98:8006/api2/json/nodes/pve/storage/local/content
+```
+
+3. Enable snippets on the `local` storage. The cloud-init file is uploaded there. First check the current content types on the Proxmox host:
+
+```bash
+ssh root@192.168.1.98 "grep -A4 '^dir: local' /etc/pve/storage.cfg"
+```
+
+Then set the list it printed plus `snippets`. For example, if it showed `iso,vztmpl,backup`:
+
+```bash
+ssh root@192.168.1.98 "pvesm set local --content iso,vztmpl,backup,snippets"
+```
+
+4. The snippet is uploaded over SSH as `root`, using your ssh-agent. Make sure your key is loaded and can log in to the host:
+
+```bash
+ssh-add ~/.ssh/id_ed25519 && ssh root@192.168.1.98 true
+```
+
+   If that fails with `Permission denied (publickey,password)`, the key is loaded in your ssh-agent but root's `authorized_keys` on the Proxmox host doesn't have it. Without that login, Terraform can't upload the cloud-init snippet. Add the key once (it asks for the root password), then re-run the check above:
+
+```bash
+ssh-copy-id root@192.168.1.98
+```
+
+5. Initialise the provider:
+
+```bash
+cd terraform && terraform init
+```
+
+### Commands
+
+Run these from inside `terraform/`.
+
+Preview:
+```bash
+terraform plan
+```
+
+Create the VM:
+```bash
+terraform apply
+```
+
+Use a different ID or IP without editing files:
+```bash
+terraform apply -var vm_id=151 -var ip_cidr=192.168.1.152/24
+```
+
+Show the IP, the SSH command and the Ansible command:
+```bash
+terraform output
+```
+
+Delete the VM:
+```bash
+terraform destroy
+```
+
+The first boot takes a minute or two while cloud-init installs qemu-guest-agent. `terraform apply` waits for it.
+
+### Then run Ansible against the new VM
+
+`ansible/inventory.ini` already points at `192.168.1.150`. The new VM has a new SSH host key, so clear the old VM's entry first:
+
+```bash
+ssh-keygen -R 192.168.1.150
+cd ansible && ansible-playbook site.yml
+```
+
+The VM has passwordless sudo, so `-K` isn't needed.
+
+The first run pulls ~80 images (~70 GB) and "Pull images and bring the stack up" prints nothing until it finishes, which can take 20+ minutes. To watch progress while it runs, open a second terminal and run this on the VM:
+
+```bash
+watch -n5 'docker images | wc -l; docker system df'
+```
+
+### Check it worked
+
+Once Ansible finishes, open Homepage at http://192.168.1.150:3002. If it loads, the VM, Docker, and the stack are up.
+
+## Ansible
+
+`ansible/` sets up and deploys the Docker VM (`logan@192.168.1.150`). Ansible runs from the Mac and SSHes into the VM. Nothing extra is installed on the VM.
+
+- `setup.yml` does the base setup: packages, the Docker apt repo and engine, the docker group, `~/docker-volumes`, a clone of this repo (only if it's missing) and freeing port 53 for Pi-hole. It makes no netplan or firewall changes.
+- `deploy.yml` runs `git pull` on the VM (with the same stash/pull/pop flow as by hand), then `docker compose -f compose.all.yml up -d --pull always --remove-orphans`.
+- `site.yml` runs both.
+
+The VM pulls from GitHub, so **push before you deploy**. Local uncommitted changes on the Mac are not deployed.
+
+### One-time setup (on the Mac)
+
+```bash
+brew install ansible
+```
+
+```bash
+cd ansible && ansible-galaxy collection install -r requirements.yml
+```
+
+```bash
+ssh-copy-id logan@192.168.1.150
+```
+
+```bash
+cd ansible && ansible homelab -m ping
+```
+
+### Commands
+
+Run these from inside `ansible/`. `ansible.cfg` points at `inventory.ini`, so `-i` isn't needed. `-K` prompts for the VM's sudo password.
+
+Deploy (pull + compose up):
+```bash
+ansible-playbook deploy.yml
+```
+
+Deploy only some services:
+```bash
+ansible-playbook deploy.yml -e '{"deploy_services":["gatus","caddy"]}'
+```
+
+Force recreate all containers (after editing a bind-mounted config such as the Caddyfile):
+```bash
+ansible-playbook deploy.yml -e recreate=always
+```
+
+Base setup only (a fresh VM, or re-checking an existing one):
+```bash
+ansible-playbook setup.yml -K
+```
+
+Full rebuild (setup + deploy):
+```bash
+ansible-playbook site.yml -K
+```
+
+Deploy a branch other than `main` (e.g. to test a PR before merging). The VM checkout must be on that branch first, or the deploy refuses to run:
+```bash
+ssh logan@192.168.1.150 'cd ~/homelab && git fetch origin && git checkout ansible'
+ansible-playbook site.yml -e repo_branch=ansible
+```
+Switch the VM back with `git checkout main` after merging.
+
+Dry run (shows what would change):
+```bash
+ansible-playbook setup.yml -K --check --diff
+```
+
+Syntax check:
+```bash
+ansible-playbook site.yml --syntax-check
+```
+
+Ad-hoc commands on the VM:
+```bash
+ansible homelab -a "docker ps"
+```
+
+```bash
+ansible homelab -a "df -h /"
+```
+
+Still manual: `docker login -u dockedupstream` on the VM, and `.env` files that aren't in git (e.g. `docker/live-auction/.env`). The deploy fails if the VM checkout isn't on `main` or if `git stash pop` conflicts. When that happens, SSH in and fix it by hand.
+
 # Pi hole
 
 for other devices in your homenetwork to use pihole DNS
