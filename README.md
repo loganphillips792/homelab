@@ -581,6 +581,52 @@ Reach the VM's console through Proxmox: **Datacenter > pve > console**
 
 Once the community script is done running, go to **VM > Summary > Copy IP** and open that address in your browser to finish the installation.
 
+## Creating the VM with Terraform
+
+`terraform/homeassistant.tf` creates VM **160** running Home Assistant OS with 2 cores, 4 GiB RAM and a 32 GiB disk. It shares state with the docker VM, so set up `terraform/` first (see [Terraform](#terraform-1)).
+
+RAM: docker-vm (20 GiB) + Home Assistant (4 GiB) = 24 of the host's 28 GiB, which leaves ~4 GiB for Proxmox. Don't start anything else big alongside them (see [VM sizing](#vm-sizing-do-this-when-creating-the-vm)).
+
+```bash
+cd terraform
+terraform init
+terraform plan   # should only add terraform_data.haos_image and proxmox_virtual_environment_vm.homeassistant
+terraform apply
+```
+
+The first apply SSHes into the Proxmox host, then downloads and unpacks the HAOS image into `/var/lib/vz/template/iso/`.
+
+HAOS ignores cloud-init, so it gets its IP from DHCP. The VM has a fixed MAC (`terraform output ha_mac_address`, default `BC:24:11:48:41:01`). Reserve an IP for that MAC on the router, then reboot the VM so it picks up the reserved address. Then open `http://<ip>:8123` to start onboarding.
+
+To find the VM's current IP, ask the guest agent. The `192.168.1.x` address is the one you want; the rest are loopback, HA's internal Docker networks and IPv6. On first boot the agent needs a minute or two before it responds.
+
+```bash
+ssh root@192.168.1.98 "qm guest cmd 160 network-get-interfaces" | grep '"ip-address"'
+```
+
+Updates: update HA from its own UI (**Settings > System > Updates**). `haos_version` is only for fresh installs. Changing it re-downloads the image and **recreates the VM**, which wipes HA, so don't bump it on a running install.
+
+## Adding a USB dongle (Zigbee / Z-Wave / Bluetooth)
+
+1. Plug the dongle into the Proxmox host and find its `vendor:product` ID:
+
+```bash
+ssh root@192.168.1.98 lsusb
+# Bus 001 Device 004: ID 10c4:ea60 Silicon Labs CP210x UART Bridge
+```
+
+2. Add a `usb` block to `proxmox_virtual_environment_vm.homeassistant` in `terraform/homeassistant.tf`, using your ID:
+
+```hcl
+  usb {
+    host = "10c4:ea60"
+    usb3 = false
+  }
+```
+
+3. Run `terraform apply`, then restart the VM (`ssh root@192.168.1.98 "qm reboot 160"`). Without Terraform, the one-off equivalent is `qm set 160 -usb0 host=10c4:ea60`, but Terraform will flag that as drift unless the block is added.
+4. HA should discover the device under **Settings > Devices & Services**.
+
 ## Backup
 
 # Estimating Docker image download size

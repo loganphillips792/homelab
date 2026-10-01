@@ -88,3 +88,38 @@ variable "ssh_public_key_file" {
   type    = string
   default = "~/.ssh/id_ed25519.pub"
 }
+
+# --- Home Assistant VM (homeassistant.tf) ---
+
+# Only used for fresh installs; HA updates itself from its UI afterwards.
+# Changing this re-downloads the image and recreates the VM.
+variable "haos_version" {
+  type    = string
+  default = "18.3"
+}
+
+variable "ha_vm_id" {
+  type    = number
+  default = 160
+}
+
+variable "ha_cores" {
+  type    = number
+  default = 2
+}
+
+variable "ha_memory_mb" {
+  type    = number
+  default = 4096
+}
+
+variable "ha_disk_gb" {
+  type    = number
+  default = 32
+}
+
+# Reserve an IP for this MAC on the router
+variable "ha_mac_address" {
+  type    = string
+  default = "BC:24:11:48:41:01"
+}
