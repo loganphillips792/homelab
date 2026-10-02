@@ -1,51 +1,13 @@
 # homelab
 
+# Commands
+
+- `docker compose -f docker/compose.all.yml up -d kafka kafka-ui akhq kafka-consumer kafka-producer \
+  cadvisor prometheus loki alloy grafana dockhand homarr`
+  - `localhost:7575`
+
+
 # Install Proxmox
-
-1. `brew install multipass`
-2. `multipass launch --name iso-builder --memory 4G --disk 20G debian:bookworm`
-3. `multipass mount "$(pwd)" iso-builder:/mnt/host`
-
-4.
-```
-multipass exec iso-builder -- sudo -- bash -eux <<'EOF'
-  # 1) Add the Proxmox repo (Debian Bookworm repo works)
-  echo "deb http://download.proxmox.com/debian/pve bookworm pve-no-subscription" \
-       > /etc/apt/sources.list.d/pve.list
-  wget -qO - http://download.proxmox.com/debian/proxmox-release-bookworm.gpg \
-       | apt-key add -
-  apt update
-
-  # 2) Install the assistant and xorriso
-  apt install -y proxmox-auto-install-assistant xorriso
-
-  # 3) Build a new ISO with your answer.toml embedded
-  proxmox-auto-install-assistant prepare-iso \
-    /mnt/host/pve-enterprise-8.4.iso \
-    --fetch-from iso \
-    --answer-file /Users/logan/repos/homelab/unattended-install.toml
-
-  # 4) Copy the generated ISO back to your Mac’s shared folder
-  cp /var/tmp/auto-installer-*.iso /mnt/host/proxmox-autoinstall.iso
-EOF
-```
-
-  5. Install Ubunu image so that we can use it for LXE containers
-      1. Open console in Proxmox host
-      2. pveam update
-      3. pveam available
-      4. pveam update
-      5. pveam download local ubuntu-23.10-standard_23.10-1_amd64.tar.zst
-  6.  Setup Kali Linux
-  7.  Setup PopOS
-      1. Download Pop OS image
-      2. Datacenter > pve > local (pve) > ISO Images > Upload POP OS ISO file
-      3. Create VM
-          - General
-              - Node: PVE
-              - VM ID: 100
-          - OS
-              - Select PopOS ISO > Next
 
 ## VM sizing (do this when creating the VM)
 

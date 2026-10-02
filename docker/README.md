@@ -1284,6 +1284,30 @@ http://homepage.homela
 
 After making any changes: `docker compose up -d --build homepage`
 
+## Homarr
+
+Dashboard at http://homarr.homelab (or http://192.168.1.150:7575), defined in
+`homarr/docker-compose.yml`. Unlike Homepage/Glance/Dynacat there is no config in the repo:
+boards, apps and integrations live in Homarr's own database in `~/docker-volumes/homarr`
+(covered by Backrest), and are edited in the web UI. `SECRET_ENCRYPTION_KEY` comes from
+`HOMARR_SECRET_ENCRYPTION_KEY` in `.env` — changing it makes stored integration secrets unreadable.
+
+The container mounts `/var/run/docker.sock`, so **Management -> Tools -> Docker** lists every
+container automatically. Putting one on a board is manual but quick: select the container(s),
+**Add to board**, check the URL/icon, save.
+
+If you've added many apps and would rather start over, stop the container, delete
+`~/docker-volumes/homarr` and run the onboarding again. That wipes your user and boards too:
+
+```bash
+docker compose -f docker/compose.all.yml stop homarr
+rm -rf ~/docker-volumes/homarr
+docker compose -f docker/compose.all.yml up -d homarr
+```
+
+This time enter only `host.docker.internal` in the base URL field, with no `http://` and no port.
+On the server, use `192.168.1.150` instead.
+
 ## Dynacat
 
 Second widget dashboard at http://dynacat.homelab, running alongside Glance rather than replacing
