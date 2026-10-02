@@ -31,6 +31,56 @@
           - qemu-guest-agent
         update_cache: true
 
+    # Go from go.dev rather than apt, which lags behind. The first stable entry in
+    # the download feed is the latest release; re-running upgrades when it changes.
+    - name: Look up latest Go release
+      ansible.builtin.uri:
+        url: https://go.dev/dl/?mode=json
+        return_content: true
+      register: go_releases
+
+    - name: Read installed Go version
+      ansible.builtin.command: head -n1 /usr/local/go/VERSION
+      register: go_installed
+      changed_when: false
+      failed_when: false
+
+    - name: Install Go
+      when: go_installed.stdout != go_latest.version
+      vars:
+        go_arch: "{{ {'x86_64': 'amd64', 'aarch64': 'arm64'}[ansible_architecture] }}"
+        go_latest: "{{ go_releases.json[0] }}"
+        go_file: "{{ go_latest.files | selectattr('os', 'eq', 'linux') | selectattr('arch', 'eq', go_arch) | selectattr('kind', 'eq', 'archive') | first }}"
+      block:
+        - name: Download Go archive
+          ansible.builtin.get_url:
+            url: "https://go.dev/dl/{{ go_file.filename }}"
+            dest: "/tmp/{{ go_file.filename }}"
+            checksum: "sha256:{{ go_file.sha256 }}"
+            mode: "0644"
+
+        # Go's docs say to remove the old tree first; extracting over it breaks.
+        - name: Remove old Go install
+          ansible.builtin.file:
+            path: /usr/local/go
+            state: absent
+
+        - name: Extract Go
+          ansible.builtin.unarchive:
+            src: "/tmp/{{ go_file.filename }}"
+            dest: /usr/local
+            remote_src: true
+
+    # Symlinks instead of a PATH edit, so go works in bash and zsh alike.
+    - name: Link go binaries into /usr/local/bin
+      ansible.builtin.file:
+        src: "/usr/local/go/bin/{{ item }}"
+        dest: "/usr/local/bin/{{ item }}"
+        state: link
+      loop:
+        - go
+        - gofmt
+
     # Lets Proxmox show the VM's IP; after this, set agent { enabled = true } in
     # terraform/kali.tf.
     - name: Enable qemu-guest-agent
