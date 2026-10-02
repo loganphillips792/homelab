@@ -1,7 +1,7 @@
 # A built image, like ../consumer — `git pull && docker compose up -d` will NOT
 # pick up changes to main.go; you need --build. See ../../README.md under
 # "## Kafka Testing Stack".
-FROM golang:1.26-alpine AS build
+FROM golang:1.27.1-alpine AS build
 
 WORKDIR /src
 

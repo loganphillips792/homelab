@@ -1,6 +1,6 @@
 module github.com/loganphillips792/homelab/kafka-producer
 
-go 1.26.0
+go 1.27.1
 
 require (
 	github.com/labstack/echo/v4 v4.16.0

@@ -1124,6 +1124,30 @@ startup order does not matter. It is also a built image. After changing `main.go
 docker compose -f docker/compose.all.yml up -d --build kafka-producer
 ```
 
+#### Running it with Go instead of Docker
+
+Needs Go 1.27.1+ (older toolchains will auto-download it via `GOTOOLCHAIN=auto`). The broker must
+be running. Run this on the server: the host listener advertises `localhost:9092`, so it is only
+reachable from the machine running the broker. Stop the container first, or pick a different
+`PORT`, so the two do not both serve requests.
+
+```bash
+cd docker/kafka/producer
+KAFKA_BOOTSTRAP=localhost:9092 PORT=8095 go run .
+
+# or build a binary and run that
+go build -o producer .
+KAFKA_BOOTSTRAP=localhost:9092 PORT=8095 ./producer
+```
+
+`KAFKA_BOOTSTRAP` is required here; its default, `kafka:29092`, only resolves inside the Docker
+network. `KAFKA_TOPIC` (default `scan.commands`) and `KAFKA_TOPIC_PARTITIONS` (default `3`) are
+optional. Then send a message:
+
+```bash
+curl -s -X POST http://localhost:8095/produce
+```
+
 ### Loki queries
 
 Run these in Grafana -> Explore against the Loki datasource. They need the observability stack
