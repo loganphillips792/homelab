@@ -1,81 +1,13 @@
 # homelab
 
-https://www.tiktok.com/@sheluuvsxavier/video/7523501146523077943?_r=1&_t=ZP-8xqbBct8xMk
+# Commands
 
-https://github.com/azpha/homelab
-
-
-
-
+- `docker compose -f docker/compose.all.yml up -d kafka kafka-ui akhq kafka-consumer kafka-producer \
+  cadvisor prometheus loki alloy grafana dockhand homarr`
+  - `localhost:7575`
 
 
-brew install multipass
-multipass launch --name iso-builder --memory 4G --disk 20G debian:bookworm
-multipass mount "$(pwd)" iso-builder:/mnt/host
-
-```
-multipass exec iso-builder -- sudo -- bash -eux <<'EOF'
-  # 1) Add the Proxmox repo (Debian Bookworm repo works)
-  echo "deb http://download.proxmox.com/debian/pve bookworm pve-no-subscription" \
-       > /etc/apt/sources.list.d/pve.list
-  wget -qO - http://download.proxmox.com/debian/proxmox-release-bookworm.gpg \
-       | apt-key add -
-  apt update
-
-  # 2) Install the assistant and xorriso
-  apt install -y proxmox-auto-install-assistant xorriso
-
-  # 3) Build a new ISO with your answer.toml embedded
-  proxmox-auto-install-assistant prepare-iso \
-    /mnt/host/pve-enterprise-8.4.iso \
-    --fetch-from iso \
-    --answer-file /Users/logan/repos/homelab/unattended-install.toml
-
-  # 4) Copy the generated ISO back to your Mac’s shared folder
-  cp /var/tmp/auto-installer-*.iso /mnt/host/proxmox-autoinstall.iso
-EOF
-```
-
-
-default username for lxc containers: root
-
-
-http://10.0.0.47:3000 - Grafana
-http://10.0.0.48:3000 - homepage
-http://10.0.0.49 - Pihole
-- Home assistant
-http://10.0.0.50:3001 - Uptime Kuma
-- Live Auction
-
-http://10.0.0.51:5678/setup - N8N
-http://10.0.0.52 - kafka
-http://10.0.0.53:8096/web - Jellyfin
-10.0.0.54 - Tailscale
-
-
-How to set up SSH if going from fresh install ?
-
-# Proxmox
-
-
-
-    4. Install Ubunu image so that we can use it for LXE containers
-        1. Open console in Proxmox host
-        2. pveam update
-        3. pveam available
-        4. pveam update
-        5. pveam download local ubuntu-23.10-standard_23.10-1_amd64.tar.zst
-    5.  Setup Kali Linux
-    6.  Setup PopOS
-        1. Download Pop OS image
-        2. Datacenter > pve > local (pve) > ISO Images > Upload POP OS ISO file
-        3. Create VM
-            - General
-                - Node: PVE
-                - VM ID: 100
-            - OS
-                - Select PopOS ISO > Next
-    7. Set up Home Assistant
+# Install Proxmox
 
 ## VM sizing (do this when creating the VM)
 
@@ -322,43 +254,26 @@ ansible homelab -a "df -h /"
 
 Still manual: `docker login -u dockedupstream` on the VM, and `.env` files that aren't in git (e.g. `docker/live-auction/.env`). The deploy fails if the VM checkout isn't on `main` or if `git stash pop` conflicts. When that happens, SSH in and fix it by hand.
 
-# Apache kafka
+### Kali VM
 
-cd /Users/logan/repos/homelab/proxmox/ansible/kafka && ansible kafka -i inventory/hosts -m shell -a "systemctl status docker && docker --version && docker run hello-world && docker ps"
+`ansible/kali.yml` sets up the Kali VM (`terraform/kali.tf`, `logan@192.168.1.142`) after the
+manual ISO install. It installs Neovim, tmux, the tools the Neovim config needs and
+qemu-guest-agent. It also clones [dotfiles](https://github.com/loganphillips792/dotfiles) to
+`~/dotfiles` and links `nvim`, `.vimrc` and `.tmux.conf`.
 
+Kali leaves sshd off, so do this once on the VM first, then copy your key from the Mac:
+```bash
+sudo systemctl enable --now ssh   # on Kali
+ssh-copy-id logan@192.168.1.142   # on the Mac
+```
 
-ssh root@10.0.0.52 -i ~/.ssh/id_rsa_terraform "docker ps --filter 'name=kafka' --format 'table {{.ID}}\t{{.Names}}\t{{.Status}}\t{{.Ports}}'"
+```bash
+cd ansible && ansible-playbook kali.yml -K
+```
 
-
-ssh root@10.0.0.52 -i ~/.ssh/id_rsa_terraform "docker logs kafka"
-
-clean up the existing container: ansible kafka -i inventory/hosts -m shell -a "docker rm -f kafka"
-
-ssh root@10.0.0.52 -i ~/.ssh/id_rsa_terraform "docker ps -a --filter name=kafka && docker logs kafka"
-
-
-Create topic ssh root@10.0.0.52 -i ~/.ssh/id_rsa_terraform "docker exec kafka /opt/kafka/bin/kafka-topics.sh --create --topic quickstart-events --bootstrap-server localhost:9092"
-
-
-Show topic - ssh root@10.0.0.52 -i ~/.ssh/id_rsa_terraform "docker exec kafka /opt/kafka/bin/kafka-topics.sh --describe --topic quickstart-events --bootstrap-server localhost:9092"
-
-ssh root@10.0.0.52 -i ~/.ssh/id_rsa_terraform "docker exec kafka /opt/kafka/bin/kafka-topics.sh --list --bootstrap-server localhost:9092"
-
-Write to stream - ssh -t root@10.0.0.52 -i ~/.ssh/id_rsa_terraform "docker exec -it kafka /opt/kafka/bin/kafka-console-producer.sh --topic quickstart-events --bootstrap-server localhost:9092"
-
-Read from stream - ssh -t root@10.0.0.52 -i ~/.ssh/id_rsa_terraform "docker exec -it kafka /opt/kafka/bin/kafka-console-consumer.sh --topic quickstart-events --from-beginning --bootstrap-server localhost:9092"
+`-K` asks for your sudo password on Kali.
 
 # Jellyfin
-
-ansible-playbook -i inventory/hosts linux_setup_jellyfin.yml
-
-ssh root@10.0.0.53 -i ~/.ssh/id_rsa_terraform "docker ps -a --filter name=jellyfin && docker logs jellyfin"
-
-ssh root@10.0.0.53 -i ~/.ssh/id_rsa_terraform "mkdir -p /var/lib/jellyfin && chown -R 1000:1000 /var/lib/jellyfin && docker restart jellyfin"
-
-ssh root@10.0.0.53 -i ~/.ssh/id_rsa_terraform "ss -tulnp | grep 8096 || echo 'No process listening on 8096' && which ufw && ufw status || iptables -L -n | grep 8096 || echo 'No firewall rules blocking 8096'"
-
-Go to set up page: `http://localhost:8096/web/index.html#!/wizardstart.html`
 
 ## Running Jellyfin without docker compose
 
@@ -431,7 +346,7 @@ Once the community script is done running, go to **VM > Summary > Copy IP** and 
 
 `terraform/homeassistant.tf` creates VM **160** running Home Assistant OS with 2 cores, 4 GiB RAM and a 32 GiB disk. It shares state with the docker VM, so set up `terraform/` first (see [Terraform](#terraform-1)).
 
-RAM: docker-vm (20 GiB) + Home Assistant (4 GiB) = 24 of the host's 28 GiB, which leaves ~4 GiB for Proxmox. Don't start anything else big alongside them (see [VM sizing](#vm-sizing-do-this-when-creating-the-vm)).
+RAM: docker-vm (20 GiB) + Home Assistant (4 GiB) = 24 of the host's 28 GiB, which leaves ~4 GiB for Proxmox. Don't start anything else big alongside them (see [VM sizing](#vm-sizing-do-this-when-creating-the-vm)). With the Kali and Pop!_OS VMs the total is 32 GiB, **more than the host has**, so never run all four at once (see [Running one VM at a time](#running-one-vm-at-a-time)).
 
 ```bash
 cd terraform
@@ -474,6 +389,72 @@ ssh root@192.168.1.98 lsusb
 4. HA should discover the device under **Settings > Devices & Services**.
 
 ## Backup
+
+# Kali Linux and Pop!_OS VMs
+
+`terraform/kali.tf` and `terraform/popos.tf` create two desktop VMs (4 cores, 4 GiB RAM, 64 GiB disk each). Terraform downloads the installer ISO and attaches it with an empty disk. You install the OS yourself from the Proxmox console.
+
+|VM|ID|MAC|ISO variable|
+|-|-|-|-|
+|Kali|170|`BC:24:11:4B:41:01`|`kali_iso_url`|
+|Pop!_OS|180|`BC:24:11:50:4F:01`|`popos_iso_url`|
+
+Like the other VMs they have `on_boot = true` and `started = true`. **A plain `terraform apply` therefore starts all four VMs (32 GiB on a 28 GiB host) and will freeze Proxmox.** Use the targeted commands below.
+
+## Installing
+
+1. Free up RAM and create one VM (see [Running one VM at a time](#running-one-vm-at-a-time)):
+
+```bash
+ssh root@192.168.1.98 "qm shutdown 150 && qm shutdown 160"
+cd terraform
+terraform apply -target=proxmox_virtual_environment_vm.kali   # or .popos
+```
+
+The first apply downloads the ISO to `/var/lib/vz/template/iso/` (Kali ~4.5 GB, Pop ~3.5 GB), so it takes a while.
+
+2. In Proxmox, open **pve > 170 (or 180) > Console** and run the graphical installer onto the 64 GiB disk.
+3. After the install reboots, the VM boots from disk. The ISO stays attached but is skipped because the disk comes first in the boot order.
+4. Reserve an IP for the VM's MAC on the router (`terraform output kali_mac_address` / `popos_mac_address`).
+5. Optional: so Proxmox can show the IP, run `sudo apt install qemu-guest-agent` in the guest, set `agent { enabled = true }` in the `.tf` file, then `terraform apply -target=...` again.
+
+To get a newer ISO, update `kali_iso_url` (from https://cdimage.kali.org/current/) or `popos_iso_url` (from `curl https://api.pop-os.org/builds/24.04/generic`). Changing an ISO URL replaces the download, and it may also recreate the VM, which **wipes the install**. Check `terraform plan` first.
+
+## Running one VM at a time
+
+|VM|ID|Terraform target|
+|-|-|-|
+|docker-vm|150|`proxmox_virtual_environment_vm.docker`|
+|Home Assistant|160|`proxmox_virtual_environment_vm.homeassistant`|
+|Kali|170|`proxmox_virtual_environment_vm.kali`|
+|Pop!_OS|180|`proxmox_virtual_environment_vm.popos`|
+
+Create or update just one VM. Terraform also pulls in that VM's dependencies, such as its image download:
+
+```bash
+cd terraform
+terraform plan  -target=proxmox_virtual_environment_vm.kali
+terraform apply -target=proxmox_virtual_environment_vm.kali
+```
+
+Start and stop VMs on the Proxmox host:
+
+```bash
+ssh root@192.168.1.98 qm list               # what's running
+ssh root@192.168.1.98 qm shutdown <id>      # clean ACPI shutdown
+ssh root@192.168.1.98 qm stop <id>          # hard stop if shutdown hangs
+ssh root@192.168.1.98 qm start <id>
+```
+
+Example: test only Kali, then go back to normal:
+
+```bash
+ssh root@192.168.1.98 "qm shutdown 150; qm shutdown 160; qm start 170"
+# ...test...
+ssh root@192.168.1.98 "qm shutdown 170; qm start 150; qm start 160"
+```
+
+Because every VM has `on_boot = true`, a Proxmox host reboot starts all four. After a reboot, shut down the ones you don't need, or turn off autostart for the desktop VMs with `qm set 170 --onboot 0` (Terraform will report this as drift).
 
 # Estimating Docker image download size
 

@@ -64,6 +64,10 @@ http://dynacat.homelab {
   reverse_proxy dynacat:8080
 }
 
+http://homarr.homelab {
+  reverse_proxy homarr:7575
+}
+
 http://uptime-kuma.homelab {
   reverse_proxy uptime-kuma:3001
 }

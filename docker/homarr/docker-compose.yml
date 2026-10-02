@@ -1,0 +1,27 @@
+# Homarr — dashboard with Docker integration. Config lives in its own DB
+# (in ~/docker-volumes/homarr), not in this repo; set it up in the web UI.
+#
+# The docker.sock mount powers Management -> Tools -> Docker, which lists every
+# container and adds any of them to a board in a few clicks.
+#
+# Paths are relative to THIS directory — Compose resolves relative paths in an
+# included file against the included file's own location, not docker/.
+# main-network is declared in ../docker-compose.yml and merges project-wide.
+
+services:
+  homarr:
+    image: ghcr.io/homarr-labs/homarr:latest
+    container_name: homarr
+    restart: unless-stopped
+    ports:
+      - "7575:7575"   # direct access for testing; caddy also proxies at homarr.homelab
+    volumes:
+      - ~/docker-volumes/homarr:/appdata
+      # Read-write: Homarr can start/stop/restart containers from its UI.
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      # Encrypts integration secrets in its DB. 64 hex chars: `openssl rand -hex 32`.
+      SECRET_ENCRYPTION_KEY: ${HOMARR_SECRET_ENCRYPTION_KEY}
+      TZ: ${TZ}
+    networks:
+      - main-network
