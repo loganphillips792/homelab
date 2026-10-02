@@ -786,8 +786,8 @@ docker/
   gatus/  glance/  homepage/  <- compose file sits next to its config/ dir
   immich/ penpot/ planka/ navidrome/ linkwarden/ matomo/ tubearchivist/
   hermes-agent/ redis-pubsub/ archivebox/   <- multi-container or own env file
-  kafka/                    <- broker + kafka-ui + akhq + a built Python consumer.
-                               The repo's only Dockerfile.
+  kafka/                    <- broker + kafka-ui + akhq + a built Python consumer
+                               and a built Go producer. The repo's only Dockerfiles.
   caddy/ pihole/            <- config only; services defined in docker-compose.yml
 ```
 
@@ -977,28 +977,29 @@ than a service list, so neither needs a per-service edit.
 
 ## Kafka Testing Stack
 
-Four services, defined in `docker/kafka/docker-compose.yml`: the `kafka` broker, the `kafka-ui`
-and `akhq` web UIs, and `kafka-consumer` (see [Consumer](#consumer) below).
+Five services, defined in `docker/kafka/docker-compose.yml`: the `kafka` broker, the `kafka-ui`
+and `akhq` web UIs, `kafka-consumer` (see [Consumer](#consumer) below), and `kafka-producer`
+(see [Producer](#producer)).
 
 ### Running just this stack
 
-Name the four services on the normal `compose.all.yml` command:
+Name the five services on the normal `compose.all.yml` command:
 
 ```bash
-docker compose -f docker/compose.all.yml up -d kafka kafka-ui akhq kafka-consumer
+docker compose -f docker/compose.all.yml up -d kafka kafka-ui akhq kafka-consumer kafka-producer
 ```
 
-Only those four start. Everything else in the fleet is left exactly as it was — not started, not
+Only those five start. Everything else in the fleet is left exactly as it was — not started, not
 stopped, not recreated. Stop them the same way:
 
 ```bash
-docker compose -f docker/compose.all.yml stop kafka kafka-ui akhq kafka-consumer
+docker compose -f docker/compose.all.yml stop kafka kafka-ui akhq kafka-consumer kafka-producer
 ```
 
 To bring the observability stack up alongside it, add its five services:
 
 ```bash
-docker compose -f docker/compose.all.yml up -d kafka kafka-ui akhq kafka-consumer \
+docker compose -f docker/compose.all.yml up -d kafka kafka-ui akhq kafka-consumer kafka-producer \
   cadvisor prometheus loki alloy grafana
 ```
 
@@ -1006,8 +1007,8 @@ Alloy discovers every running container, so this is what puts `kafka-consumer`'s
 and makes it queryable in Grafana rather than only via `docker logs`. Note that Prometheus has no
 Kafka scrape job configured, so this gives you logs, not broker metrics.
 
-`--build` is not needed the first time; Compose builds `kafka-consumer` automatically when its
-image is missing. See the deploy note under [Consumer](#consumer) for when you *do* need it.
+`--build` is not needed the first time; Compose builds `kafka-consumer` and `kafka-producer`
+automatically when their images are missing. See the deploy note under [Consumer](#consumer) for when you *do* need it.
 
 Prefer this over `cd docker/kafka && docker compose up -d`. Both work and both land in the same
 Compose project — the file pins `name: docker` precisely so they do. The difference is what
@@ -1093,7 +1094,7 @@ deliberate: the broker has auto-create on, so subscribing to a missing topic wou
 it with a *single* partition, and the `--partitions 3` create command above would then fail with
 `TopicExistsException`.
 
-**This is the only built image in the repo** — every other service uses a prebuilt tag. So
+**This is a built image** (as is `kafka-producer`) — every other service uses a prebuilt tag. So
 `git pull && docker compose -f docker/compose.all.yml up -d` will start it the first time but will
 **not** pick up later edits to `consumer.py`. After changing the code:
 
@@ -1103,6 +1104,25 @@ docker compose -f docker/compose.all.yml up -d --build kafka-consumer
 
 Config lives in `environment:` in `docker/kafka/docker-compose.yml` — `KAFKA_TOPIC`,
 `KAFKA_GROUP`, `KAFKA_BOOTSTRAP`, `KAFKA_AUTO_OFFSET_RESET`.
+
+### Producer
+
+`kafka-producer` is a small Go/Echo service (`docker/kafka/producer/`) with one endpoint.
+`POST /produce` publishes a random JSON command to `scan.commands`. The message is keyed by its
+`id`, so messages spread across partitions. The response contains the message plus the
+partition and offset it landed on.
+
+```bash
+curl -s -X POST http://192.168.1.150:8094/produce   # send one message
+docker logs -f kafka-consumer                         # watch the consumer pick it up
+```
+
+Like the consumer, it creates the topic with 3 partitions at startup if it is missing, so the
+startup order does not matter. It is also a built image. After changing `main.go`:
+
+```bash
+docker compose -f docker/compose.all.yml up -d --build kafka-producer
+```
 
 ### Loki queries
 
@@ -1547,7 +1567,7 @@ To ssh into VM:
 - Pihole - DNS server that resolves *.homelab domains to 10.0.0.32 (your Docker host)
 - Caddy - Reverse proxy listening on ports 80/443, routes requests based on hostname to the appropriate container
 - `main-network` connects most services; Caddy bridges default, main-network, and kafka-network
-- `kafka-network` carries only the Kafka stack (`kafka`, `kafka-ui`, `akhq`, `kafka-consumer`)
+- `kafka-network` carries only the Kafka stack (`kafka`, `kafka-ui`, `akhq`, `kafka-consumer`, `kafka-producer`)
   plus Caddy, which reverse-proxies the two UIs
 
 
