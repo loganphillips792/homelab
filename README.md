@@ -254,6 +254,25 @@ ansible homelab -a "df -h /"
 
 Still manual: `docker login -u dockedupstream` on the VM, and `.env` files that aren't in git (e.g. `docker/live-auction/.env`). The deploy fails if the VM checkout isn't on `main` or if `git stash pop` conflicts. When that happens, SSH in and fix it by hand.
 
+### Kali VM
+
+`ansible/kali.yml` sets up the Kali VM (`terraform/kali.tf`, `logan@192.168.1.142`) after the
+manual ISO install. It installs Neovim, tmux, the tools the Neovim config needs and
+qemu-guest-agent. It also clones [dotfiles](https://github.com/loganphillips792/dotfiles) to
+`~/dotfiles` and links `nvim`, `.vimrc` and `.tmux.conf`.
+
+Kali leaves sshd off, so do this once on the VM first, then copy your key from the Mac:
+```bash
+sudo systemctl enable --now ssh   # on Kali
+ssh-copy-id logan@192.168.1.142   # on the Mac
+```
+
+```bash
+cd ansible && ansible-playbook kali.yml -K
+```
+
+`-K` asks for your sudo password on Kali.
+
 # Jellyfin
 
 ## Running Jellyfin without docker compose
