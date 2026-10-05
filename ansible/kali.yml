@@ -1,0 +1,121 @@
+# Post-install setup for the Kali VM (terraform/kali.tf). Terraform only creates the
+# VM and the OS is installed by hand from the ISO, so this is the step after that.
+#
+# One-time on Kali before the first run (Kali ships sshd but leaves it off):
+#   sudo systemctl enable --now ssh
+# then from the Mac: ssh-copy-id logan@192.168.1.142
+#
+# Run: ansible-playbook kali.yml -K
+- name: Base setup for the Kali VM
+  hosts: kali
+  become: true
+
+  vars:
+    dotfiles_repo: https://github.com/loganphillips792/dotfiles.git
+    dotfiles_dir: "/home/{{ ansible_user }}/dotfiles"
+
+  tasks:
+    - name: Install packages
+      ansible.builtin.apt:
+        name:
+          - neovim
+          - tmux
+          - git
+          - curl
+          - unzip
+          - ripgrep         # telescope live_grep
+          - fd-find         # telescope find_files
+          - build-essential # treesitter compiles parsers
+          - nodejs          # mason installs many LSPs via npm
+          - npm
+          - qemu-guest-agent
+        update_cache: true
+
+    # Go from go.dev rather than apt, which lags behind. The first stable entry in
+    # the download feed is the latest release; re-running upgrades when it changes.
+    - name: Look up latest Go release
+      ansible.builtin.uri:
+        url: https://go.dev/dl/?mode=json
+        return_content: true
+      register: go_releases
+
+    - name: Read installed Go version
+      ansible.builtin.command: head -n1 /usr/local/go/VERSION
+      register: go_installed
+      changed_when: false
+      failed_when: false
+
+    - name: Install Go
+      when: go_installed.stdout != go_latest.version
+      vars:
+        go_arch: "{{ {'x86_64': 'amd64', 'aarch64': 'arm64'}[ansible_architecture] }}"
+        go_latest: "{{ go_releases.json[0] }}"
+        go_file: "{{ go_latest.files | selectattr('os', 'eq', 'linux') | selectattr('arch', 'eq', go_arch) | selectattr('kind', 'eq', 'archive') | first }}"
+      block:
+        - name: Download Go archive
+          ansible.builtin.get_url:
+            url: "https://go.dev/dl/{{ go_file.filename }}"
+            dest: "/tmp/{{ go_file.filename }}"
+            checksum: "sha256:{{ go_file.sha256 }}"
+            mode: "0644"
+
+        # Go's docs say to remove the old tree first; extracting over it breaks.
+        - name: Remove old Go install
+          ansible.builtin.file:
+            path: /usr/local/go
+            state: absent
+
+        - name: Extract Go
+          ansible.builtin.unarchive:
+            src: "/tmp/{{ go_file.filename }}"
+            dest: /usr/local
+            remote_src: true
+
+    # Symlinks instead of a PATH edit, so go works in bash and zsh alike.
+    - name: Link go binaries into /usr/local/bin
+      ansible.builtin.file:
+        src: "/usr/local/go/bin/{{ item }}"
+        dest: "/usr/local/bin/{{ item }}"
+        state: link
+      loop:
+        - go
+        - gofmt
+
+    # Lets Proxmox show the VM's IP; after this, set agent { enabled = true } in
+    # terraform/kali.tf.
+    - name: Enable qemu-guest-agent
+      ansible.builtin.systemd_service:
+        name: qemu-guest-agent
+        state: started
+        enabled: true
+
+    # Re-running pulls the latest dotfiles; it fails rather than overwrite local edits.
+    - name: Clone dotfiles
+      become: false
+      ansible.builtin.git:
+        repo: "{{ dotfiles_repo }}"
+        dest: "{{ dotfiles_dir }}"
+        update: true
+
+    - name: Create ~/.config
+      become: false
+      ansible.builtin.file:
+        path: "/home/{{ ansible_user }}/.config"
+        state: directory
+        mode: "0755"
+
+    # Same links setup.sh checks for on the Mac, minus the macOS-only ones.
+    # .zshrc is left alone: it expects Oh My Zsh, powerlevel10k and brew tools,
+    # and would replace Kali's own zsh config.
+    # Not forced, so an existing real file/dir at a link path fails the task
+    # instead of being replaced.
+    - name: Link dotfiles
+      become: false
+      ansible.builtin.file:
+        src: "{{ dotfiles_dir }}/{{ item.src }}"
+        dest: "/home/{{ ansible_user }}/{{ item.dest }}"
+        state: link
+      loop:
+        - { src: nvim, dest: .config/nvim }
+        - { src: .vimrc, dest: .vimrc }
+        - { src: tmux/.tmux.conf, dest: .tmux.conf }

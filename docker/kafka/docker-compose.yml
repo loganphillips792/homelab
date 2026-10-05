@@ -1,5 +1,6 @@
 # Kafka testing stack — a single-broker KRaft cluster, two UIs (kafka-ui and
-# akhq, both reverse-proxied by Caddy), and a Python consumer on scan.commands.
+# akhq, both reverse-proxied by Caddy), a Python consumer on scan.commands, and a
+# Go/Echo producer whose POST /produce publishes a random object to that topic.
 #
 # `name: docker` pins the Compose project name. It normally defaults to the
 # directory of the compose file, so a standalone run from here would land in a
@@ -9,7 +10,7 @@
 #
 # Whole fleet:   docker compose -f docker/compose.all.yml up -d
 # Just this stack:
-#   docker compose -f docker/compose.all.yml up -d kafka kafka-ui akhq kafka-consumer
+#   docker compose -f docker/compose.all.yml up -d kafka kafka-ui akhq kafka-consumer kafka-producer
 #
 # Use that rather than `cd docker/kafka && docker compose up -d`. Both work and
 # both land in project `docker`, but running from in here means Compose cannot
@@ -118,7 +119,8 @@ services:
       - main-network
       - kafka-network
 
-  # The one built image in the repo; everything else is a prebuilt tag. A plain
+  # One of the two built images in the repo (with kafka-producer); everything
+  # else is a prebuilt tag. A plain
   # `git pull && docker compose up -d` will NOT rebuild it after a consumer.py
   # change — see ../README.md under "## Kafka Testing Stack".
   kafka-consumer:
@@ -132,6 +134,25 @@ services:
       # earliest: the first run of a new group replays the topic from the start.
       KAFKA_AUTO_OFFSET_RESET: earliest
       # Only used if the consumer has to create the topic itself.
+      KAFKA_TOPIC_PARTITIONS: 3
+    depends_on:
+      kafka:
+        condition: service_healthy
+    networks:
+      - kafka-network
+
+  # Built from ./producer, so like kafka-consumer it needs --build after a code
+  # change. `curl -X POST http://<host>:8094/produce` sends one random message.
+  kafka-producer:
+    build: ./producer
+    container_name: kafka-producer
+    restart: unless-stopped
+    ports:
+      - "8094:8080"
+    environment:
+      KAFKA_BOOTSTRAP: kafka:29092
+      KAFKA_TOPIC: scan.commands
+      # Only used if the producer has to create the topic itself.
       KAFKA_TOPIC_PARTITIONS: 3
     depends_on:
       kafka:

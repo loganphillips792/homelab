@@ -1,4 +1,4 @@
-# The only built image in this repo — every other service uses a prebuilt tag.
+# A built image (as is ../producer) — every other service uses a prebuilt tag.
 # That means `git pull && docker compose up -d` will NOT pick up changes to
 # consumer.py; you need --build. See ../../README.md under "## Kafka Testing Stack".
 FROM python:3.12-slim
