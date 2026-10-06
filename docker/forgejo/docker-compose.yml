@@ -1,13 +1,14 @@
 # Forgejo (self-hosted git forge, a Gitea fork) at http://forgejo.homelab.
 #
 # One container, no database container: with no FORGEJO__database__* variables set,
-# Forgejo falls back to SQLite, which lives inside the same /data volume as the repos
-# and config. That keeps the whole service to a single named volume to back up.
+# Forgejo falls back to SQLite, which lives inside the same /data directory as the repos
+# and config. That keeps the whole service to a single directory to back up.
 #
-# Storage differs from upstream: the docs bind-mount ./forgejo:/data, but this repo uses
-# named volumes -- backup-remote-volumes.sh tars named volumes and would skip a bind mount
-# entirely. Upstream's /etc/localtime:/etc/localtime:ro mount is likewise replaced by the
-# shared ${TZ} from docker/.env.
+# Storage is a bind mount like upstream's ./forgejo:/data, but under ~/docker-volumes (as
+# homarr, matomo, etc. do) rather than inside the repo checkout, so repos and the database
+# can't end up committed. Note backup-remote-volumes.sh only tars named volumes, so it does
+# not cover this directory. Upstream's /etc/localtime:/etc/localtime:ro mount is replaced
+# by the shared ${TZ} from docker/.env.
 #
 # No web port is published. Host 3000 is already linkwarden's, and Caddy reaches this
 # container over main-network anyway (forgejo:3000). SSH does need a real host port,
@@ -43,10 +44,8 @@ services:
       - "222:22" # git-over-SSH
       - "3014:3000" # web UI exposed on localhost for testing (3000 is linkwarden's); caddy also proxies internally
     volumes:
-      # Repos, config and the SQLite database all live under here.
-      - forgejo_data:/data
+      # Repos, config and the SQLite database all live under here. Must be owned by
+      # USER_UID:USER_GID (1000:1000) or the container may not start.
+      - ~/docker-volumes/forgejo:/data
     networks:
       - main-network
-
-volumes:
-  forgejo_data:
