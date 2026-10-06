@@ -1,3 +1,64 @@
+# Table of Contents
+
+- [Setting Up VM and Docker](#setting-up-vm-and-docker)
+  - [Changing the Proxmox Host IP (router / subnet changed)](#changing-the-proxmox-host-ip-router--subnet-changed)
+  - [Allowing Claude to ssh into VM](#allowing-claude-to-ssh-into-vm)
+  - [TailScale](#tailscale)
+  - [Useful Commands](#useful-commands)
+- [Backup strategy](#backup-strategy)
+  - [ArchiveBox volume backup](#archivebox-volume-backup)
+- [Deploying](#deploying)
+- [Commands](#commands)
+  - [Restart vs recreate](#restart-vs-recreate)
+  - [Repository layout](#repository-layout)
+  - [Adding a new service](#adding-a-new-service)
+- [Services](#services)
+  - [Kafka Testing Stack](#kafka-testing-stack)
+  - [Kafka UI](#kafka-ui)
+  - [Grafana](#grafana)
+  - [N8N](#n8n)
+  - [Dozzle](#dozzle)
+  - [PiHole](#pihole)
+  - [Homepage](#homepage)
+  - [Homarr](#homarr)
+  - [Dynacat](#dynacat)
+  - [Uptime Kuma](#uptime-kuma)
+  - [Tailscale](#tailscale-1)
+  - [Test Postgres](#test-postgres)
+  - [Live-Auction](#live-auction)
+  - [Redis](#redis)
+  - [Redis Pub/Sub](#redis-pubsub)
+  - [Umami](#umami)
+  - [Ollama](#ollama)
+  - [Komodo](#komodo)
+  - [Karakeep](#karakeep)
+  - [Linkwarden](#linkwarden)
+  - [Forgejo](#forgejo)
+  - [Dockhand](#dockhand)
+  - [C Advisor](#c-advisor)
+  - [Matomo](#matomo)
+  - [Hermes Agent](#hermes-agent)
+  - [ArchiveBox](#archivebox)
+  - [Penpot](#penpot)
+  - [Planka](#planka)
+  - [Navidrome](#navidrome)
+  - [Backrest](#backrest)
+  - [Immich](#immich)
+  - [Tube Archivist](#tube-archivist)
+- [DNS Process Explained](#dns-process-explained)
+- [TODO](#todo)
+- [Grafana Queries](#grafana-queries)
+- [Loki Queries](#loki-queries-1)
+- [List of Services](#list-of-services)
+  - [Services requiring URL change between localhost and homelab](#services-requiring-url-change-between-localhost-and-homelab)
+  - [Applications](#applications)
+  - [Backing / infrastructure services](#backing--infrastructure-services)
+  - [Stopped / not running](#stopped--not-running)
+- [Install PopOS & Access Proxmox GUI outside of home network (Tailscale on Proxmox host)](#install-popos--access-proxmox-gui-outside-of-home-network-tailscale-on-proxmox-host)
+- [Tailscale in LXC on proxmox as a subnet router](#tailscale-in-lxc-on-proxmox-as-a-subnet-router)
+- [Adding linux VM and setting up RDP and tailscale](#adding-linux-vm-and-setting-up-rdp-and-tailscale)
+
+
 # Setting Up VM and Docker
 
 1. Download ISO image (Proxmox ISO installer): https://www.proxmox.com/en/proxmox-virtual-environment/get-started and use Balena Etcher to flash ISO image to USB Drive
@@ -2314,7 +2375,7 @@ wizard writes that file once.
 
 ```
 docker compose -f docker/compose.all.yml up -d forgejo
-docker compose -f docker/compose.all.yml up -d --force-recreate pihole caddy gatus homepage
+docker compose -f docker/compose.all.yml up -d --force-recreate pihole caddy gatus homepage dockhand grafana prometheus loki
 ```
 
 The second line picks up the bind-mounted config edits (DNS record, Caddy site block, Gatus
@@ -2353,6 +2414,45 @@ ssh -F /dev/null -T git@forgejo.homelab -p 222   # expect the Forgejo greeting, 
 git clone ssh://git@forgejo.homelab:222/<user>/<repo>.git
 ```
 
+**Commits show `loganphillips792`, not `logan-admin`.** Pusher and author are two different
+things. The pusher is the Forgejo account you authenticate as (`logan-admin`); Forgejo uses it
+only to check write access. The author is stored inside the commit, filled in by git from the
+local `user.name`/`user.email` at `git commit` time, before Forgejo is involved. The Mac's are
+`loganphillips792` / `loganphillips792@gmail.com` (same identity as GitHub), so that's what every
+commit carries wherever it's pushed.
+
+Forgejo links a commit to an account by matching the author email. A match shows that user's
+avatar and profile link; no match shows the raw name. `logan-admin` only has
+`loganphillips33@yahoo.com`, so nothing links. Check what a commit used:
+
+```
+git log -1 --format='%an <%ae>'
+```
+
+Two fixes:
+
+1. **Add the email to the Forgejo account** (preferred) — Settings → Emails, add
+   `loganphillips792@gmail.com`. Past and future commits link to `logan-admin`, nothing changes
+   in git, and commits keep one identity across GitHub and Forgejo.
+2. **Override the author for one repo:**
+   ```
+   git config user.name "logan-admin"
+   git config user.email "loganphillips33@yahoo.com"
+   ```
+   Only affects new commits; already-pushed ones keep `loganphillips792` unless history is
+   rewritten.
+
+Where git reads `user.name`/`user.email` from — later levels override earlier ones:
+
+| Level | File | Applies to |
+|-|-|-|
+| System | `/etc/gitconfig` (or Homebrew's `$(brew --prefix)/etc/gitconfig`) | every user on the machine |
+| Global | `~/.gitconfig` | every repo for you |
+| Local | `<repo>/.git/config` | that one repo |
+
+On the Mac both values come from `~/.gitconfig`. `git config --show-origin --list` shows which
+file sets each value.
+
 Backup — one volume covers repos, config and the database:
 
 ```
@@ -2362,6 +2462,78 @@ ssh logan@10.0.0.32 "docker run --rm -v docker_forgejo_data:/data -v \$HOME:/bac
 `backup-remote-volumes.sh` stops the stack before it tars, because a live SQLite database and
 in-flight git operations do not tar consistently. Run the one-liner above against a stopped
 container for the same reason if the repos are busy.
+
+**Backup and restore with restic** (snapshots tagged `forgejo`).
+
+One-time setup (skip whatever you've already done):
+
+```bash
+brew install restic
+openssl rand -base64 32 > ~/.restic-password
+chmod 600 ~/.restic-password
+
+export RESTIC_REPOSITORY=~/restic/homelab
+export RESTIC_PASSWORD_FILE=~/.restic-password
+restic init
+```
+
+The two `export` lines are needed in every new terminal before the commands below, unless you
+add them to `~/.zshrc`.
+
+Manual backup:
+
+```bash
+docker stop forgejo
+restic backup ~/docker-volumes/forgejo --tag forgejo
+docker start forgejo
+```
+
+Check the backup:
+
+```bash
+restic snapshots --tag forgejo
+restic check
+```
+
+List every tag in the repo (restic has no built-in command for this):
+
+```bash
+restic snapshots --json | jq -r '.[].tags[]?' | sort -u
+```
+
+Test restore (safe, doesn't touch the live data):
+
+```bash
+restic restore latest --tag forgejo --target /tmp/restore-test
+ls /tmp/restore-test/Users/$USER/docker-volumes/forgejo
+rm -rf /tmp/restore-test
+```
+
+Full restore (rolls Forgejo back to the snapshot):
+
+```bash
+docker stop forgejo
+mv ~/docker-volumes/forgejo ~/docker-volumes/forgejo.old
+restic restore latest --tag forgejo --target /
+docker start forgejo
+```
+
+Restore an older snapshot — list the snapshots, then use the ID in place of `latest` in either
+restore above:
+
+```bash
+restic snapshots --tag forgejo
+restic restore 1a2b3c4d --target /
+```
+
+Restore a single file or folder — find its path inside the snapshot, then restore only that to
+a scratch location:
+
+```bash
+restic find --tag forgejo app.ini
+restic restore latest --tag forgejo --target /tmp/restore-one \
+  --include /Users/$USER/docker-volumes/forgejo/gitea/conf/app.ini
+```
 
 Full reset (wipes everything):
 
