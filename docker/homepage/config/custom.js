@@ -26,6 +26,7 @@
     glance: 8084,
     grafana: 3013,
     hermes: 9119,
+    homeassistant: 8123,
     homepage: 3002,
     immich: 2283,
     jellyfin: 8096,
@@ -57,6 +58,7 @@
     umami: 3011,
     "uptime-kuma": 3004,
     vaults3: 9020,
+    zigbee2mqtt: 8095,
   };
 
   const KEY = "homelab-link-mode";

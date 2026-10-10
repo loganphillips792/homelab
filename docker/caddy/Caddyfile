@@ -195,6 +195,18 @@ http://dockhand.homelab {
   reverse_proxy dockhand:3000
 }
 
+# Home Assistant runs with network_mode: host, so there is no container name to proxy
+# to -- host.docker.internal is mapped to the host by extra_hosts on the caddy service.
+# It answers 400 here until Caddy's subnet is listed under http.trusted_proxies in its
+# configuration.yaml (see "Home Assistant" in docker/README.md).
+http://homeassistant.homelab {
+  reverse_proxy host.docker.internal:8123
+}
+
+http://zigbee2mqtt.homelab {
+  reverse_proxy zigbee2mqtt:8080
+}
+
 # Container name is matomo-app (the compose service is `matomo`), serving on :80.
 # Matomo pins trusted_hosts[] during installation to whichever hostname you first
 # complete setup on, and rejects other Host headers afterwards — so run the installer

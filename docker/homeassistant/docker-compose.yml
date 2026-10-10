@@ -1,0 +1,136 @@
+# Home Assistant + Mosquitto (MQTT broker) + Zigbee2MQTT, at http://homeassistant.homelab
+# and http://zigbee2mqtt.homelab.
+#
+# The usual three-container layout: Zigbee devices talk to the SLZB-06M coordinator, Zigbee2MQTT
+# publishes them as MQTT topics on Mosquitto, and Home Assistant's MQTT integration
+# discovers them from there. Nothing here is a Home Assistant add-on; each piece is its
+# own container and can be restarted or upgraded alone.
+#
+# homeassistant is the one service in this repo that runs with network_mode: host, so it
+# is not on main-network. Device discovery (mDNS, SSDP, DHCP watching, Cast, HomeKit)
+# needs to see the LAN itself, which a bridge network hides. That has four consequences:
+#   - The UI is simply host port 8123. The ports: entry only matters for local testing
+#     in bridge mode (HA_NETWORK_MODE=bridge, see the service below).
+#   - Caddy cannot proxy to the container name. It uses host.docker.internal:8123, which
+#     extra_hosts on the caddy service (root docker-compose.yml) maps to the host.
+#   - Home Assistant answers proxied requests with a 400 until Caddy is listed under
+#     http.trusted_proxies in its configuration.yaml. That is a one-time edit after first
+#     boot -- see "Home Assistant" in docker/README.md.
+#   - It reaches the broker at 127.0.0.1:1883 (mosquitto's published port), while
+#     zigbee2mqtt uses mqtt://mosquitto:1883 over main-network.
+#
+# All state lives under ~/docker-volumes/homeassistant/ (config, mosquitto, zigbee2mqtt),
+# so that one directory is the whole backup. backup-remote-volumes.sh only tars named
+# volumes and does not cover it; backrest sees it as /userdata/homeassistant.
+#
+# MQTT_USER and MQTT_PASSWORD come from the shared docker/.env, so there is no
+# homeassistant/.env.
+#
+# main-network is declared in the root docker-compose.yml, not here -- like the other
+# per-service files in this repo, this only comes up via compose.all.yml:
+#   docker compose -f compose.all.yml up -d homeassistant mosquitto zigbee2mqtt
+# Docs: https://www.home-assistant.io/installation/linux#docker-compose
+#       https://www.zigbee2mqtt.io/guide/installation/02_docker.html
+
+services:
+  homeassistant:
+    image: ghcr.io/home-assistant/home-assistant:stable
+    container_name: homeassistant
+    restart: unless-stopped
+    # Home Assistant flushes its recorder database on shutdown, and Docker's default 10s
+    # can cut that off.
+    stop_grace_period: 60s
+    # host on the server (the default). On a Mac that does not work for testing: Docker
+    # Desktop's "host" is its own Linux VM, not macOS, so nothing answers on
+    # localhost:8123. To run it locally, switch to Docker's default bridge at run time,
+    # which is what makes the ports: entry below take effect:
+    #   HA_NETWORK_MODE=bridge docker compose -f compose.all.yml up -d homeassistant mosquitto
+    # In bridge mode there is no device discovery, and the broker address for the MQTT
+    # integration is host.docker.internal instead of 127.0.0.1.
+    network_mode: ${HA_NETWORK_MODE:-host}
+    ports:
+      # Ignored in host mode, where Docker prints "Published ports are discarded when
+      # using host network mode" on every up. That warning is expected on the server.
+      - "8123:8123" # localhost testing with HA_NETWORK_MODE=bridge only
+    # Upstream's compose also sets `privileged: true` and mounts /run/dbus:/run/dbus:ro.
+    # Both are left out on purpose: they only matter for Bluetooth or a USB radio attached
+    # to this container, and the Zigbee coordinator belongs to zigbee2mqtt below. Add them back
+    # if you ever plug hardware into Home Assistant itself.
+    environment:
+      - TZ=${TZ}
+    volumes:
+      # configuration.yaml, the SQLite recorder database, .storage and Home Assistant's
+      # own backups (config/backups). Written by root inside the container, so editing
+      # configuration.yaml on the host needs sudo.
+      - ~/docker-volumes/homeassistant/config:/config
+      # The Rounded-Bubble theme, kept in the repo and layered over the data dir read-only.
+      # The generated configuration.yaml already loads /config/themes, so no config edit.
+      - ./themes:/config/themes:ro
+
+  mosquitto:
+    image: eclipse-mosquitto:2
+    container_name: mosquitto
+    restart: unless-stopped
+    # Mosquitto wants a hashed password file, not env vars. Rebuilding that file from
+    # docker/.env on every start keeps .env the single source of truth, so there is no
+    # manual `mosquitto_passwd` step and changing the password is just an edit plus
+    # `up -d`. $$ defers expansion to the container's shell. The chown matters because
+    # the broker drops to the mosquitto user and warns about files it does not own.
+    command:
+      - sh
+      - -ec
+      - |
+        mosquitto_passwd -b -c /mosquitto/data/passwd "$$MQTT_USER" "$$MQTT_PASSWORD"
+        chown mosquitto:mosquitto /mosquitto/data/passwd
+        exec mosquitto -c /mosquitto/config/mosquitto.conf
+    environment:
+      - MQTT_USER=${MQTT_USER}
+      - MQTT_PASSWORD=${MQTT_PASSWORD}
+    ports:
+      # Not just for testing, unlike most published ports here: host-networked Home
+      # Assistant connects through this one, and so would any MQTT device on the LAN.
+      - "1883:1883"
+    volumes:
+      # The directory, not the single file: git replaces a file on pull, and a
+      # single-file bind mount would keep showing the old inode until a recreate.
+      - ./mosquitto:/mosquitto/config:ro
+      # Retained messages and the generated password file.
+      - ~/docker-volumes/homeassistant/mosquitto:/mosquitto/data
+    networks:
+      - main-network
+
+  zigbee2mqtt:
+    image: ghcr.io/koenkk/zigbee2mqtt
+    container_name: zigbee2mqtt
+    restart: unless-stopped
+    depends_on:
+      - mosquitto
+    environment:
+      - TZ=${TZ}
+      # ZIGBEE2MQTT_CONFIG_<PATH> overrides the matching key in data/configuration.yaml
+      # on every start, so these stay authoritative even after the first-start
+      # onboarding page writes that file.
+      - ZIGBEE2MQTT_CONFIG_MQTT_SERVER=mqtt://mosquitto:1883
+      - ZIGBEE2MQTT_CONFIG_MQTT_USER=${MQTT_USER}
+      - ZIGBEE2MQTT_CONFIG_MQTT_PASSWORD=${MQTT_PASSWORD}
+      # The coordinator is an SMLIGHT SLZB-06M: a network coordinator on the LAN, not a
+      # USB stick, so there is no devices: entry and no USB passthrough. Zigbee2MQTT
+      # reaches its radio over TCP on port 6638, which works the same from Docker
+      # Desktop on the Mac and from the server. SLZB_HOST is its IP in docker/.env --
+      # an IP rather than slzb-06m.local, because containers cannot resolve mDNS names.
+      # Until it is set, zigbee2mqtt restarts in a loop with a connection error.
+      - ZIGBEE2MQTT_CONFIG_SERIAL_PORT=tcp://${SLZB_HOST}:6638
+      # The 06M's EFR32MG21 chip runs EmberZNet firmware.
+      - ZIGBEE2MQTT_CONFIG_SERIAL_ADAPTER=ember
+      # Publishes MQTT discovery messages, which is how paired devices show up in Home
+      # Assistant without any per-device config.
+      - ZIGBEE2MQTT_CONFIG_HOMEASSISTANT_ENABLED=true
+      - ZIGBEE2MQTT_CONFIG_FRONTEND_ENABLED=true
+    ports:
+      - "8095:8080" # exposed on localhost for testing (8080 is drawio's); caddy also proxies internally
+    volumes:
+      # configuration.yaml (which holds the network key), database.db and the
+      # coordinator backup. Losing this directory means re-pairing every device.
+      - ~/docker-volumes/homeassistant/zigbee2mqtt:/app/data
+    networks:
+      - main-network

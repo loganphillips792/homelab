@@ -159,6 +159,14 @@
     - Cronmaster:
         href: http://cronmaster.homelab
         description: Cron job scheduling
+    - Home Assistant:
+        icon: home-assistant
+        href: http://homeassistant.homelab
+        description: Home automation hub
+    - Zigbee2MQTT:
+        icon: zigbee2mqtt
+        href: http://zigbee2mqtt.homelab
+        description: Zigbee devices bridged to MQTT
 
 # Apps
 - Apps:

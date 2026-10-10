@@ -7,12 +7,20 @@
   - [Useful Commands](#useful-commands)
 - [Backup strategy](#backup-strategy)
   - [ArchiveBox volume backup](#archivebox-volume-backup)
+- [Backup and Restore](#backup-and-restore)
+  - [General commands](#general-commands)
+  - [Set up](#set-up)
+  - [Forgejo](#forgejo)
+  - [Home Assistant](#home-assistant)
 - [Deploying](#deploying)
 - [Commands](#commands)
   - [Restart vs recreate](#restart-vs-recreate)
   - [Repository layout](#repository-layout)
   - [Adding a new service](#adding-a-new-service)
 - [Services](#services)
+  - [Media](#media)
+    - [Jellyfin](#jellyfin)
+    - [Navidrome](#navidrome)
   - [Kafka Testing Stack](#kafka-testing-stack)
   - [Kafka UI](#kafka-ui)
   - [Grafana](#grafana)
@@ -33,15 +41,15 @@
   - [Komodo](#komodo)
   - [Karakeep](#karakeep)
   - [Linkwarden](#linkwarden)
-  - [Forgejo](#forgejo)
+  - [Forgejo](#forgejo-1)
   - [Dockhand](#dockhand)
+  - [Home Assistant](#home-assistant-1)
   - [C Advisor](#c-advisor)
   - [Matomo](#matomo)
   - [Hermes Agent](#hermes-agent)
   - [ArchiveBox](#archivebox)
   - [Penpot](#penpot)
   - [Planka](#planka)
-  - [Navidrome](#navidrome)
   - [Backrest](#backrest)
   - [Immich](#immich)
   - [Tube Archivist](#tube-archivist)
@@ -762,6 +770,224 @@ ssh logan@192.168.1.150 'docker start archivebox >/dev/null'
 
 The tar is rooted at `archivebox/`, so it extracts into `~/docker-volumes/` and recreates that directory.
 
+# Backup and Restore
+
+## General commands
+
+List snapshots (drop `--tag` to list every snapshot in the repo):
+
+```bash
+restic -r $RESTIC_REPOSITORY snapshots --tag forgejo
+```
+
+Delete a snapshot:
+
+```bash
+restic -r $RESTIC_REPOSITORY forget [SNAPSHOT_ID]
+```
+
+`forget` only removes the snapshot record. The data it referenced stays in the repo until you run
+`restic -r $RESTIC_REPOSITORY prune` (or `forget --prune` in one step).
+
+Check that the snapshots were deleted (one file per remaining snapshot):
+
+```bash
+ls $RESTIC_REPOSITORY/snapshots
+```
+
+List every tag in the repo (restic has no built-in command for this):
+
+```bash
+restic snapshots --json | jq -r '.[].tags[]?' | sort -u
+```
+
+List the keys (passwords) that can unlock the repo:
+
+```bash
+restic key list
+```
+
+If restic prints `found N old cache directories in ~/Library/Caches/restic`, clear them with:
+
+```bash
+restic cache --cleanup
+```
+
+## Set up
+
+One-time setup (skip whatever you've already done):
+
+```bash
+brew install restic
+openssl rand -base64 32 > ~/.restic-password
+chmod 600 ~/.restic-password
+
+export RESTIC_REPOSITORY=~/restic/homelab
+export RESTIC_PASSWORD_FILE=~/.restic-password
+restic init
+```
+
+The two `export` lines are needed in every new terminal before the commands in the sections
+below, unless you add them to `~/.zshrc`.
+
+## Move the repo to an external drive
+
+Copy it, verify the copy, then point restic at the new location. The repo doesn't care where it
+lives, and the password stays the same.
+
+```bash
+# 1. Copy (replace DRIVE with your drive's name; make sure no backup is running)
+mkdir -p /Volumes/DRIVE/restic
+rsync -a ~/restic/homelab/ /Volumes/DRIVE/restic/homelab/
+
+# 2. Verify the copy, reading every byte back off the drive
+restic -r /Volumes/DRIVE/restic/homelab check --read-data
+
+# 3. Point restic at it (also update this line in ~/.zshrc and your notes)
+export RESTIC_REPOSITORY=/Volumes/DRIVE/restic/homelab
+restic snapshots
+
+# 4. Only once step 3 shows your snapshot, remove the original
+rm -rf ~/restic/homelab
+```
+
+- **Drive not plugged in:** restic fails with an error instead of writing somewhere else, so a
+  backup can't silently land on your internal disk.
+- **Unplugging:** eject the drive properly first. Pulling it mid-write is the main way a repo on
+  USB gets damaged; `restic check` tells you if it happened.
+- **Filesystem:** APFS or exFAT both work.
+
+Consider skipping step 4 and keeping both copies. A repo that lives only on one USB drive is a
+single point of failure, and you could refresh the drive copy with the same `rsync` line after
+each backup.
+
+## Forgejo
+
+Backup and restore with restic (snapshots tagged `forgejo`).
+
+Confirm it's a bind mount, not a named volume. With a named volume (`forgejo-data:/data`), the
+data lives inside Docker's VM and the backup line below would miss it. Check with:
+
+```bash
+docker inspect forgejo --format '{{json .Mounts}}'
+```
+
+You want `"Type":"bind"` with `Source` pointing at your `docker-volumes/forgejo` folder.
+
+These notes also assume Forgejo uses its default SQLite database, which lives inside `/data`. If
+you run it with a separate Postgres or MySQL container, that database needs stopping and backing
+up as well.
+
+Manual backup:
+
+```bash
+docker stop forgejo
+restic backup ~/docker-volumes/forgejo --tag forgejo
+docker start forgejo
+```
+
+Check the backup:
+
+```bash
+restic snapshots --tag forgejo
+restic check
+```
+
+Test restore (safe, doesn't touch the live data):
+
+```bash
+restic restore latest --tag forgejo --target /tmp/restore-test
+ls /tmp/restore-test/Users/$USER/docker-volumes/forgejo
+rm -rf /tmp/restore-test
+```
+
+Full restore (rolls Forgejo back to the snapshot):
+
+```bash
+docker stop forgejo
+mv ~/docker-volumes/forgejo ~/docker-volumes/forgejo.old
+restic restore latest --tag forgejo --target /
+docker start forgejo
+```
+
+You should now see the decrypted forgejo directory at `ls ~/docker-volumes`
+
+Restore an older snapshot — list the snapshots, then use the ID in place of `latest` in either
+restore above:
+
+```bash
+restic snapshots --tag forgejo
+restic restore 1a2b3c4d --target /
+```
+
+Restore a single file or folder — find its path inside the snapshot, then restore only that to
+a scratch location:
+
+```bash
+restic find --tag forgejo app.ini
+restic restore latest --tag forgejo --target /tmp/restore-one \
+  --include /Users/$USER/docker-volumes/forgejo/gitea/conf/app.ini
+```
+
+## Home Assistant
+
+Backup and restore with restic (snapshots tagged `homeassistant`). Uses the repo from
+[Set up](#set-up), with two differences from Forgejo:
+
+- **Stop all three containers.** Home Assistant writes its SQLite recorder database constantly,
+  Mosquitto saves retained messages to disk, and Zigbee2MQTT writes its pairing database, so stop
+  `homeassistant`, `mosquitto` and `zigbee2mqtt` together.
+- **restic needs `sudo`.** Home Assistant writes `config/` as root, so your user cannot read all of
+  it. `sudo` drops exported variables, so every command passes them through with
+  `--preserve-env`. Restoring as root also keeps the original file ownership.
+
+The paths below use `$HOME` rather than `/Users/$USER`, so they work on both the Mac and the server.
+`$HOME` is expanded by your shell before `sudo` runs, so it still points at your user.
+
+Manual backup:
+
+```bash
+docker stop homeassistant zigbee2mqtt mosquitto
+sudo --preserve-env=RESTIC_REPOSITORY,RESTIC_PASSWORD_FILE restic backup ~/docker-volumes/homeassistant --tag homeassistant
+docker start mosquitto zigbee2mqtt homeassistant
+```
+
+Check the backup:
+
+```bash
+sudo --preserve-env=RESTIC_REPOSITORY,RESTIC_PASSWORD_FILE restic snapshots --tag homeassistant
+```
+
+Test restore (safe, doesn't touch the live data):
+
+```bash
+sudo --preserve-env=RESTIC_REPOSITORY,RESTIC_PASSWORD_FILE restic restore latest --tag homeassistant --target /tmp/restore-test
+sudo ls /tmp/restore-test$HOME/docker-volumes/homeassistant
+sudo rm -rf /tmp/restore-test
+```
+
+Full restore (rolls Home Assistant, Mosquitto and Zigbee2MQTT back to the snapshot):
+
+```bash
+docker stop homeassistant zigbee2mqtt mosquitto
+sudo mv ~/docker-volumes/homeassistant ~/docker-volumes/homeassistant.old
+sudo --preserve-env=RESTIC_REPOSITORY,RESTIC_PASSWORD_FILE restic restore latest --tag homeassistant --target /
+docker start mosquitto zigbee2mqtt homeassistant
+```
+
+Restore a single file, e.g. a broken `configuration.yaml`, to a scratch location:
+
+```bash
+sudo --preserve-env=RESTIC_REPOSITORY,RESTIC_PASSWORD_FILE restic find --tag homeassistant configuration.yaml
+sudo --preserve-env=RESTIC_REPOSITORY,RESTIC_PASSWORD_FILE restic restore latest --tag homeassistant --target /tmp/restore-one \
+  --include $HOME/docker-volumes/homeassistant/config/configuration.yaml
+```
+
+To schedule this instead, add a Backrest plan for `/userdata/homeassistant`. Backrest cannot stop
+the containers by itself, so either add pre/post hooks that do, or accept a small risk of catching
+the recorder database mid-write. Home Assistant's own backups in `config/backups/` are inside the
+snapshot either way.
+
 # Deploying
 
 1. On the machine you want to access services from, set DNS servers (in this order):
@@ -1035,6 +1261,407 @@ than a service list, so neither needs a per-service edit.
 
 
 # Services
+
+## Media
+
+### Jellyfin
+
+#### Running through docker compose
+
+`docker/.env` sets `JELLYFIN_MUSIC_DIR` / `JELLYFIN_MOVIES_DIR` / `JELLYFIN_TVSHOWS_DIR` to the VM paths (`/mnt/ssd/...`), which don't exist on the Mac. The SSD mounts at `/Volumes/SSD` with `movies/`, `music/` and `tvshows/` at its root, so override all three in the shell — shell variables take precedence over `.env`:
+
+```bash
+JELLYFIN_MUSIC_DIR=/Volumes/SSD/music \
+JELLYFIN_MOVIES_DIR=/Volumes/SSD/movies \
+JELLYFIN_TVSHOWS_DIR=/Volumes/SSD/tvshows \
+docker compose -f docker/compose.all.yml up -d jellyfin
+```
+
+Then add libraries in the Jellyfin UI pointing at `/media/music` and `/media/movies`, and a separate **Shows** library at `/media/tvshows`.
+
+To bring up the observability stack, dockhand and homepage alongside it:
+
+```bash
+JELLYFIN_MUSIC_DIR=/Volumes/SSD/music JELLYFIN_MOVIES_DIR=/Volumes/SSD/movies JELLYFIN_TVSHOWS_DIR=/Volumes/SSD/tvshows docker compose -f docker/compose.all.yml up -d prometheus loki alloy grafana cadvisor dockhand homepage jellyfin
+```
+
+To bring up the observability stack, dockhand, gatus, navidrome and jellyfin:
+
+```bash
+JELLYFIN_MUSIC_DIR=/Volumes/SSD/music JELLYFIN_MOVIES_DIR=/Volumes/SSD/movies JELLYFIN_TVSHOWS_DIR=/Volumes/SSD/tvshows docker compose -f docker/compose.all.yml up -d prometheus loki alloy grafana cadvisor dockhand gatus navidrome jellyfin
+```
+
+Variables written this way apply only to that one command. They take priority over the `/mnt/ssd/...` values in `docker/.env`, so Jellyfin mounts the SSD folders instead. Only Jellyfin uses these three variables, so the other services aren't affected.
+
+To check which folders it will mount before starting anything:
+
+```bash
+JELLYFIN_MUSIC_DIR=/Volumes/SSD/music JELLYFIN_MOVIES_DIR=/Volumes/SSD/movies JELLYFIN_TVSHOWS_DIR=/Volumes/SSD/tvshows docker compose -f docker/compose.all.yml config jellyfin | grep source
+```
+
+- Plug the SSD in **before** running this. If `/Volumes/SSD` isn't mounted, docker silently creates empty dirs and the libraries show up empty — unmount isn't detected either, so after re-plugging the drive run the same command with `--force-recreate`.
+- The overrides only apply to that one command. A later plain `up -d` (e.g. the full update command) recreates jellyfin with the `/mnt/ssd` paths, since the resolved config changed.
+
+
+#### Running Jellyfin without docker compose
+
+Standalone `docker run` equivalent of the `jellyfin` service in
+`docker/docker-compose.yml`, for a brand new VM with nothing else on it -- no
+compose stack, no Caddy, no user-defined networks. Jellyfin goes on the default
+`bridge` network and is reached directly on port 8096.
+
+```sh
+docker pull jellyfin/jellyfin
+
+# 1. Config/cache dirs. Safe to create empty -- Jellyfin populates them.
+mkdir -p ~/docker-volumes/jellyfin/config ~/docker-volumes/jellyfin/cache
+
+# 2. Media dirs. These must ALREADY hold the library (and, if they live on a
+#    separate disk, that disk must already be mounted). A bind mount resolves
+#    its source once, and docker silently creates a missing source as an empty
+#    dir rather than failing, so the library would just show up empty.
+ls /mnt/ssd/music /mnt/ssd/movies /mnt/ssd/tvshows
+
+# 3. Run it. Media is mounted read-only so Jellyfin can never modify the files.
+docker run -d \
+  --name jellyfin \
+  --restart unless-stopped \
+  -p 8096:8096/tcp \
+  -p 7359:7359/udp \
+  -e JELLYFIN_PublishedServerUrl=http://example.com \
+  -v ~/docker-volumes/jellyfin/config:/config \
+  -v ~/docker-volumes/jellyfin/cache:/cache \
+  --mount type=bind,source=/mnt/ssd/music,target=/media/music,readonly \
+  --mount type=bind,source=/mnt/ssd/movies,target=/media/movies,readonly \
+  --mount type=bind,source=/mnt/ssd/tvshows,target=/media/tvshows,readonly \
+  jellyfin/jellyfin
+```
+
+Then open the setup wizard at `http://<vm-ip>:8096/web/index.html#!/wizardstart.html`
+and point the libraries at `/media/music`, `/media/movies` and `/media/tvshows` (as a
+separate **Shows** library).
+
+Notes:
+
+- Bind Mounts are needed to pass folders from the host OS to the container OS
+  whereas volumes are maintained by Docker and can be considered easier to
+  backup and control by external programs. For a simple setup, it's considered
+  easier to use Bind Mounts instead of volumes. Multiple media libraries can be
+  bind mounted if needed:
+
+  ```sh
+  --mount type=bind,source=/mnt/ssd/music,target=/media/music,readonly \
+  --mount type=bind,source=/mnt/ssd/movies,target=/media/movies,readonly \
+  --mount type=bind,source=/mnt/ssd/shows,target=/media/shows,readonly
+  ```
+
+- `/mnt/ssd/music`, `/mnt/ssd/movies` and `/mnt/ssd/tvshows` are the values of
+  `JELLYFIN_MUSIC_DIR` / `JELLYFIN_MOVIES_DIR` / `JELLYFIN_TVSHOWS_DIR` in `docker/.env` -- substitute your own paths. Add more
+  libraries by repeating `--mount` with a different `target=/media/<name>`.
+  Use absolute paths in `--mount`; the shell does not expand `~` there (it does
+  for `-v`, which is why the config/cache lines can use it).
+- `7359/udp` is client autodiscovery. Drop it if you only ever connect by
+  entering the server address manually.
+- Set `JELLYFIN_PublishedServerUrl` to the address clients actually use
+  (e.g. `http://<vm-ip>:8096`); it is only an autodiscovery hint.
+- Check on it with `docker logs -f jellyfin` and `docker ps --filter name=jellyfin`.
+
+#### General commands
+
+Copy media from the Elements drive to the SSD (uses Homebrew rsync for `--info=progress2`):
+
+```bash
+# No deleting: --delete is left out, so nothing on the SSD gets removed.
+# Only add it if you want the SSD to be an exact mirror of Elements.
+
+# Dry run first (-n): shows what would be copied, copies nothing
+rsync -avhn --info=progress2 --exclude='.DS_Store' --exclude='._*' /Volumes/Elements/media/music/ /Volumes/SSD/music/
+rsync -avhn --info=progress2 --exclude='.DS_Store' --exclude='._*' /Volumes/Elements/media/movies/ /Volumes/SSD/movies/
+rsync -avhn --info=progress2 --exclude='.DS_Store' --exclude='._*' /Volumes/Elements/media/tvshows/ /Volumes/SSD/tvshows/
+
+# Real run
+rsync -avh --info=progress2 --exclude='.DS_Store' --exclude='._*' /Volumes/Elements/media/music/ /Volumes/SSD/music/
+rsync -avh --info=progress2 --exclude='.DS_Store' --exclude='._*' /Volumes/Elements/media/movies/ /Volumes/SSD/movies/
+rsync -avh --info=progress2 --exclude='.DS_Store' --exclude='._*' /Volumes/Elements/media/tvshows/ /Volumes/SSD/tvshows/
+```
+
+#### New or deleted media not showing in Jellyfin
+
+Jellyfin only picks up added or removed files when it rescans the library. Real-time monitoring doesn't work through the bind mount on the Mac, so new media (e.g. copied in with the rsync commands above) doesn't appear, and deleted media stays listed, until the next scan.
+
+**Fix:** go to **Dashboard → Libraries** and click **Scan All Libraries**. You can also open the TV Shows library's **⋯** menu and choose **Scan library**. New media should appear, and deleted media disappear, when the scan finishes. You can make the automatic scan more frequent under **Dashboard → Scheduled Tasks → Scan Media Library** (default: every 12 hours).
+
+The scan only adds new media if its folder and file names follow Jellyfin's naming rules. That matters most for TV shows, which should look like `Show Name/Season 01/Show Name S01E01.mkv`. Badly named files can be skipped or matched to the wrong show.
+
+#### Playback error after unplugging the SSD
+
+Symptom: after the SSD is unplugged and plugged back in, episodes still show up in Jellyfin, but playing one fails with "Playback error, playback failed due to a fatal player error".
+
+The container is still holding the old, now-dead mount from before the drive was unplugged. A bind mount is attached once, when the container is created. Unplugging the SSD broke that mount inside the container. When it's plugged back in, macOS mounts it again as a new `/Volumes/SSD`, but the running container doesn't pick that up. Jellyfin's library database still lists the episode, so it shows up, but the file can't be read and playback fails.
+
+**Fix:** recreate the container so it mounts the SSD again. Make sure the SSD is plugged in first:
+
+```bash
+JELLYFIN_MUSIC_DIR=/Volumes/SSD/music JELLYFIN_MOVIES_DIR=/Volumes/SSD/movies JELLYFIN_TVSHOWS_DIR=/Volumes/SSD/tvshows docker compose -f docker/compose.all.yml up -d --force-recreate jellyfin
+```
+
+`docker restart jellyfin` won't work. A restart keeps the same container and the same broken mount. You need `--force-recreate`.
+
+To check that the container can see the files again:
+
+```bash
+docker exec jellyfin ls /media/tvshows
+```
+
+Libraries, watch history and settings are kept in `~/docker-volumes/jellyfin/config`, so recreating the container doesn't lose anything.
+
+##### If the recreate fails with `file exists`
+
+```
+Error response from daemon: error while creating mount source path '/host_mnt/Volumes/SSD/music': mkdir /host_mnt/Volumes/SSD: file exists
+```
+
+Docker Desktop runs containers in a Linux VM and shows Mac folders to it under `/host_mnt/...`. When the SSD was unplugged, the VM kept a dead entry for `/host_mnt/Volumes/SSD`. Docker tries to create that path for the new mount, finds the dead entry in the way, and fails. Recreating the container doesn't help because the dead entry is in the VM, not the container.
+
+**Fix:** restart Docker Desktop, which restarts the VM and clears the dead entry. Quit it from the menu bar whale → **Quit Docker Desktop** and open it again, or:
+
+```bash
+osascript -e 'quit app "Docker"' && sleep 5 && open -a Docker
+```
+
+Then run the `--force-recreate` command above again. Restarting Docker Desktop stops every running container, not just Jellyfin; the ones with `restart: unless-stopped` come back up on their own.
+
+
+### Navidrome
+
+[What am I doing wrong? : r/navidrome](https://www.reddit.com/r/navidrome/comments/1v3mmm1/what_am_i_doing_wrong/)
+
+
+[Navidrome](https://www.navidrome.org) is a self-hosted music server and streamer that's compatible with the Subsonic API, so any Subsonic client app can play from it. It's a single container defined in `navidrome/docker-compose.yml`, on `main-network`, and Caddy proxies http://navidrome.homelab → `navidrome:4533`.
+
+The music library is set by `NAVIDROME_MUSIC_DIR` in `docker/navidrome/.env`, mounted read-only at `/music`. It currently points at the SSD external drive:
+
+```
+NAVIDROME_MUSIC_DIR=/Volumes/SSD/music
+```
+
+That's a Mac path and it does **not** exist on the Linux VM. Docker would silently create an empty directory there rather than fail, leaving Navidrome scanning nothing — repoint it before running this on the VM. Unset the var entirely and it falls back to `~/docker-volumes/navidrome/music`.
+
+If Navidrome is already running and you change the library path, update the env variable and then run:
+
+```
+docker compose -f compose.all.yml up -d navidrome
+```
+
+Compose re-reads the env file, sees the bind mount source changed, and automatically recreates the container with the new mount. On startup Navidrome rescans the new library location.
+
+Recreating is safe: the database lives in the `navidrome_data` named volume, not in the container, so users, play counts and ratings all survive. Only `/music` changes. Do check the new path actually exists on the host first — per the warning above, a bad path gets silently created as an empty directory and Navidrome comes up scanning nothing.
+
+The key thing to avoid is `docker compose restart navidrome` — restart just stops and starts the existing container with its old mounts, so the env change would be silently ignored. Volume/env changes always require a recreate, which `up -d` handles for you.
+
+Editing `navidrome/.env` on the Mac does nothing to the server on its own — commit, push, and `git pull` on the VM, then run the `up -d` there.
+
+The `navidrome.homelab` record is already committed to `pihole/etc-dnsmasq.d/10-homelab.conf`, so it just needs Pi-hole to pick it up. Start the service and reload DNS:
+
+```
+docker compose -f compose.all.yml up -d navidrome
+docker compose -f compose.all.yml restart pihole caddy
+```
+
+Reach the UI at http://localhost:4533, or at http://navidrome.homelab wherever Caddy and Pi-hole are actually serving the stack (see the phone-access section below — the `.homelab` name does not resolve to the Mac today). The first account you create on the sign-up screen becomes the admin.
+
+Notes:
+
+- The library is mounted `:ro` so a scan can never modify the originals. Navidrome's own DB, cache and artwork live in the `navidrome_data` named volume.
+- That volume is deliberately **not** a `~/docker-volumes` bind mount like most services here. Navidrome's SQLite DB runs in WAL mode, which needs shared-memory locking via real `mmap`; a Docker Desktop bind mount is VirtioFS (`fakeowner`), which doesn't support it, and the scanner dies partway through with `locking protocol` / `file is not a database`. Named volumes are real ext4 inside the VM. It also means `backup-remote-volumes.sh` picks the DB up, since that script only tars named volumes.
+- The initial scan runs on startup — about 3 minutes for the ~5,400-track Elements library. Watch it with `docker compose -f compose.all.yml logs -f navidrome`; it ends with `Scanner: Finished scanning all libraries`. Rescans then run on a schedule (`ND_SCANSCHEDULE`).
+- Unlike Planka and Penpot, Navidrome doesn't bake a base URL into the frontend, so there's no `BASE_URL` env var to juggle — it serves correctly on whatever host it's reached by (localhost, LAN IP, or `.homelab`) with no config changes and no one URL breaking another.
+- Upstream's `user: 1000:1000` is left commented out in compose — the uid differs between the Linux VM (1000) and a Mac running it locally (501). Uncomment it on the VM if you hit permission errors on `/data`.
+- Its `compose.all.yml` include lists both `.env` and `navidrome/.env`: naming an `env_file` replaces the default `.env` lookup, so the shared one has to be listed explicitly or `${TZ}` resolves to empty.
+
+#### Changing the mount path (external drive on the VM)
+
+Two separate things have to be true: the host path has to be **mounted before the container is created**, and `NAVIDROME_MUSIC_DIR` has to point at it. Miss either one and Navidrome shows **"not a valid path"** — Docker silently creates the missing bind source as an empty directory rather than failing, so `/music` inside the container is an empty dir.
+
+**1. Make the mount permanent (do this first)**
+
+Add the SSD to the VM: `VM > Hardweare > Add > USB Device > Use USB Vendor/Device ID > Select the SSD`
+
+A bind mount resolves its source once, at container-create time. If the container already existed when you ran `mount /dev/sdb1 /mnt/ssd`, it is still bound to the empty pre-mount directory — mounting afterwards does not propagate into a running container. The same trap fires on every reboot if the mount isn't in `/etc/fstab`.
+
+```
+sudo mkdir -p /mnt/ssd
+```
+
+First find the device — `/dev/sdb1` below is the typical answer, not a given:
+
+```
+sudo dmesg | tail -20       # right after the USB passthrough: "[sdb] Attached SCSI disk"
+lsblk -o NAME,SIZE,TYPE,TRAN,MODEL,FSTYPE,LABEL,MOUNTPOINTS
+```
+
+`sda` is the VM's virtual boot disk (blank or `sata` under `TRAN`, model `QEMU HARDDISK`) — leave it alone. The SSD is the row with `TRAN=usb` and a size matching the physical drive; the indented rows under it are its partitions. Whatever disk name that row shows in the `NAME` column — `sdb`, `sdc`, whatever it happens to be — is what goes in the next command:
+
+```
+lsblk -f /dev/<disk-from-NAME-above>   # e.g. lsblk -f /dev/sdb
+                                       # whole disk: note FSTYPE + UUID per partition
+```
+
+Add a line to `/etc/fstab` (`sudo vim /etc/fstab`), keyed by **UUID** — the `sdb` letter is assigned in detection order and can shift between boots:
+
+```
+# ext4:
+UUID=<uuid>  /mnt/ssd  ext4     defaults,nofail                          0 2
+# exFAT/NTFS (typical for an external drive):
+UUID=<uuid>  /mnt/ssd  exfat    defaults,nofail,uid=1000,gid=1000,umask=022  0 0
+# hfsplus (what the SSD external drive actually is — Mac-formatted):
+UUID=<uuid>  /mnt/ssd  hfsplus  ro,nofail                                0 0
+```
+
+Or skip the editor and append:
+
+```
+# substitute the partition you identified above for /dev/sdb1
+echo "UUID=$(sudo blkid -s UUID -o value /dev/sdb1)  /mnt/ssd  ext4  defaults,nofail  0 2" | sudo tee -a /etc/fstab
+```
+
+`nofail` matters — without it the VM drops to emergency mode at boot if the SSD is ever unplugged. Then verify before trusting it to a reboot:
+
+```
+sudo findmnt --verify                 # syntax-checks the whole fstab
+sudo umount /mnt/ssd && sudo mount -a && ls /mnt/ssd
+findmnt /mnt/ssd                      # prints a row = actually mounted
+```
+
+`findmnt` printing a row is the confirmation you want — `ls` succeeding proves nothing, since an unmounted mountpoint is just an empty directory that lists fine. A syntax error in `fstab` is one of the few ways to make a VM unbootable, hence the `--verify` pass first. `findmnt -S /dev/sdb1` goes the other way and lists every mountpoint the device is currently attached at, which is how you catch it already being mounted somewhere else (`mount` will refuse with `already mounted on ...`).
+
+**2. Point the env var at it**
+
+In `docker/navidrome/.env`:
+
+```
+NAVIDROME_MUSIC_DIR=/mnt/ssd/music   # or just /mnt/ssd if the files are at the drive root
+```
+
+**3. Recreate, don't restart**
+
+```
+docker compose -f compose.all.yml up -d --force-recreate navidrome
+docker exec navidrome ls /music | head
+```
+
+If that `ls` shows your music, the UI picks it up on the next scan.
+
+Two caveats:
+
+- `navidrome/.env` is git-tracked and shared with the Mac, so setting `/mnt/ssd` there breaks the Mac side. If you run Navidrome in both places, that file wants to be gitignored with a `.env.example` committed instead.
+- If the drive is ext4 owned by root with restrictive permissions you'll need `chown`/`chmod` on it, or leave the container running as root (the `user: "1000:1000"` line stays commented).
+
+**Unmounting and remounting the SSD while the container runs**
+
+If you `umount /mnt/ssd` and mount it again — swapping the drive, a `mount -a` after an fstab edit, the SSD dropping off and coming back — the running container does **not** follow. Its bind mount is attached to the filesystem that was there when the container started, and Docker mounts it `rprivate`, so a new mount landing on `/mnt/ssd` afterwards doesn't propagate into the container's mount namespace. Navidrome keeps looking at the old, now-detached filesystem and `/music` goes empty or stale mid-scan.
+
+Restart to re-resolve it:
+
+```
+docker compose -f compose.all.yml restart navidrome
+docker exec navidrome ls /music | head    # confirm it's back
+```
+
+This is the one case where `restart` is the right tool. Everywhere else in this section it isn't — restart reuses the existing container config, so it silently ignores `.env` and compose changes, which is why step 3 needs `up -d --force-recreate`. Here the config hasn't changed at all; the container just has to redo the mount against whatever is on `/mnt/ssd` now. Verify the host side is actually mounted first (`findmnt /mnt/ssd` prints a row), or the restart just re-binds the empty mountpoint.
+
+#### Access from your phone (or any LAN device)
+
+Port 4533 is published on all interfaces, so anything on the same Wi-Fi can reach Navidrome directly by the host's LAN IP — no Caddy, no DNS, no Pi-hole involved. Get the address of the Mac running it:
+
+```
+ipconfig getifaddr en0
+```
+
+Then browse to `http://<that-ip>:4533`. At the time of writing that's http://10.0.0.227:4533.
+
+Since Navidrome speaks the Subsonic API, a native client is usually nicer than the web UI on a phone — Amperfy or play:Sub on iOS, Symfonium or DSub on Android. Point any of them at the same `http://<ip>:4533` with the admin login for offline sync and lock-screen controls.
+
+Three things worth knowing:
+
+- **The IP is DHCP and will eventually change.** If the phone stops connecting, re-run `ipconfig getifaddr en0` before assuming anything is broken. A DHCP reservation in the router pinning the Mac to a fixed address is the real fix.
+- **`navidrome.homelab` does not work from other devices when the stack runs on the Mac.** Caddy and Pi-hole aren't running there, and the records in `10-homelab.conf` all point at `10.0.0.32` while the Mac currently answers on `10.0.0.227` — so the name resolves to the wrong host. Pinning the Mac to `10.0.0.32` via DHCP reservation would make all the existing records correct at once. Until then, use the IP directly.
+- **To confirm it's genuinely reachable rather than just listening**, check the bind address and make a real request over the LAN (not loopback):
+
+```
+docker port navidrome                              # want 0.0.0.0:4533, not 127.0.0.1:4533
+curl --max-time 5 -o /dev/null -w '%{http_code}\n' http://<ip>:4533/app/   # want 200
+```
+
+macOS's firewall can also block this even when the port is bound correctly — check with `/usr/libexec/ApplicationFirewall/socketfilterfw --getglobalstate`.
+
+#### Feishin (desktop client)
+
+[Feishin](https://github.com/jeffvli/feishin) is a desktop Subsonic/Navidrome client — a nicer full-screen player than the web UI on a laptop. Point it at the server and sign in with the Navidrome account:
+
+```
+Server:    http://navidrome.homelab
+Username:  admin
+Password:  password
+```
+
+Use `http://<host-ip>:4533` instead of the `.homelab` name anywhere DNS doesn't resolve it (see the phone-access section above).
+
+#### Reinstall / start fresh
+
+Wipes the database and rebuilds from scratch.
+
+> **Danger — don't use `docker compose down navidrome`.** Depending on the Compose version that tears down the whole project, and `compose.all.yml` is every service in the stack. `stop` + `rm` can only touch navidrome.
+
+```
+cd ~/repos/homelab/docker
+
+# 1. Stop and remove just the container
+docker compose -f compose.all.yml stop navidrome
+docker compose -f compose.all.yml rm -f navidrome
+
+# 2. Delete the DB, cache and plugins -- this is the actual "uninstall"
+docker volume rm docker_navidrome_data
+
+# 3. Force a fresh image (optional, skip if you just want a clean DB)
+docker rmi deluan/navidrome:latest
+
+# 4. Rebuild from scratch
+docker compose -f compose.all.yml pull navidrome
+docker compose -f compose.all.yml up -d navidrome
+
+# 5. Watch the scan
+docker compose -f compose.all.yml logs -f navidrome
+```
+
+This throws away the admin account, play counts, ratings and playlists — you'll create a new admin on first load. The music itself is never at risk: the library is mounted `:ro`, so nothing Navidrome does can touch it. It just gets re-scanned from scratch — about 3 minutes for the ~5,400-track Elements library.
+
+> **Note — a reinstall won't fix `locking protocol` or `file is not a database`.** Those aren't corruption, so wiping the DB only buys you a clean one that breaks again on the next scan. They mean `/data` has ended up on a bind mount instead of the `navidrome_data` named volume — see the volume comment in `navidrome/docker-compose.yml`. Check with:
+>
+> ```
+> docker inspect navidrome --format '{{range .Mounts}}{{.Type}} {{.Destination}}{{"\n"}}{{end}}'
+> ```
+>
+> `/data` must say `volume`. If it says `bind`, that's the bug.
+
+#### Running it standalone (outside the homelab stack)
+
+Navidrome doesn't depend on anything else in the stack — no Caddy, no Pi-hole, no `main-network`. If the repo isn't checked out, or you just want it on some other machine, one `docker run` is the whole install:
+
+```
+docker run -d --name navidrome --restart unless-stopped \
+  -p 4533:4533 -e TZ=America/Chicago \
+  -v navidrome_data:/data \
+  -v /Volumes/Elements/Music:/music:ro \
+  deluan/navidrome:latest
+
+docker exec navidrome ls /music | head
+```
+
+Swap `/Volumes/Elements/Music` for wherever the library actually is on that host. The same rules from the rest of this section still apply: `/data` has to be the named volume (not a bind mount) or the SQLite DB breaks mid-scan, the music mount stays `:ro`, and the drive has to be mounted *before* the container is created or Docker silently binds an empty directory. Reach it at http://localhost:4533 and create the admin account on first load.
+
+Note the volume is plain `navidrome_data` here, not the `docker_navidrome_data` that Compose creates — the project prefix only comes from `compose.all.yml`. So a standalone run gets its own separate database, and the reinstall commands above won't touch it.
+
 
 ## Kafka Testing Stack
 
@@ -2463,77 +3090,7 @@ ssh logan@10.0.0.32 "docker run --rm -v docker_forgejo_data:/data -v \$HOME:/bac
 in-flight git operations do not tar consistently. Run the one-liner above against a stopped
 container for the same reason if the repos are busy.
 
-**Backup and restore with restic** (snapshots tagged `forgejo`).
-
-One-time setup (skip whatever you've already done):
-
-```bash
-brew install restic
-openssl rand -base64 32 > ~/.restic-password
-chmod 600 ~/.restic-password
-
-export RESTIC_REPOSITORY=~/restic/homelab
-export RESTIC_PASSWORD_FILE=~/.restic-password
-restic init
-```
-
-The two `export` lines are needed in every new terminal before the commands below, unless you
-add them to `~/.zshrc`.
-
-Manual backup:
-
-```bash
-docker stop forgejo
-restic backup ~/docker-volumes/forgejo --tag forgejo
-docker start forgejo
-```
-
-Check the backup:
-
-```bash
-restic snapshots --tag forgejo
-restic check
-```
-
-List every tag in the repo (restic has no built-in command for this):
-
-```bash
-restic snapshots --json | jq -r '.[].tags[]?' | sort -u
-```
-
-Test restore (safe, doesn't touch the live data):
-
-```bash
-restic restore latest --tag forgejo --target /tmp/restore-test
-ls /tmp/restore-test/Users/$USER/docker-volumes/forgejo
-rm -rf /tmp/restore-test
-```
-
-Full restore (rolls Forgejo back to the snapshot):
-
-```bash
-docker stop forgejo
-mv ~/docker-volumes/forgejo ~/docker-volumes/forgejo.old
-restic restore latest --tag forgejo --target /
-docker start forgejo
-```
-
-Restore an older snapshot — list the snapshots, then use the ID in place of `latest` in either
-restore above:
-
-```bash
-restic snapshots --tag forgejo
-restic restore 1a2b3c4d --target /
-```
-
-Restore a single file or folder — find its path inside the snapshot, then restore only that to
-a scratch location:
-
-```bash
-restic find --tag forgejo app.ini
-restic restore latest --tag forgejo --target /tmp/restore-one \
-  --include /Users/$USER/docker-volumes/forgejo/gitea/conf/app.ini
-```
+Backup and restore with restic: see [Forgejo](#forgejo) under Backup and Restore.
 
 Full reset (wipes everything):
 
@@ -2631,6 +3188,254 @@ docker compose -f docker/compose.all.yml rm -fsv dockhand
 docker volume rm docker_dockhand_data
 docker compose -f docker/compose.all.yml up -d dockhand
 ```
+
+## Home Assistant
+
+Three containers from `homeassistant/docker-compose.yml`. Zigbee devices talk to the SLZB-06M coordinator,
+Zigbee2MQTT publishes them as MQTT topics on Mosquitto, and Home Assistant's MQTT integration
+discovers them from there.
+
+| Container | Reached at | Data under `~/docker-volumes/homeassistant/` |
+|-|-|-|
+| homeassistant | http://homeassistant.homelab, `<server>:8123` | `config/` |
+| mosquitto | `<server>:1883`, `mosquitto:1883` on main-network | `mosquitto/` |
+| zigbee2mqtt | http://zigbee2mqtt.homelab, `<server>:8095` | `zigbee2mqtt/` |
+
+This is separate from the Home Assistant OS VM in `terraform/homeassistant.tf` (root README). The
+two share nothing, so settings made in one do not appear in the other.
+
+### Why homeassistant is not on main-network
+
+It runs with `network_mode: host`, because device discovery (mDNS, SSDP, DHCP watching, Cast,
+HomeKit) needs to see the LAN itself and a bridge network hides it. That breaks the "three keys"
+rule from [Adding a new service](#adding-a-new-service), which shows up in three places:
+
+- Caddy proxies to `host.docker.internal:8123` instead of a container name. The `extra_hosts` entry
+  on the caddy service in `docker-compose.yml` is what makes that name resolve to the host.
+- Home Assistant must be told to trust Caddy (first boot, step 2).
+- Home Assistant reaches the broker at `127.0.0.1:1883`, while Zigbee2MQTT uses
+  `mqtt://mosquitto:1883`.
+
+### First boot
+
+1. Start Home Assistant, the broker and Zigbee2MQTT:
+
+```bash
+docker compose -f docker/compose.all.yml up -d homeassistant mosquitto zigbee2mqtt gatus dockhand grafana prometheus
+```
+
+   Leave out `zigbee2mqtt` until `SLZB_HOST` is set in `docker/.env` (see
+   [Zigbee2MQTT and the SLZB-06M](#zigbee2mqtt-and-the-slzb-06m)), or it keeps restarting with a
+   connection error. Leave off the service names to start the whole stack.
+
+2. Give Home Assistant about a minute to write its default `configuration.yaml`, then tell it to
+   trust Caddy and restart it. Without this block every request through `homeassistant.homelab`
+   gets a 400. The file is written by root inside the container, hence `sudo`.
+
+```bash
+sudo tee -a ~/docker-volumes/homeassistant/config/configuration.yaml <<'EOF'
+
+http:
+  use_x_forwarded_for: true
+  trusted_proxies:
+    - 172.16.0.0/12
+EOF
+docker compose -f docker/compose.all.yml restart homeassistant
+```
+
+   `172.16.0.0/12` covers every subnet Docker hands out by default, so it keeps working when the
+   networks are recreated with different addresses.
+
+3. Pick up the DNS record, Caddy route (and its `extra_hosts`), Gatus endpoint and Homepage tile:
+
+```bash
+docker compose -f docker/compose.all.yml up -d --force-recreate pihole caddy gatus homepage
+```
+
+4. Open http://homeassistant.homelab and create the owner account.
+
+5. Connect MQTT: **Settings > Devices & services > Add integration > MQTT**, with broker
+   `127.0.0.1`, port `1883`, and `MQTT_USER` / `MQTT_PASSWORD` from `docker/.env`.
+
+Check it one layer at a time:
+
+```bash
+dig +short homeassistant.homelab @192.168.1.150
+curl -sI http://homeassistant.homelab/manifest.json    # want 200
+```
+
+| Response | Meaning |
+|-|-|
+| 400 | The `http:` block is missing or its subnet is wrong. `docker logs homeassistant` names the proxy IP it rejected. |
+| 502 | Caddy cannot reach host port 8123. Either Home Assistant is down, or a firewall is in the way: check `sudo ufw status`, and if it is active, `sudo ufw allow 8123/tcp`. |
+
+### Running it on the Mac
+
+Host networking does not work for local testing: Docker Desktop's "host" is its own Linux VM, not
+macOS, so nothing answers on `localhost:8123`. Switch Home Assistant to Docker's default bridge at
+run time, which is what makes its `8123:8123` port mapping take effect:
+
+```bash
+HA_NETWORK_MODE=bridge docker compose -f docker/compose.all.yml up -d homeassistant mosquitto zigbee2mqtt gatus dockhand grafana prometheus
+```
+
+Leave out `zigbee2mqtt` until `SLZB_HOST` is set in `docker/.env` (see
+[Zigbee2MQTT and the SLZB-06M](#zigbee2mqtt-and-the-slzb-06m)), or it keeps restarting with a
+connection error. Leave off the service names to start the whole stack.
+
+Then open http://localhost:8123. Two things differ from the server in this mode: there is no device
+discovery, and the broker address for the MQTT integration is `host.docker.internal` instead of
+`127.0.0.1`. No `trusted_proxies` block is needed, since this bypasses Caddy.
+
+Pass the variable on every `up` for this service. Without it Compose sees the mode changed back to
+`host` and recreates the container. On the server, leave it unset; the
+`Published ports are discarded when using host network mode` warning there is expected.
+
+### MQTT credentials
+
+`MQTT_USER` and `MQTT_PASSWORD` live in `docker/.env`. Mosquitto wants a hashed password file rather
+than env vars, so the service's `command` rebuilds `/mosquitto/data/passwd` from them on every start.
+To change the password, edit `.env`, run `up -d mosquitto`, then update it in Home Assistant's MQTT
+integration.
+
+```bash
+# anonymous clients are refused: prints "not authorised"
+docker compose -f docker/compose.all.yml exec mosquitto mosquitto_sub -t '#' -C 1 -W 3
+
+# watch everything on the broker (source docker/.env first for the two variables)
+docker compose -f docker/compose.all.yml exec mosquitto \
+  mosquitto_sub -u "$MQTT_USER" -P "$MQTT_PASSWORD" -t '#' -v
+```
+
+### Zigbee2MQTT and the SLZB-06M
+
+The Zigbee coordinator is an SMLIGHT SLZB-06M. It is a network coordinator: it sits on the LAN
+(Ethernet or PoE) and serves its Zigbee radio on TCP port 6638. Zigbee2MQTT connects to
+`tcp://${SLZB_HOST}:6638`, so there is no USB passthrough, no `devices:` entry, and the same compose
+file works on the Mac and on the server. Only one Zigbee2MQTT may be connected to it at a time, so
+stop the Mac's before starting the server's.
+
+1. Set up the SLZB-06M in its own web UI (open its IP in a browser; the router shows which IP it
+   got):
+   - **Mode:** Zigbee Coordinator, with the connection set to LAN (Ethernet).
+   - **Firmware:** the EmberZNet coordinator firmware it ships with. Update it from the same UI if
+     offered.
+   - Reserve its IP on the router so it never changes.
+
+2. Put the IP in `docker/.env` and check the port answers:
+
+```bash
+SLZB_HOST=192.168.1.x
+nc -z -G 2 192.168.1.x 6638 && echo reachable
+```
+
+   Containers cannot resolve `.local` mDNS names, which is why this is an IP. While `SLZB_HOST` is
+   empty, zigbee2mqtt restarts in a loop with a connection error.
+
+3. Start it (on the Mac, `HA_NETWORK_MODE=bridge` keeps Home Assistant in bridge mode if it is
+   recreated too):
+
+```bash
+HA_NETWORK_MODE=bridge docker compose -f docker/compose.all.yml up -d zigbee2mqtt
+```
+
+4. Open http://localhost:8095 (Mac) or http://zigbee2mqtt.homelab (server) and finish the
+   first-start page. The broker address, MQTT login, coordinator address and adapter type (`ember`,
+   for the 06M's EFR32MG21 chip) are already supplied through `ZIGBEE2MQTT_CONFIG_*` variables in
+   the compose file, and those override `configuration.yaml` on every start.
+
+5. Turn on **Permit join** and pair a device. It appears in Home Assistant by itself, through MQTT
+   discovery.
+
+```bash
+docker logs zigbee2mqtt 2>&1 | grep -iE 'coordinator|error'   # firmware line, no connection errors
+
+# prints {"state":"online"} once Zigbee2MQTT is connected to the broker
+docker compose -f docker/compose.all.yml exec mosquitto \
+  mosquitto_sub -u "$MQTT_USER" -P "$MQTT_PASSWORD" -t zigbee2mqtt/bridge/state -C 1 -W 5
+```
+
+Moving from the Mac to the server: the Zigbee network (its key and every pairing) lives in
+`~/docker-volumes/homeassistant/zigbee2mqtt/`. Copy that directory to the server before starting the
+server's Zigbee2MQTT, or every device has to be re-paired.
+
+### Dashboard and theme
+
+The dashboard is Home Assistant's own **Overview**, which builds itself from your areas and devices
+using the Sections layout. To arrange it yourself, open it, then **pencil icon > Take control**.
+That turns it into an editable Sections dashboard. Dashboards edited in the UI are saved in the
+data dir (`config/.storage/lovelace*`), not in the repo, so they are covered by the data-dir backup
+but do not carry over to another host on their own.
+
+`themes/rounded-bubble.yaml` is the Rounded-Bubble theme from
+https://github.com/jlnbln/My-HA-Dashboard, mounted read-only at `/config/themes`. The generated
+`configuration.yaml` already loads that directory, so no config edit is needed. Pick it on your
+profile page under **Theme**. Changes to the file need a Home Assistant restart.
+
+One change from upstream: its `card-mod-theme` / `card-mod-root-yaml` block is removed. That block
+only padded the page (100px left on desktop, 180px bottom on mobile) to make room for the author's
+navbar card, and it needed the card-mod custom card to load. Without it the theme is plain
+variables and needs nothing installed. It asks for the Poppins font, which is not bundled, so text
+falls back to the default font.
+
+### Kiosk mode
+
+1. Install HACS. Your setup runs Home Assistant in Docker, so you don't get the add-on store. Install
+   HACS from inside the container:
+
+```bash
+docker exec -it homeassistant bash -c "wget -O - https://get.hacs.xyz | bash -"
+```
+
+   Restart Home Assistant:
+
+```bash
+docker compose -f docker/compose.all.yml restart homeassistant
+```
+
+   Then add it under **Settings → Devices & services → Add integration → HACS**.
+
+2. Install kiosk-mode. In HACS, search for **Kiosk Mode** (by NemesisRE), download it, and refresh
+   your browser.
+
+3. Turn it on. You can do this in either of two ways:
+   - **Per URL:** add `?kiosk` to a dashboard URL, for example
+     `http://<ha-host>:8123/lovelace/0?kiosk`. This hides the header and the sidebar. Use
+     `?hide_header` or `?hide_sidebar` to hide only one of them.
+   - **Per dashboard:** open the dashboard, then **⋮ → Edit → ⋮ → Raw configuration editor**, and
+     add this at the top:
+
+```yaml
+kiosk_mode:
+  kiosk: true
+```
+
+   You can also limit it to certain users with `user_settings` blocks. This way your admin account
+   keeps the full UI and only something like a wall-tablet user gets kiosk mode.
+
+Kiosk mode only hides Home Assistant's own header and sidebar. To get rid of the browser chrome too,
+use one of these:
+
+- **Android tablet:** the Fully Kiosk Browser app.
+- **Desktop:** launch Chrome with `--kiosk "http://<ha-host>:8123/lovelace/0?kiosk"`, or press F11
+  for full screen.
+
+To exit kiosk mode, remove `?kiosk` from the URL. If you turned it on in the dashboard config, add
+`?disable_km` to the URL to get the UI back temporarily.
+
+### Backup
+
+Everything is under `~/docker-volumes/homeassistant/`, so that directory is the whole backup.
+`backup-remote-volumes.sh` only tars named volumes and does not cover it; **backrest** sees it as
+`/userdata/homeassistant`.
+
+- `config/` also receives Home Assistant's own backups (**Settings > System > Backups**) in
+  `config/backups/`. Turn on automatic backups there.
+- `zigbee2mqtt/` holds the Zigbee network key and pairing database. Losing it means re-pairing every
+  device.
+- `mosquitto/` holds retained messages and the generated password file. It rebuilds itself.
+
+Backup and restore with restic: see [Home Assistant](#home-assistant) under Backup and Restore.
 
 ## C Advisor
 
@@ -2915,236 +3720,6 @@ Notes:
 - `planka-postgres` uses `POSTGRES_HOST_AUTH_METHOD=trust` (LAN-only, no DB password), matching upstream. Don't expose Postgres outside the `planka` network.
 - The upstream compose's optional Traefik/S3/OIDC config is dropped — Caddy handles ingress; enable the others later via env if needed.
 
-
-## Navidrome
-
-[What am I doing wrong? : r/navidrome](https://www.reddit.com/r/navidrome/comments/1v3mmm1/what_am_i_doing_wrong/)
-
-
-[Navidrome](https://www.navidrome.org) is a self-hosted music server and streamer that's compatible with the Subsonic API, so any Subsonic client app can play from it. It's a single container defined in `navidrome/docker-compose.yml`, on `main-network`, and Caddy proxies http://navidrome.homelab → `navidrome:4533`.
-
-The music library is set by `NAVIDROME_MUSIC_DIR` in `docker/navidrome/.env`, mounted read-only at `/music`. It currently points at the SSD external drive:
-
-```
-NAVIDROME_MUSIC_DIR=/Volumes/SSD/music
-```
-
-That's a Mac path and it does **not** exist on the Linux VM. Docker would silently create an empty directory there rather than fail, leaving Navidrome scanning nothing — repoint it before running this on the VM. Unset the var entirely and it falls back to `~/docker-volumes/navidrome/music`.
-
-If Navidrome is already running and you change the library path, update the env variable and then run:
-
-```
-docker compose -f compose.all.yml up -d navidrome
-```
-
-Compose re-reads the env file, sees the bind mount source changed, and automatically recreates the container with the new mount. On startup Navidrome rescans the new library location.
-
-Recreating is safe: the database lives in the `navidrome_data` named volume, not in the container, so users, play counts and ratings all survive. Only `/music` changes. Do check the new path actually exists on the host first — per the warning above, a bad path gets silently created as an empty directory and Navidrome comes up scanning nothing.
-
-The key thing to avoid is `docker compose restart navidrome` — restart just stops and starts the existing container with its old mounts, so the env change would be silently ignored. Volume/env changes always require a recreate, which `up -d` handles for you.
-
-Editing `navidrome/.env` on the Mac does nothing to the server on its own — commit, push, and `git pull` on the VM, then run the `up -d` there.
-
-The `navidrome.homelab` record is already committed to `pihole/etc-dnsmasq.d/10-homelab.conf`, so it just needs Pi-hole to pick it up. Start the service and reload DNS:
-
-```
-docker compose -f compose.all.yml up -d navidrome
-docker compose -f compose.all.yml restart pihole caddy
-```
-
-Reach the UI at http://localhost:4533, or at http://navidrome.homelab wherever Caddy and Pi-hole are actually serving the stack (see the phone-access section below — the `.homelab` name does not resolve to the Mac today). The first account you create on the sign-up screen becomes the admin.
-
-Notes:
-
-- The library is mounted `:ro` so a scan can never modify the originals. Navidrome's own DB, cache and artwork live in the `navidrome_data` named volume.
-- That volume is deliberately **not** a `~/docker-volumes` bind mount like most services here. Navidrome's SQLite DB runs in WAL mode, which needs shared-memory locking via real `mmap`; a Docker Desktop bind mount is VirtioFS (`fakeowner`), which doesn't support it, and the scanner dies partway through with `locking protocol` / `file is not a database`. Named volumes are real ext4 inside the VM. It also means `backup-remote-volumes.sh` picks the DB up, since that script only tars named volumes.
-- The initial scan runs on startup — about 3 minutes for the ~5,400-track Elements library. Watch it with `docker compose -f compose.all.yml logs -f navidrome`; it ends with `Scanner: Finished scanning all libraries`. Rescans then run on a schedule (`ND_SCANSCHEDULE`).
-- Unlike Planka and Penpot, Navidrome doesn't bake a base URL into the frontend, so there's no `BASE_URL` env var to juggle — it serves correctly on whatever host it's reached by (localhost, LAN IP, or `.homelab`) with no config changes and no one URL breaking another.
-- Upstream's `user: 1000:1000` is left commented out in compose — the uid differs between the Linux VM (1000) and a Mac running it locally (501). Uncomment it on the VM if you hit permission errors on `/data`.
-- Its `compose.all.yml` include lists both `.env` and `navidrome/.env`: naming an `env_file` replaces the default `.env` lookup, so the shared one has to be listed explicitly or `${TZ}` resolves to empty.
-
-### Changing the mount path (external drive on the VM)
-
-Two separate things have to be true: the host path has to be **mounted before the container is created**, and `NAVIDROME_MUSIC_DIR` has to point at it. Miss either one and Navidrome shows **"not a valid path"** — Docker silently creates the missing bind source as an empty directory rather than failing, so `/music` inside the container is an empty dir.
-
-**1. Make the mount permanent (do this first)**
-
-Add the SSD to the VM: `VM > Hardweare > Add > USB Device > Use USB Vendor/Device ID > Select the SSD`
-
-A bind mount resolves its source once, at container-create time. If the container already existed when you ran `mount /dev/sdb1 /mnt/ssd`, it is still bound to the empty pre-mount directory — mounting afterwards does not propagate into a running container. The same trap fires on every reboot if the mount isn't in `/etc/fstab`.
-
-```
-sudo mkdir -p /mnt/ssd
-```
-
-First find the device — `/dev/sdb1` below is the typical answer, not a given:
-
-```
-sudo dmesg | tail -20       # right after the USB passthrough: "[sdb] Attached SCSI disk"
-lsblk -o NAME,SIZE,TYPE,TRAN,MODEL,FSTYPE,LABEL,MOUNTPOINTS
-```
-
-`sda` is the VM's virtual boot disk (blank or `sata` under `TRAN`, model `QEMU HARDDISK`) — leave it alone. The SSD is the row with `TRAN=usb` and a size matching the physical drive; the indented rows under it are its partitions. Whatever disk name that row shows in the `NAME` column — `sdb`, `sdc`, whatever it happens to be — is what goes in the next command:
-
-```
-lsblk -f /dev/<disk-from-NAME-above>   # e.g. lsblk -f /dev/sdb
-                                       # whole disk: note FSTYPE + UUID per partition
-```
-
-Add a line to `/etc/fstab` (`sudo vim /etc/fstab`), keyed by **UUID** — the `sdb` letter is assigned in detection order and can shift between boots:
-
-```
-# ext4:
-UUID=<uuid>  /mnt/ssd  ext4     defaults,nofail                          0 2
-# exFAT/NTFS (typical for an external drive):
-UUID=<uuid>  /mnt/ssd  exfat    defaults,nofail,uid=1000,gid=1000,umask=022  0 0
-# hfsplus (what the SSD external drive actually is — Mac-formatted):
-UUID=<uuid>  /mnt/ssd  hfsplus  ro,nofail                                0 0
-```
-
-Or skip the editor and append:
-
-```
-# substitute the partition you identified above for /dev/sdb1
-echo "UUID=$(sudo blkid -s UUID -o value /dev/sdb1)  /mnt/ssd  ext4  defaults,nofail  0 2" | sudo tee -a /etc/fstab
-```
-
-`nofail` matters — without it the VM drops to emergency mode at boot if the SSD is ever unplugged. Then verify before trusting it to a reboot:
-
-```
-sudo findmnt --verify                 # syntax-checks the whole fstab
-sudo umount /mnt/ssd && sudo mount -a && ls /mnt/ssd
-findmnt /mnt/ssd                      # prints a row = actually mounted
-```
-
-`findmnt` printing a row is the confirmation you want — `ls` succeeding proves nothing, since an unmounted mountpoint is just an empty directory that lists fine. A syntax error in `fstab` is one of the few ways to make a VM unbootable, hence the `--verify` pass first. `findmnt -S /dev/sdb1` goes the other way and lists every mountpoint the device is currently attached at, which is how you catch it already being mounted somewhere else (`mount` will refuse with `already mounted on ...`).
-
-**2. Point the env var at it**
-
-In `docker/navidrome/.env`:
-
-```
-NAVIDROME_MUSIC_DIR=/mnt/ssd/music   # or just /mnt/ssd if the files are at the drive root
-```
-
-**3. Recreate, don't restart**
-
-```
-docker compose -f compose.all.yml up -d --force-recreate navidrome
-docker exec navidrome ls /music | head
-```
-
-If that `ls` shows your music, the UI picks it up on the next scan.
-
-Two caveats:
-
-- `navidrome/.env` is git-tracked and shared with the Mac, so setting `/mnt/ssd` there breaks the Mac side. If you run Navidrome in both places, that file wants to be gitignored with a `.env.example` committed instead.
-- If the drive is ext4 owned by root with restrictive permissions you'll need `chown`/`chmod` on it, or leave the container running as root (the `user: "1000:1000"` line stays commented).
-
-**Unmounting and remounting the SSD while the container runs**
-
-If you `umount /mnt/ssd` and mount it again — swapping the drive, a `mount -a` after an fstab edit, the SSD dropping off and coming back — the running container does **not** follow. Its bind mount is attached to the filesystem that was there when the container started, and Docker mounts it `rprivate`, so a new mount landing on `/mnt/ssd` afterwards doesn't propagate into the container's mount namespace. Navidrome keeps looking at the old, now-detached filesystem and `/music` goes empty or stale mid-scan.
-
-Restart to re-resolve it:
-
-```
-docker compose -f compose.all.yml restart navidrome
-docker exec navidrome ls /music | head    # confirm it's back
-```
-
-This is the one case where `restart` is the right tool. Everywhere else in this section it isn't — restart reuses the existing container config, so it silently ignores `.env` and compose changes, which is why step 3 needs `up -d --force-recreate`. Here the config hasn't changed at all; the container just has to redo the mount against whatever is on `/mnt/ssd` now. Verify the host side is actually mounted first (`findmnt /mnt/ssd` prints a row), or the restart just re-binds the empty mountpoint.
-
-### Access from your phone (or any LAN device)
-
-Port 4533 is published on all interfaces, so anything on the same Wi-Fi can reach Navidrome directly by the host's LAN IP — no Caddy, no DNS, no Pi-hole involved. Get the address of the Mac running it:
-
-```
-ipconfig getifaddr en0
-```
-
-Then browse to `http://<that-ip>:4533`. At the time of writing that's http://10.0.0.227:4533.
-
-Since Navidrome speaks the Subsonic API, a native client is usually nicer than the web UI on a phone — Amperfy or play:Sub on iOS, Symfonium or DSub on Android. Point any of them at the same `http://<ip>:4533` with the admin login for offline sync and lock-screen controls.
-
-Three things worth knowing:
-
-- **The IP is DHCP and will eventually change.** If the phone stops connecting, re-run `ipconfig getifaddr en0` before assuming anything is broken. A DHCP reservation in the router pinning the Mac to a fixed address is the real fix.
-- **`navidrome.homelab` does not work from other devices when the stack runs on the Mac.** Caddy and Pi-hole aren't running there, and the records in `10-homelab.conf` all point at `10.0.0.32` while the Mac currently answers on `10.0.0.227` — so the name resolves to the wrong host. Pinning the Mac to `10.0.0.32` via DHCP reservation would make all the existing records correct at once. Until then, use the IP directly.
-- **To confirm it's genuinely reachable rather than just listening**, check the bind address and make a real request over the LAN (not loopback):
-
-```
-docker port navidrome                              # want 0.0.0.0:4533, not 127.0.0.1:4533
-curl --max-time 5 -o /dev/null -w '%{http_code}\n' http://<ip>:4533/app/   # want 200
-```
-
-macOS's firewall can also block this even when the port is bound correctly — check with `/usr/libexec/ApplicationFirewall/socketfilterfw --getglobalstate`.
-
-### Feishin (desktop client)
-
-[Feishin](https://github.com/jeffvli/feishin) is a desktop Subsonic/Navidrome client — a nicer full-screen player than the web UI on a laptop. Point it at the server and sign in with the Navidrome account:
-
-```
-Server:    http://navidrome.homelab
-Username:  admin
-Password:  password
-```
-
-Use `http://<host-ip>:4533` instead of the `.homelab` name anywhere DNS doesn't resolve it (see the phone-access section above).
-
-### Reinstall / start fresh
-
-Wipes the database and rebuilds from scratch.
-
-> **Danger — don't use `docker compose down navidrome`.** Depending on the Compose version that tears down the whole project, and `compose.all.yml` is every service in the stack. `stop` + `rm` can only touch navidrome.
-
-```
-cd ~/repos/homelab/docker
-
-# 1. Stop and remove just the container
-docker compose -f compose.all.yml stop navidrome
-docker compose -f compose.all.yml rm -f navidrome
-
-# 2. Delete the DB, cache and plugins -- this is the actual "uninstall"
-docker volume rm docker_navidrome_data
-
-# 3. Force a fresh image (optional, skip if you just want a clean DB)
-docker rmi deluan/navidrome:latest
-
-# 4. Rebuild from scratch
-docker compose -f compose.all.yml pull navidrome
-docker compose -f compose.all.yml up -d navidrome
-
-# 5. Watch the scan
-docker compose -f compose.all.yml logs -f navidrome
-```
-
-This throws away the admin account, play counts, ratings and playlists — you'll create a new admin on first load. The music itself is never at risk: the library is mounted `:ro`, so nothing Navidrome does can touch it. It just gets re-scanned from scratch — about 3 minutes for the ~5,400-track Elements library.
-
-> **Note — a reinstall won't fix `locking protocol` or `file is not a database`.** Those aren't corruption, so wiping the DB only buys you a clean one that breaks again on the next scan. They mean `/data` has ended up on a bind mount instead of the `navidrome_data` named volume — see the volume comment in `navidrome/docker-compose.yml`. Check with:
->
-> ```
-> docker inspect navidrome --format '{{range .Mounts}}{{.Type}} {{.Destination}}{{"\n"}}{{end}}'
-> ```
->
-> `/data` must say `volume`. If it says `bind`, that's the bug.
-
-### Running it standalone (outside the homelab stack)
-
-Navidrome doesn't depend on anything else in the stack — no Caddy, no Pi-hole, no `main-network`. If the repo isn't checked out, or you just want it on some other machine, one `docker run` is the whole install:
-
-```
-docker run -d --name navidrome --restart unless-stopped \
-  -p 4533:4533 -e TZ=America/Chicago \
-  -v navidrome_data:/data \
-  -v /Volumes/Elements/Music:/music:ro \
-  deluan/navidrome:latest
-
-docker exec navidrome ls /music | head
-```
-
-Swap `/Volumes/Elements/Music` for wherever the library actually is on that host. The same rules from the rest of this section still apply: `/data` has to be the named volume (not a bind mount) or the SQLite DB breaks mid-scan, the music mount stays `:ro`, and the drive has to be mounted *before* the container is created or Docker silently binds an empty directory. Reach it at http://localhost:4533 and create the admin account on first load.
-
-Note the volume is plain `navidrome_data` here, not the `docker_navidrome_data` that Compose creates — the project prefix only comes from `compose.all.yml`. So a standalone run gets its own separate database, and the reinstall commands above won't touch it.
 
 ## Backrest
 
@@ -3512,6 +4087,8 @@ These services bake their public URL into the frontend at startup — they only 
 | garage-webui | http://localhost:3909 | http://garage.homelab | admin / changeMe123 |
 | seaweedfs | http://localhost:8888 (master: 9333, S3: 8333, WebDAV: 7333, volume: 8380) | http://seaweedfs.homelab (master: seaweedfs-master.homelab, S3: seaweedfs-s3.homelab, WebDAV: seaweedfs-webdav.homelab) | S3: admin / changeMe123 |
 | planka | http://localhost:1337 | http://planka.homelab | created via `npm run db:create-admin-user` |
+| homeassistant | http://localhost:8123 | http://homeassistant.homelab | set on first run (onboarding) |
+| zigbee2mqtt | http://localhost:8095 | http://zigbee2mqtt.homelab | N/A |
 | penpot-mailcatch | http://localhost:1080 | N/A (no Caddy block) | N/A |
 | matomo | http://localhost:8093 | N/A (no Caddy block) | set on first run; DB pass changeMe |
 | alloy | http://localhost:12345 | N/A (no Caddy block) | N/A |
@@ -3526,6 +4103,7 @@ No web UI; listed for completeness.
 | kafka (broker) | localhost:9092, localhost:29092 | N/A | N/A |
 | redis | localhost:6379 | N/A | password: changeMe |
 | redis-pubsub | localhost:6380 | N/A | password: changeMe |
+| mosquitto (MQTT broker) | localhost:1883 | N/A | `MQTT_USER` / `MQTT_PASSWORD` in docker/.env |
 | test-db (postgres) | localhost:5432 | N/A | testuser / testpassword |
 | n8n postgres | N/A | N/A | changeUser / changePassword |
 | metabase-db (postgres) | N/A | N/A | metabase / changeMe |

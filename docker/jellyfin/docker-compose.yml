@@ -1,0 +1,45 @@
+# Jellyfin (media server for the music, movie and TV show libraries) at http://jellyfin.homelab.
+#
+# main-network is declared in the root docker-compose.yml, not here -- like the other
+# per-service files in this repo, this only comes up via compose.all.yml:
+#   docker compose -f compose.all.yml up -d jellyfin
+# No jellyfin/.env: JELLYFIN_MUSIC_DIR / JELLYFIN_MOVIES_DIR / JELLYFIN_TVSHOWS_DIR come
+# from the shared docker/.env (VM paths under /mnt/ssd). To run on the Mac against
+# /Volumes/SSD, override them in the shell -- see "Running through docker compose"
+# in README.md.
+
+services:
+  jellyfin:
+    image: jellyfin/jellyfin
+    container_name: jellyfin
+    # user: "1000:1000"
+    volumes:
+      - ~/docker-volumes/jellyfin/config:/config
+      - ~/docker-volumes/jellyfin/cache:/cache
+      # Music library, mounted read-only so Jellyfin can never modify the files.
+      # Set JELLYFIN_MUSIC_DIR in docker/.env -- on the VM that's the SSD at
+      # /mnt/ssd/music (see "Changing the mount path" in README.md). The host path
+      # must already be mounted BEFORE the container is created: a bind mount
+      # resolves its source once, and docker silently creates a missing source as
+      # an empty dir rather than failing, so the library shows up empty.
+      - ${JELLYFIN_MUSIC_DIR:-~/docker-volumes/jellyfin/music}:/media/music:ro
+      # Movie library, same rules. Also on the SSD, so it's covered by the same
+      # /mnt/ssd fstab entry -- and it goes stale on a remount for the same reason.
+      - ${JELLYFIN_MOVIES_DIR:-~/docker-volumes/jellyfin/movies}:/media/movies:ro
+      # TV show library, same rules. Kept separate from movies because Jellyfin
+      # scans each library with a single content type (Movies vs Shows).
+      - ${JELLYFIN_TVSHOWS_DIR:-~/docker-volumes/jellyfin/tvshows}:/media/tvshows:ro
+      # Additional libraries: add more mounts under /media, one per content type.
+      # Optional - extra fonts to be used during transcoding with subtitle burn-in
+      # - type: bind
+      #   source: /usr/local/share/fonts
+      #   target: /usr/local/share/fonts/custom
+      #   read_only: true
+    restart: 'unless-stopped'
+    # Optional - alternative address used for autodiscovery
+    environment:
+      - JELLYFIN_PublishedServerUrl=http://example.com
+    ports:
+      - "8096:8096" # exposed on localhost for testing; caddy also proxies internally
+    networks:
+      - main-network
