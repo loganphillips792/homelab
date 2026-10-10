@@ -570,38 +570,6 @@ services:
     networks:
       - main-network
 
-  jellyfin:
-    image: jellyfin/jellyfin
-    container_name: jellyfin
-    # user: "1000:1000"
-    volumes:
-      - ~/docker-volumes/jellyfin/config:/config
-      - ~/docker-volumes/jellyfin/cache:/cache
-      # Music library, mounted read-only so Jellyfin can never modify the files.
-      # Set JELLYFIN_MUSIC_DIR in docker/.env -- on the VM that's the SSD at
-      # /mnt/ssd/music (see "Changing the mount path" in README.md). The host path
-      # must already be mounted BEFORE the container is created: a bind mount
-      # resolves its source once, and docker silently creates a missing source as
-      # an empty dir rather than failing, so the library shows up empty.
-      - ${JELLYFIN_MUSIC_DIR:-~/docker-volumes/jellyfin/music}:/media/music:ro
-      # Movie library, same rules. Also on the SSD, so it's covered by the same
-      # /mnt/ssd fstab entry -- and it goes stale on a remount for the same reason.
-      - ${JELLYFIN_MOVIES_DIR:-~/docker-volumes/jellyfin/movies}:/media/movies:ro
-      # Additional libraries: add more mounts under /media, one per content type.
-      # Optional - extra fonts to be used during transcoding with subtitle burn-in
-      # - type: bind
-      #   source: /usr/local/share/fonts
-      #   target: /usr/local/share/fonts/custom
-      #   read_only: true
-    restart: 'unless-stopped'
-    # Optional - alternative address used for autodiscovery
-    environment:
-      - JELLYFIN_PublishedServerUrl=http://example.com
-    ports:
-      - "8096:8096" # exposed on localhost for testing; caddy also proxies internally
-    networks:
-      - main-network
-
   pinchflat:
     image: ghcr.io/kieraneglin/pinchflat:latest
     platform: linux/x86_64 # to fix error: no matching manifest for linux/arm64/v8 in the manifest list entries
@@ -678,6 +646,10 @@ services:
       - "80:80"
       - "443:443"
       - "443:443/udp"
+    # For services that run with network_mode: host (homeassistant) and so have no name
+    # on main-network: the Caddyfile proxies those to host.docker.internal:<port>.
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     volumes:
       - ./caddy:/etc/caddy
       - ./caddy/site:/srv

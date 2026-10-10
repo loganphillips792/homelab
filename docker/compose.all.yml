@@ -21,6 +21,10 @@ include:
   - redis-pubsub/docker-compose.yml
   - forgejo/docker-compose.yml
   - dockhand/docker-compose.yml
+  - jellyfin/docker-compose.yml
+  # Home Assistant + Mosquitto + Zigbee2MQTT. homeassistant runs with network_mode: host,
+  # so it is the one service Caddy reaches through host.docker.internal instead of by name.
+  - homeassistant/docker-compose.yml
   # S3-compatible object storage, five implementations side by side to compare.
   # Each reads only its own .env — none of them use the shared vars like ${TZ}.
   - path: silo/docker-compose.yml
