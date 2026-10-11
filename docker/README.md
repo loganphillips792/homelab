@@ -19,6 +19,7 @@
   - [Adding a new service](#adding-a-new-service)
 - [Services](#services)
   - [Media](#media)
+    - [Running the media stack](#running-the-media-stack)
     - [Jellyfin](#jellyfin)
     - [Navidrome](#navidrome)
   - [Kafka Testing Stack](#kafka-testing-stack)
@@ -1264,6 +1265,16 @@ than a service list, so neither needs a per-service edit.
 
 ## Media
 
+### Running the media stack
+
+To bring up the observability stack, dockhand, gatus, navidrome and jellyfin:
+
+```bash
+JELLYFIN_MUSIC_DIR=/Volumes/SSD/music JELLYFIN_MOVIES_DIR=/Volumes/SSD/movies JELLYFIN_TVSHOWS_DIR=/Volumes/SSD/tvshows docker compose -f docker/compose.all.yml up -d prometheus loki alloy grafana cadvisor dockhand gatus navidrome jellyfin
+```
+
+The `JELLYFIN_*` overrides are explained under [Running through docker compose](#running-through-docker-compose). Navidrome needs no override; `navidrome/.env` already points `NAVIDROME_MUSIC_DIR` at `/Volumes/SSD/music`.
+
 ### Jellyfin
 
 #### Running through docker compose
@@ -1283,12 +1294,6 @@ To bring up the observability stack, dockhand and homepage alongside it:
 
 ```bash
 JELLYFIN_MUSIC_DIR=/Volumes/SSD/music JELLYFIN_MOVIES_DIR=/Volumes/SSD/movies JELLYFIN_TVSHOWS_DIR=/Volumes/SSD/tvshows docker compose -f docker/compose.all.yml up -d prometheus loki alloy grafana cadvisor dockhand homepage jellyfin
-```
-
-To bring up the observability stack, dockhand, gatus, navidrome and jellyfin:
-
-```bash
-JELLYFIN_MUSIC_DIR=/Volumes/SSD/music JELLYFIN_MOVIES_DIR=/Volumes/SSD/movies JELLYFIN_TVSHOWS_DIR=/Volumes/SSD/tvshows docker compose -f docker/compose.all.yml up -d prometheus loki alloy grafana cadvisor dockhand gatus navidrome jellyfin
 ```
 
 Variables written this way apply only to that one command. They take priority over the `/mnt/ssd/...` values in `docker/.env`, so Jellyfin mounts the SSD folders instead. Only Jellyfin uses these three variables, so the other services aren't affected.
