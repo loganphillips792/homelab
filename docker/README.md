@@ -790,6 +790,18 @@ restic -r $RESTIC_REPOSITORY forget [SNAPSHOT_ID]
 `forget` only removes the snapshot record. The data it referenced stays in the repo until you run
 `restic -r $RESTIC_REPOSITORY prune` (or `forget --prune` in one step).
 
+Delete every snapshot with a given tag. Preview what would be removed first:
+
+```bash
+restic snapshots --tag mytag --json | jq -r '.[].id' | xargs restic forget --dry-run
+```
+
+Then delete them and prune the data they referenced:
+
+```bash
+restic snapshots --tag mytag --json | jq -r '.[].id' | xargs restic forget --prune
+```
+
 Check that the snapshots were deleted (one file per remaining snapshot):
 
 ```bash
