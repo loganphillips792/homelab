@@ -802,6 +802,12 @@ Then delete them and prune the data they referenced:
 restic snapshots --tag mytag --json | jq -r '.[].id' | xargs restic forget --prune
 ```
 
+On restic 0.16 or newer you can skip the ID lookup:
+
+```bash
+restic forget --tag mytag --unsafe-allow-remove-all --prune
+```
+
 Check that the snapshots were deleted (one file per remaining snapshot):
 
 ```bash
