@@ -10,6 +10,7 @@
 - [Backup and Restore](#backup-and-restore)
   - [General commands](#general-commands)
   - [Set up](#set-up)
+  - [Upload the repo to Google Drive](#upload-the-repo-to-google-drive)
   - [Forgejo](#forgejo)
   - [Home Assistant](#home-assistant)
 - [Deploying](#deploying)
@@ -879,6 +880,145 @@ rm -rf ~/restic-backups/homelab
 Consider skipping step 4 and keeping both copies. A repo that lives only on one USB drive is a
 single point of failure, and you could refresh the drive copy with the same `rsync` line after
 each backup.
+
+## Upload the repo to Google Drive
+
+restic talks to Google Drive through [rclone](https://rclone.org/drive/) (`brew install rclone`).
+Set up an rclone remote called `gdrive`, then either use it as a restic repo directly or mirror
+the local repo to it.
+
+### 1. Create your own Google API client ID
+
+Optional, but recommended. rclone's shared client ID is heavily rate-limited, and big initial
+uploads go noticeably faster with your own.
+
+1. Log into the [Google API Console](https://console.developers.google.com/) with any Google
+   account. It doesn't have to be the account that owns the Drive.
+2. Select a project or create a new one.
+3. Under **ENABLE APIS AND SERVICES**, search for "Drive" and enable the **Google Drive API**.
+4. Click **Credentials** in the left panel (not "Create credentials", which opens the wizard).
+5. If you haven't configured an OAuth consent screen yet, click **CONFIGURE CONSENT SCREEN**
+   (top right), then **Get started**. Enter an application name ("rclone" is fine) and a user
+   support email (your own is fine). Under **Audience**, select **External**. Enter your contact
+   information, agree to the terms and click **Create**.
+   (A Google Workspace user could pick **Internal** instead, which limits API use to users in
+   the organisation.)
+6. Add the scopes. Click **Data Access** in the left panel, then **Add or remove scopes**, and
+   select these three. Alternatively, scroll down to **Manually add scopes**, paste the
+   comma-separated list, click **Add to table**, then **Update**:
+   - `https://www.googleapis.com/auth/docs`
+   - `https://www.googleapis.com/auth/drive` (needed to edit, create and delete files)
+   - `https://www.googleapis.com/auth/drive.metadata.readonly`
+
+   You should now see the three scopes on the Data Access page. Press **Save** at the bottom.
+7. Click **Audience**, scroll down, click **+ Add users**, add yourself as a test user and save.
+8. Go to **Overview**, click **Create OAuth client**, choose **Desktop app** and click
+   **Create** (the default name is fine).
+9. Note the client ID and client secret it shows. If you chose **Internal** in step 5, skip to
+   the rclone setup. Your destination drive must then be in the same Workspace.
+10. Go to **Audience**, click **PUBLISH APP** and confirm.
+    If the button is greyed out, Google requires a homepage URL and a privacy policy URL first,
+    even for a personal single-user app. Go to **Branding**, fill in **Application home page**
+    and **Application privacy policy link** (a free GitHub Pages site works), add that domain
+    under **Authorized domains**, and save. **PUBLISH APP** should then be available.
+
+### 2. Set up the rclone remote
+
+```bash
+rclone config
+```
+
+| Prompt | Answer |
+|-|-|
+| New remote | `n` |
+| name | `gdrive` |
+| Storage | `drive` |
+| client_id / client_secret | the values from step 9 (blank uses rclone's shared, rate-limited key) |
+| scope | `1` (Full access to all files, excluding Application Data Folder) |
+| service_account_file | leave blank |
+| Edit advanced config? | `n` |
+| Use web browser to automatically authenticate? | `y` (on a machine with a browser) |
+| Configure this as a Shared Drive (Team Drive)? | `n` |
+| Keep this "gdrive" remote? | `y` |
+
+On a headless box (Proxmox LXC/VM), answer `n` to the web browser question, run
+`rclone authorize "drive"` on a machine with a browser, and paste the token back in.
+
+Optionally, add `use_trash = false` under `[gdrive]` in `~/.config/rclone/rclone.conf`.
+Otherwise every file `restic prune` deletes goes to Drive's trash and keeps counting against your
+quota.
+
+### 3a. Use Drive as a restic repo directly (recommended)
+
+```bash
+restic -r rclone:gdrive:restic-docker init
+restic -r rclone:gdrive:restic-docker backup /path/to/volumes
+```
+
+This is a separate repository, so if the local one gets corrupted, the Drive copy isn't affected.
+
+In Backrest, add a new repo with the URI `rclone:gdrive:restic-docker` and give it its own plans
+and retention. Backrest runs in Docker, so the container needs both rclone and your config. The
+official image should include rclone, so usually you only need to mount `rclone.conf` into the
+container (e.g. at `/root/.config/rclone/rclone.conf`). Check the image docs for the exact path.
+
+### 3b. Or mirror the existing local repo
+
+```bash
+rclone sync $RESTIC_REPOSITORY gdrive:restic-docker --transfers 4
+```
+
+Run it from a Backrest hook after each backup, or from cron. It's simpler, but it's a straight
+copy: corruption or deletion in the local repo gets copied up too.
+
+A middle option is `restic copy`, which copies snapshots from the local repo into a Drive repo
+made with 3a and only adds data.
+
+### Checking the Drive repo
+
+Run this now and then:
+
+```bash
+restic -r rclone:gdrive:restic-docker check
+```
+
+Every so often, add `--read-data-subset=5%` to actually read back a sample of the data.
+
+### Deleting the Drive repo / "repository already exists"
+
+If `init` fails because the repository already exists, `restic-docker` already has a restic repo
+in it, possibly from an earlier `init` that succeeded. Before deleting anything, check whether
+you can just use it:
+
+```bash
+restic -r rclone:gdrive:restic-docker snapshots
+```
+
+If it accepts your password, the repo is fine. Skip `init` and start backing up.
+
+If you've lost the password or want a clean start, wipe the whole folder. Deleting only the
+`config` file would leave orphaned `keys/`, `data/` and other folders behind.
+
+```bash
+# see what's there first
+rclone ls gdrive:restic-docker
+
+# delete the folder and everything in it
+rclone purge gdrive:restic-docker --drive-use-trash=false
+
+# then re-init
+restic -r rclone:gdrive:restic-docker init
+```
+
+Without `--drive-use-trash=false`, Drive moves the files to the trash instead of deleting them.
+That's safer if you're unsure, but they still count against your storage until you empty the
+trash. With the flag, `purge` can't be undone, so make sure nothing in that repo matters first.
+
+If you really only want to remove the config file:
+
+```bash
+rclone deletefile gdrive:restic-docker/config
+```
 
 ## Forgejo
 
