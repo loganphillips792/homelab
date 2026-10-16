@@ -841,7 +841,7 @@ brew install restic
 openssl rand -base64 32 > ~/.restic-password
 chmod 600 ~/.restic-password
 
-export RESTIC_REPOSITORY=~/restic/homelab
+export RESTIC_REPOSITORY=~/restic-backups/homelab
 export RESTIC_PASSWORD_FILE=~/.restic-password
 restic init
 ```
@@ -857,17 +857,17 @@ lives, and the password stays the same.
 ```bash
 # 1. Copy (replace DRIVE with your drive's name; make sure no backup is running)
 mkdir -p /Volumes/DRIVE/restic
-rsync -a ~/restic/homelab/ /Volumes/DRIVE/restic/homelab/
+rsync -a ~/restic-backups/homelab/ /Volumes/DRIVE/restic-backups/homelab/
 
 # 2. Verify the copy, reading every byte back off the drive
-restic -r /Volumes/DRIVE/restic/homelab check --read-data
+restic -r /Volumes/DRIVE/restic-backups/homelab check --read-data
 
 # 3. Point restic at it (also update this line in ~/.zshrc and your notes)
-export RESTIC_REPOSITORY=/Volumes/DRIVE/restic/homelab
+export RESTIC_REPOSITORY=/Volumes/DRIVE/restic-backups/homelab
 restic snapshots
 
 # 4. Only once step 3 shows your snapshot, remove the original
-rm -rf ~/restic/homelab
+rm -rf ~/restic-backups/homelab
 ```
 
 - **Drive not plugged in:** restic fails with an error instead of writing somewhere else, so a
