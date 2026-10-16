@@ -952,7 +952,7 @@ quota.
 
 ```bash
 restic -r rclone:gdrive:restic-docker init
-restic -r rclone:gdrive:restic-docker backup /path/to/volumes
+restic -r rclone:gdrive:restic-docker backup ~/docker-volumes/forgejo
 ```
 
 This is a separate repository, so if the local one gets corrupted, the Drive copy isn't affected.
