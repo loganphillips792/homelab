@@ -952,7 +952,21 @@ quota.
 
 ```bash
 restic -r rclone:gdrive:restic-docker init
-restic -r rclone:gdrive:restic-docker backup ~/docker-volumes/forgejo
+restic -r rclone:gdrive:restic-docker backup ~/docker-volumes/forgejo --tag forgejo
+```
+
+If you already took snapshots without the tag, add it to them:
+
+```bash
+restic -r rclone:gdrive:restic-docker tag --add forgejo --path ~/docker-volumes/forgejo
+```
+
+Home Assistant's files are owned by root, so its backup needs `sudo`. `sudo` sets `HOME` to `/root`,
+so point rclone at your config explicitly and pass the password file through:
+
+```bash
+sudo env RCLONE_CONFIG=$HOME/.config/rclone/rclone.conf RESTIC_PASSWORD_FILE=$RESTIC_PASSWORD_FILE \
+  restic -r rclone:gdrive:restic-docker backup ~/docker-volumes/homeassistant --tag homeassistant
 ```
 
 This is a separate repository, so if the local one gets corrupted, the Drive copy isn't affected.
