@@ -952,7 +952,21 @@ quota.
 
 ```bash
 restic -r rclone:gdrive:restic-docker init
-restic -r rclone:gdrive:restic-docker backup ~/docker-volumes/forgejo
+restic -r rclone:gdrive:restic-docker backup ~/docker-volumes/forgejo --tag forgejo
+```
+
+If you already took snapshots without the tag, add it to them:
+
+```bash
+restic -r rclone:gdrive:restic-docker tag --add forgejo --path ~/docker-volumes/forgejo
+```
+
+Home Assistant's files are owned by root, so its backup needs `sudo`. `sudo` sets `HOME` to `/root`,
+so point rclone at your config explicitly and pass the password file through:
+
+```bash
+sudo env RCLONE_CONFIG=$HOME/.config/rclone/rclone.conf RESTIC_PASSWORD_FILE=$RESTIC_PASSWORD_FILE \
+  restic -r rclone:gdrive:restic-docker backup ~/docker-volumes/homeassistant --tag homeassistant
 ```
 
 This is a separate repository, so if the local one gets corrupted, the Drive copy isn't affected.
@@ -983,6 +997,26 @@ restic -r rclone:gdrive:restic-docker check
 ```
 
 Every so often, add `--read-data-subset=5%` to actually read back a sample of the data.
+
+### Browsing and restoring from the Drive repo
+
+```bash
+restic -r rclone:gdrive:restic-docker snapshots                      # lists both, with their tags and paths
+restic -r rclone:gdrive:restic-docker snapshots --tag homeassistant  # only Home Assistant
+restic -r rclone:gdrive:restic-docker restore latest --tag forgejo --target /tmp/restore
+```
+
+For a folder-like view, `restic -r rclone:gdrive:restic-docker mount /mnt/restic` shows snapshots
+grouped by tag and by path. It needs FUSE installed on the server.
+
+Home Assistant's files are owned by root, so restoring the `homeassistant` tag with its original
+ownership (or back into `~/docker-volumes/homeassistant`) needs `sudo`, with the same `env`
+workaround as the backup in 3a:
+
+```bash
+sudo env RCLONE_CONFIG=$HOME/.config/rclone/rclone.conf RESTIC_PASSWORD_FILE=$RESTIC_PASSWORD_FILE \
+  restic -r rclone:gdrive:restic-docker restore latest --tag homeassistant --target /tmp/restore
+```
 
 ### Deleting the Drive repo / "repository already exists"
 
