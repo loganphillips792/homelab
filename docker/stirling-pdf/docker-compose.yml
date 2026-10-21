@@ -1,0 +1,37 @@
+# Stirling PDF (self-hosted PDF toolbox: merge, split, OCR, convert, sign...).
+# Single container on the shared main-network so Caddy can proxy
+# http://stirling.homelab -> stirling-pdf:8080. Upstream publishes 8080, but that's
+# already taken on this host, so it's published on 8097 instead.
+#
+# First login is admin / stirling -- change it right away.
+#
+# main-network is declared in the root docker-compose.yml, not here -- like the
+# other per-service files in this repo, this only comes up via compose.all.yml:
+#   docker compose -f compose.all.yml up -d stirling-pdf
+# Docs: https://docs.stirlingpdf.com/
+
+services:
+  stirling-pdf:
+    # latest = LibreOffice, Tesseract/OCRmyPDF, Calibre etc. (~4 GB suggested).
+    # Swap to latest-ultra-lite (core PDF tools only, no login, ~2 GB) if memory
+    # gets tight -- volumes carry over between tags.
+    image: docker.stirlingpdf.com/stirlingtools/stirling-pdf:latest
+    container_name: stirling-pdf
+    restart: unless-stopped
+    ports:
+      - "8097:8080" # exposed on localhost for testing; caddy also proxies internally
+    environment:
+      - TZ=${TZ}
+    volumes:
+      # settings.yml, the built-in DB + backups, and generated keys.
+      - ~/docker-volumes/stirling-pdf/configs:/configs
+      - ~/docker-volumes/stirling-pdf/logs:/logs
+      - ~/docker-volumes/stirling-pdf/customFiles:/customFiles
+      - ~/docker-volumes/stirling-pdf/pipeline:/pipeline
+      # Files users save on the server (file storage is on by default).
+      - ~/docker-volumes/stirling-pdf/storage:/storage
+      # Extra OCR language files.
+      - ~/docker-volumes/stirling-pdf/tessdata:/usr/share/tessdata
+    mem_limit: 4g
+    networks:
+      - main-network

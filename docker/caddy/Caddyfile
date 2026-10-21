@@ -183,6 +183,10 @@ http://linkwarden.homelab {
   reverse_proxy linkwarden:3000
 }
 
+http://stirling.homelab {
+  reverse_proxy stirling-pdf:8080
+}
+
 # Web UI only. Git-over-SSH bypasses Caddy entirely -- clients hit the published
 # host port 222 directly (see forgejo/docker-compose.yml).
 http://forgejo.homelab {

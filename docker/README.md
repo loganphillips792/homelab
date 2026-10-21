@@ -4234,6 +4234,7 @@ These services bake their public URL into the frontend at startup — they only 
 | beszel | http://localhost:8090 | http://beszel.homelab | set on first run |
 | backrest | http://localhost:9898 | http://backrest.homelab | set on first run |
 | paperless-ngx | http://localhost:8001 | http://paperless.homelab | admin / changeMe |
+| stirling-pdf | http://localhost:8097 | http://stirling.homelab | admin / stirling |
 | tubearchivist | http://localhost:8000 | http://tubearchivist.homelab | tubearchivist / changeMe |
 | pinchflat | http://localhost:8945 | http://pinchflat.homelab | N/A |
 | immich | http://localhost:2283 | http://immich.homelab | set on first run |
