@@ -209,6 +209,10 @@
         icon: https://cdn.jsdelivr.net/gh/selfhst/icons/svg/uptime-kuma.svg
         href: http://paperless.homelab
         description: Document management (scan, OCR, archive)
+    - Stirling PDF:
+        icon: stirling-pdf
+        href: http://stirling.homelab
+        description: PDF toolbox (merge, split, OCR, convert)
     - ArchiveBox:
         icon: archivebox
         href: http://archivebox.homelab
