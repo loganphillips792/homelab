@@ -9,6 +9,7 @@
 (() => {
   const PORTS = {
     akhq: 8092,
+    arcane: 3552,
     backrest: 9898,
     beszel: 8090,
     cadvisor: 8089,
