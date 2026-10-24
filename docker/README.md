@@ -1432,6 +1432,19 @@ The long version is in [DNS Process Explained](#dns-process-explained).
     sudo dscacheutil -flushcache && sudo killall -HUP mDNSResponder
     ```
 
+    To check it on the Mac, list the DNS servers set on Wi-Fi (should print `192.168.1.130`; "There
+    aren't any DNS Servers set" means it's using the router's):
+
+    ```bash
+    networksetup -getdnsservers Wi-Fi
+    ```
+
+    And the resolvers macOS is actually using right now:
+
+    ```bash
+    scutil --dns | grep nameserver
+    ```
+
     To undo on the Mac (back to the router's DNS): `networksetup -setdnsservers Wi-Fi empty`.
 
 ## Starting the stack
