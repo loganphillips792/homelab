@@ -953,10 +953,45 @@ quota.
 
 ```bash
 restic -r rclone:gdrive:restic-docker init
-restic -r rclone:gdrive:restic-docker backup ~/docker-volumes/forgejo
+restic -r rclone:gdrive:restic-docker backup ~/docker-volumes/forgejo --tag forgejo
+```
+
+If you already took snapshots without the tag, add it to them:
+
+```bash
+restic -r rclone:gdrive:restic-docker tag --add forgejo --path ~/docker-volumes/forgejo
+```
+
+Home Assistant's files are owned by root, so its backup needs `sudo`. `sudo` sets `HOME` to `/root`,
+so point rclone at your config explicitly and pass the password file through:
+
+```bash
+sudo env RCLONE_CONFIG=$HOME/.config/rclone/rclone.conf RESTIC_PASSWORD_FILE=$RESTIC_PASSWORD_FILE \
+  restic -r rclone:gdrive:restic-docker backup ~/docker-volumes/homeassistant --tag homeassistant
 ```
 
 This is a separate repository, so if the local one gets corrupted, the Drive copy isn't affected.
+
+Forgejo and Home Assistant both go into this one repo (a single `restic-docker/` folder on Drive),
+not one repo each. Each backup becomes its own snapshot, and the tag tells them apart:
+
+```bash
+restic -r rclone:gdrive:restic-docker snapshots --tag forgejo
+restic -r rclone:gdrive:restic-docker snapshots --tag homeassistant
+```
+
+See every snapshot grouped by tag:
+
+```bash
+restic -r rclone:gdrive:restic-docker snapshots --group-by tags
+```
+
+Sharing one repo means data is deduplicated across both services, and there's one password and
+one `check`/`prune` to run. Retention can still differ per service: `forget --tag forgejo
+--keep-daily 7` only touches Forgejo snapshots. Without `--tag`, `forget` groups snapshots by host
+and path, so one service's retention never removes the other's snapshots. Use separate repos
+(e.g. `rclone:gdrive:restic-forgejo`, each with its own `init`) only if you want separate passwords
+or want to delete one service's backups by removing its folder.
 
 In Backrest, add a new repo with the URI `rclone:gdrive:restic-docker` and give it its own plans
 and retention. Backrest runs in Docker, so the container needs both rclone and your config. The
@@ -984,6 +1019,137 @@ restic -r rclone:gdrive:restic-docker check
 ```
 
 Every so often, add `--read-data-subset=5%` to actually read back a sample of the data.
+
+### Browsing the Drive repo
+
+To see the folders and files you backed up, without restoring anything:
+
+```bash
+export RESTIC_REPOSITORY=rclone:gdrive:restic-docker
+
+restic snapshots                        # list snapshots and their IDs
+restic ls latest                        # every path in the newest snapshot
+restic ls latest /Users/logan/docker-volumes/forgejo   # just one subtree
+restic ls <snapshot-id> --long          # adds sizes, permissions and mtimes
+restic find '*.db'                      # search across all snapshots
+```
+
+To browse it like a normal folder, mount it:
+
+```bash
+restic mount ~/restic-mnt               # then open ~/restic-mnt/snapshots/latest/ in Finder
+```
+
+On macOS, `mount` needs macFUSE or FUSE-T. Backrest can also do this in its web UI: open the
+repo, click a snapshot, and expand the file tree.
+
+Opening `restic-docker` in Google Drive won't show your files. restic encrypts everything and
+splits it into chunks, so the folder only contains `config`, `keys/`, `snapshots/`, `index/`,
+`locks/` and `data/` (full of files named by hash). To see that raw layout, which is only useful
+for debugging:
+
+```bash
+rclone tree gdrive:restic-docker --max-depth 2
+```
+
+### Browsing and restoring from the Drive repo
+
+```bash
+restic -r rclone:gdrive:restic-docker snapshots                      # lists both, with their tags and paths
+restic -r rclone:gdrive:restic-docker snapshots --tag homeassistant  # only Home Assistant
+restic -r rclone:gdrive:restic-docker restore latest --tag forgejo --target /tmp/restore
+```
+
+For a folder-like view, `restic -r rclone:gdrive:restic-docker mount /mnt/restic` shows snapshots
+grouped by tag and by path. It needs FUSE installed on the server.
+
+Home Assistant's files are owned by root, so restoring the `homeassistant` tag with its original
+ownership (or back into `~/docker-volumes/homeassistant`) needs `sudo`, with the same `env`
+workaround as the backup in 3a:
+
+```bash
+sudo env RCLONE_CONFIG=$HOME/.config/rclone/rclone.conf RESTIC_PASSWORD_FILE=$RESTIC_PASSWORD_FILE \
+  restic -r rclone:gdrive:restic-docker restore latest --tag homeassistant --target /tmp/restore
+```
+
+Full restore (rolls Forgejo back to the snapshot). Snapshots store absolute paths, so
+`--target /` puts the files back where they were backed up from:
+
+```bash
+docker stop forgejo
+mv ~/docker-volumes/forgejo ~/docker-volumes/forgejo.old
+restic -r rclone:gdrive:restic-docker restore latest --tag forgejo --target /
+docker start forgejo
+```
+
+The same for Home Assistant, Mosquitto and Zigbee2MQTT:
+
+```bash
+docker stop homeassistant zigbee2mqtt mosquitto
+sudo mv ~/docker-volumes/homeassistant ~/docker-volumes/homeassistant.old
+sudo env RCLONE_CONFIG=$HOME/.config/rclone/rclone.conf RESTIC_PASSWORD_FILE=$RESTIC_PASSWORD_FILE \
+  restic -r rclone:gdrive:restic-docker restore latest --tag homeassistant --target /
+docker start mosquitto zigbee2mqtt homeassistant
+```
+
+Restore an older snapshot by using its ID in place of `latest`:
+
+```bash
+restic -r rclone:gdrive:restic-docker snapshots --tag forgejo
+restic -r rclone:gdrive:restic-docker restore 1a2b3c4d --target /
+```
+
+Restore a single file or folder to a scratch location:
+
+```bash
+restic -r rclone:gdrive:restic-docker find --tag forgejo app.ini
+restic -r rclone:gdrive:restic-docker restore latest --tag forgejo --target /tmp/restore-one \
+  --include $HOME/docker-volumes/forgejo/gitea/conf/app.ini
+```
+
+If you mirrored with 3b, the Drive folder is still a normal restic repo (with the local repo's
+password), so all of the commands above work on it unchanged. For a big restore it's usually
+faster to pull the whole repo down first and restore from local disk:
+
+```bash
+rclone sync gdrive:restic-docker ~/restic-from-drive --transfers 8
+restic -r ~/restic-from-drive restore latest --tag forgejo --target /
+```
+
+### Restoring on a fresh machine
+
+This is the case the Drive copy is for: the server (and the local repo) are gone. You need two
+things that are not stored in the Drive repo itself:
+
+- **The restic password** for the Drive repo. Without it the data can't be decrypted, so keep it
+  somewhere off the server (e.g. a password manager).
+- **An rclone remote for the same Google account.** If you don't have a copy of the old
+  `rclone.conf`, redo [step 2](#2-set-up-the-rclone-remote) with the name `gdrive`. A new token
+  works fine, as long as it's for the account that owns the `restic-docker` folder.
+
+Then:
+
+```bash
+# install restic and rclone, set up the gdrive remote, then:
+echo 'your-restic-password' > ~/.restic-password && chmod 600 ~/.restic-password
+export RESTIC_PASSWORD_FILE=~/.restic-password
+
+rclone lsd gdrive:restic-docker                       # should show data, index, keys, snapshots
+restic -r rclone:gdrive:restic-docker snapshots
+restic -r rclone:gdrive:restic-docker restore latest --tag forgejo --target /
+```
+
+If the new machine's home directory is different from the old one, `--target /` recreates the
+old path (e.g. `/Users/olduser/docker-volumes/forgejo`). Restore to a scratch target instead and
+move the folder into `~/docker-volumes`:
+
+```bash
+restic -r rclone:gdrive:restic-docker restore latest --tag forgejo --target /tmp/restore
+mv /tmp/restore/*/*/docker-volumes/forgejo ~/docker-volumes/
+```
+
+Bring the containers up with `docker compose -f docker/compose.all.yml up -d` once the data is in
+place.
 
 ### Deleting the Drive repo / "repository already exists"
 
