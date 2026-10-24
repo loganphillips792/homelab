@@ -2228,7 +2228,24 @@ you to handle by hand.
 Settings and the SQLite DB live in the `seerr_config` named volume (`docker_seerr_config` on
 disk, because of the project prefix), mounted at `/app/config`. It's deliberately not a
 `~/docker-volumes` bind mount, for the same SQLite-locking reason as Navidrome's `navidrome_data`.
-Recreating or updating the container keeps everything. To start fresh:
+Recreating or updating the container keeps everything.
+
+> **"The `/app/config` volume mount was not configured properly" banner:** this is a false alarm
+> with a named volume. The image ships an empty `/app/config/DOCKER` marker file, and Seerr shows
+> the banner whenever it can see that file. A bind mount hides it, but a new named volume gets a
+> copy from the image. Delete it once per new volume (first start, on the VM, or after a reset):
+>
+> ```bash
+> docker exec seerr rm /app/config/DOCKER
+> ```
+>
+> ```bash
+> docker compose -f docker/compose.all.yml restart seerr
+> ```
+>
+> `curl -s http://localhost:5055/api/v1/status/appdata` should then show `"appData":true`.
+
+To start fresh (then delete the marker file again, as above):
 
 ```bash
 docker compose -f docker/compose.all.yml rm -sf seerr

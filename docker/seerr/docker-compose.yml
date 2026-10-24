@@ -7,6 +7,10 @@
 # ownership, so the node user (UID 1000) can write to it without a chown, and
 # backup-remote-volumes.sh covers it.
 #
+# A new named volume gets a copy of the image's /app/config/DOCKER marker file, which makes Seerr
+# show a false "volume mount was not configured properly" banner. Delete it once per new volume:
+#   docker exec seerr rm /app/config/DOCKER && docker compose -f compose.all.yml restart seerr
+#
 # main-network is declared in the root docker-compose.yml, not here -- like the other
 # per-service files in this repo, this only comes up via compose.all.yml:
 #   docker compose -f compose.all.yml up -d seerr
