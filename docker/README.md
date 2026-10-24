@@ -29,6 +29,7 @@
     - [Running the media stack](#running-the-media-stack)
     - [Jellyfin](#jellyfin)
     - [Navidrome](#navidrome)
+    - [Seerr](#seerr)
   - [Kafka Testing Stack](#kafka-testing-stack)
   - [Kafka UI](#kafka-ui)
   - [Grafana](#grafana)
@@ -1352,7 +1353,7 @@ sudo dscacheutil -flushcache && sudo killall -HUP mDNSResponder
 
 # Running on the Mac (LAN access)
 
-Runs Jellyfin, Homepage, Gatus, Arcane and the observability stack (Prometheus, Loki, Alloy,
+Runs Jellyfin, Seerr, Homepage, Gatus, Arcane and the observability stack (Prometheus, Loki, Alloy,
 Grafana, cAdvisor) in Docker Desktop on the Mac, reachable from any device on the home network
 as `http://<name>.homelab`. Same compose files as the VM — the Mac just takes the VM's place:
 
@@ -1453,7 +1454,7 @@ Plug in the SSD **first** (see the warning under [Mac-specific gotchas](#mac-spe
 from the repo root:
 
 ```bash
-JELLYFIN_MUSIC_DIR=/Volumes/SSD/music JELLYFIN_MOVIES_DIR=/Volumes/SSD/movies JELLYFIN_TVSHOWS_DIR=/Volumes/SSD/tvshows GATUS_DNS=192.168.1.130 docker compose -f docker/compose.all.yml up -d caddy pihole homepage gatus arcane cadvisor prometheus loki alloy grafana jellyfin
+JELLYFIN_MUSIC_DIR=/Volumes/SSD/music JELLYFIN_MOVIES_DIR=/Volumes/SSD/movies JELLYFIN_TVSHOWS_DIR=/Volumes/SSD/tvshows GATUS_DNS=192.168.1.130 docker compose -f docker/compose.all.yml up -d caddy pihole homepage gatus arcane cadvisor prometheus loki alloy grafana jellyfin seerr
 ```
 
 - `caddy` and `pihole` are the way in, so they're always part of the command.
@@ -1469,7 +1470,7 @@ the VM's DNS and Jellyfin against `/mnt/ssd`.
 To stop the services but keep DNS answering for the devices pointed at the Mac:
 
 ```bash
-docker compose -f docker/compose.all.yml stop homepage gatus arcane cadvisor prometheus loki alloy grafana jellyfin
+docker compose -f docker/compose.all.yml stop homepage gatus arcane cadvisor prometheus loki alloy grafana jellyfin seerr
 ```
 
 ## Checking it works
@@ -1500,6 +1501,7 @@ by IP when DNS isn't set up. Homepage is the exception: it rejects any host not 
 |-|-|-|
 |Homepage|http://homepage.homelab|http://localhost:3002 (this Mac only)|
 |Jellyfin|http://jellyfin.homelab|http://192.168.1.130:8096|
+|Seerr|http://seerr.homelab|http://192.168.1.130:5055|
 |Gatus|http://gatus.homelab|http://192.168.1.130:8082|
 |Arcane|http://arcane.homelab|http://192.168.1.130:3552|
 |Grafana|http://grafana.homelab|http://192.168.1.130:3013|
@@ -2189,6 +2191,59 @@ docker exec navidrome ls /music | head
 Swap `/Volumes/Elements/Music` for wherever the library actually is on that host. The same rules from the rest of this section still apply: `/data` has to be the named volume (not a bind mount) or the SQLite DB breaks mid-scan, the music mount stays `:ro`, and the drive has to be mounted *before* the container is created or Docker silently binds an empty directory. Reach it at http://localhost:4533 and create the admin account on first load.
 
 Note the volume is plain `navidrome_data` here, not the `docker_navidrome_data` that Compose creates — the project prefix only comes from `compose.all.yml`. So a standalone run gets its own separate database, and the reinstall commands above won't touch it.
+
+### Seerr
+
+[Seerr](https://docs.seerr.dev) (the project formerly called Jellyseerr) is the request front end
+for Jellyfin: people browse movies and shows, request them, and Seerr marks what's already in the
+Jellyfin library. It's a single container in `seerr/docker-compose.yml`, on `main-network`, and
+Caddy proxies http://seerr.homelab → `seerr:5055`.
+
+Start it on its own, or as part of the Mac start command under
+[Starting the stack](#starting-the-stack):
+
+```bash
+docker compose -f docker/compose.all.yml up -d seerr
+```
+
+#### First run
+
+Open http://seerr.homelab. It redirects to the setup wizard:
+
+1. Choose **Jellyfin** as the media server.
+2. Jellyfin URL: hostname `jellyfin`, port `8096`, no SSL. Both containers are on `main-network`,
+   so Seerr reaches Jellyfin by container name. Don't use `jellyfin.homelab` or `localhost` here.
+3. Sign in with a Jellyfin admin account. That account becomes Seerr's admin, and other Jellyfin
+   users can sign in with their own Jellyfin logins.
+4. Pick which Jellyfin libraries to sync (Movies, Shows), then run a sync.
+5. Settings > General > **Application URL**: `http://seerr.homelab`, so links in notifications
+   point somewhere reachable.
+
+Seerr only *tracks* requests. Fulfilling them automatically needs Radarr (movies) and Sonarr
+(shows), which aren't in this stack. Without them, requests just sit in Seerr's request list for
+you to handle by hand.
+
+#### Data
+
+Settings and the SQLite DB live in the `seerr_config` named volume (`docker_seerr_config` on
+disk, because of the project prefix), mounted at `/app/config`. It's deliberately not a
+`~/docker-volumes` bind mount, for the same SQLite-locking reason as Navidrome's `navidrome_data`.
+Recreating or updating the container keeps everything. To start fresh:
+
+```bash
+docker compose -f docker/compose.all.yml rm -sf seerr
+```
+
+```bash
+docker volume rm docker_seerr_config
+```
+
+```bash
+docker compose -f docker/compose.all.yml up -d seerr
+```
+
+The Homepage tile's request-count widget is commented out in `homepage/config/services.yaml`.
+Fill in the API key from Settings > General once setup is done.
 
 
 ## Kafka Testing Stack
@@ -4646,6 +4701,7 @@ These services bake their public URL into the frontend at startup — they only 
 | dynacat | http://localhost:8085 | http://dynacat.homelab | admin / mysecretpassword |
 | uptime-kuma | http://localhost:3004 | http://uptime-kuma.homelab | set on first run, but set it to admin / password123 |
 | jellyfin | http://localhost:8096 | http://jellyfin.homelab | set on first run |
+| seerr | http://localhost:5055 | http://seerr.homelab | sign in with a Jellyfin account (first one becomes admin) |
 | n8n | http://localhost:5678 | http://n8n.homelab | set on first run (/setup) |
 | flame | http://localhost:5005 | http://flame.homelab | password: changeMe |
 | redisinsight | http://localhost:5540 | http://redisinsight.homelab | N/A (connection pre-seeded) |
