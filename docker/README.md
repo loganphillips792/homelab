@@ -14,6 +14,12 @@
   - [Forgejo](#forgejo)
   - [Home Assistant](#home-assistant)
 - [Deploying](#deploying)
+- [Running on the Mac (LAN access)](#running-on-the-mac-lan-access)
+  - [One-time setup](#one-time-setup)
+  - [Starting the stack](#starting-the-stack)
+  - [Checking it works](#checking-it-works)
+  - [URLs](#urls)
+  - [Mac-specific gotchas](#mac-specific-gotchas)
 - [Commands](#commands)
   - [Restart vs recreate](#restart-vs-recreate)
   - [Repository layout](#repository-layout)
@@ -1344,6 +1350,183 @@ sudo dscacheutil -flushcache && sudo killall -HUP mDNSResponder
 
 6. Access `http://grafana.homelab` to verify services are running
 
+# Running on the Mac (LAN access)
+
+Runs Jellyfin, Homepage, Gatus, Arcane and the observability stack (Prometheus, Loki, Alloy,
+Grafana, cAdvisor) in Docker Desktop on the Mac, reachable from any device on the home network
+as `http://<name>.homelab`. Same compose files as the VM — the Mac just takes the VM's place:
+
+1. A device asks Pi-hole (on the Mac, port 53) for `jellyfin.homelab`.
+2. Pi-hole answers with the Mac's IP (`192.168.1.130`).
+3. The device connects to the Mac on port 80, where Caddy picks the container by hostname.
+
+The long version is in [DNS Process Explained](#dns-process-explained).
+
+## One-time setup
+
+1. **Get the Mac's IP** and reserve it in the router's DHCP settings so it never changes —
+   the DNS records, `GATUS_DNS` and every device's DNS setting below all use it:
+
+    ```bash
+    ipconfig getifaddr $(route -n get default | awk '/interface:/{print $2}')
+    ```
+
+    That asks for the IP of whichever interface the Mac is actually online through (`en0` is Wi-Fi
+    on most Macs; a wired adapter shows up as a different `enX`). The rest of this section uses
+    `192.168.1.130`, the value at the time of writing; substitute yours if it differs.
+
+2. **Docker Desktop settings:** turn on *General > Start Docker Desktop when you sign in*, and
+   make sure *Resources > Network > Use kernel networking for UDP* is **off** (it breaks Pi-hole's
+   DNS on port 53).
+
+3. **Keep the Mac awake.** If it sleeps, every device pointed at it loses DNS and every service at
+   once. System Settings > Battery (or Energy) > *Prevent automatic sleeping when the display is
+   off*, or from the terminal (never sleep while on the charger):
+
+    ```bash
+    sudo pmset -c sleep 0
+    ```
+
+4. **Required: replace the placeholder IP in the DNS records with the Mac's IP.**
+   `pihole/etc-dnsmasq.d/10-homelab.conf` is committed with `10.0.0.32` as a placeholder on every
+   record, and it stays that way in git. Pi-hole serves whatever is in the file, so until the
+   placeholder is swapped for the IP from step 1, every `*.homelab` name points at an address that
+   doesn't exist and nothing loads. One command swaps the placeholder for the Mac's current IP:
+
+    ```bash
+    sed -i '' "s/10\.0\.0\.32/$(ipconfig getifaddr $(route -n get default | awk '/interface:/{print $2}'))/g" docker/pihole/etc-dnsmasq.d/10-homelab.conf
+    ```
+
+    Check that it took (every record should show the Mac's IP, none `10.0.0.32`), then restart
+    Pi-hole so it re-reads the file:
+
+    ```bash
+    grep -c 10.0.0.32 docker/pihole/etc-dnsmasq.d/10-homelab.conf   # should print 0
+    ```
+
+    ```bash
+    docker compose -f docker/compose.all.yml restart pihole
+    ```
+
+    Use a full `restart`. `pihole reloaddns` did not pick up the edited `host-record` lines when
+    this was tested.
+
+    > **Don't commit this edit.** The committed file keeps `10.0.0.32`. Before committing anything
+    > else, or before a `git pull`, put the placeholder back with
+    > `git checkout -- docker/pihole/etc-dnsmasq.d/10-homelab.conf`, then re-run the `sed` and
+    > restart afterwards. Or wrap the pull in `git stash` / `git stash pop` the same way
+    > [Deploying](#deploying) does.
+
+5. **Point each device's DNS at the Mac** (or set it once in the router's DHCP settings so every
+   device gets it). Don't add a public resolver as a second entry, see
+   [Pointing a device at Pi-hole for DNS](#pointing-a-device-at-pi-hole-for-dns) for why.
+
+    |Device|Where|
+    |-|-|
+    |The Mac itself|`networksetup -setdnsservers Wi-Fi 192.168.1.130`, then flush the cache (below)|
+    |iPhone / iPad|Settings > Wi-Fi > (i) next to the network > Configure DNS > Manual > `192.168.1.130`|
+    |Android|Turn off Settings > Network > *Private DNS* first, then Wi-Fi > the network > IP settings: Static > DNS 1 `192.168.1.130`|
+    |Other Macs|System Settings > Wi-Fi > Details > DNS|
+
+    ```bash
+    sudo dscacheutil -flushcache && sudo killall -HUP mDNSResponder
+    ```
+
+    To undo on the Mac (back to the router's DNS): `networksetup -setdnsservers Wi-Fi empty`.
+
+## Starting the stack
+
+Plug in the SSD **first** (see the warning under [Mac-specific gotchas](#mac-specific-gotchas)), then
+from the repo root:
+
+```bash
+JELLYFIN_MUSIC_DIR=/Volumes/SSD/music JELLYFIN_MOVIES_DIR=/Volumes/SSD/movies JELLYFIN_TVSHOWS_DIR=/Volumes/SSD/tvshows GATUS_DNS=192.168.1.130 docker compose -f docker/compose.all.yml up -d caddy pihole homepage gatus arcane cadvisor prometheus loki alloy grafana jellyfin
+```
+
+- `caddy` and `pihole` are the way in, so they're always part of the command.
+- `JELLYFIN_*` swap the VM's `/mnt/ssd/...` paths for the SSD's, see
+  [Running through docker compose](#running-through-docker-compose).
+- `GATUS_DNS` points Gatus at the Mac's Pi-hole. Its default is the VM's (`192.168.1.150`), so
+  without it Gatus checks the VM's services, or fails every check on DNS when the VM is off.
+
+These variables apply to that one command only. Run the **same** command for every later `up`
+(add `--pull always` to update images). A plain `docker compose ... up -d` recreates Gatus against
+the VM's DNS and Jellyfin against `/mnt/ssd`.
+
+To stop the services but keep DNS answering for the devices pointed at the Mac:
+
+```bash
+docker compose -f docker/compose.all.yml stop homepage gatus arcane cadvisor prometheus loki alloy grafana jellyfin
+```
+
+## Checking it works
+
+```bash
+docker compose -f docker/compose.all.yml ps
+```
+
+```bash
+dig +short jellyfin.homelab @192.168.1.130   # should print 192.168.1.130
+```
+
+```bash
+curl -s -o /dev/null -w '%{http_code}\n' -H 'Host: homepage.homelab' http://192.168.1.130/   # 200
+```
+
+Then open http://homepage.homelab on a phone. In Gatus (http://gatus.homelab), checks for services
+that aren't running on the Mac show as down. That's expected, since its config lists the whole VM
+stack.
+
+## URLs
+
+The direct ports are published on all of the Mac's interfaces, so they also work from other devices
+by IP when DNS isn't set up. Homepage is the exception: it rejects any host not in
+`HOMEPAGE_ALLOWED_HOSTS`, so use its `.homelab` name from other devices.
+
+|Service|Through Caddy|Direct|
+|-|-|-|
+|Homepage|http://homepage.homelab|http://localhost:3002 (this Mac only)|
+|Jellyfin|http://jellyfin.homelab|http://192.168.1.130:8096|
+|Gatus|http://gatus.homelab|http://192.168.1.130:8082|
+|Arcane|http://arcane.homelab|http://192.168.1.130:3552|
+|Grafana|http://grafana.homelab|http://192.168.1.130:3013|
+|Prometheus|http://prometheus.homelab|http://192.168.1.130:9090|
+|Loki (API only, `/ready`)|http://loki.homelab|http://192.168.1.130:3100|
+|cAdvisor|http://cadvisor.homelab|http://192.168.1.130:8089|
+|Alloy|—|http://192.168.1.130:12345|
+|Pi-hole|http://pihole.homelab/admin/|http://192.168.1.130:8088/admin/|
+
+In the Jellyfin TV/phone apps, enter `http://jellyfin.homelab` as the server address, or
+`http://192.168.1.130:8096` on devices that aren't using Pi-hole.
+
+## Mac-specific gotchas
+
+- **SSD not plugged in:** docker silently creates the missing `/Volumes/SSD/...` folders and the
+  libraries show up empty. The leftover `/Volumes/SSD` folder can also make macOS mount the drive
+  as `/Volumes/SSD 1` the next time it's plugged in. If that happens, unplug the drive and remove
+  the empty folders (`rmdir` refuses to delete anything that isn't empty):
+
+    ```bash
+    sudo rmdir /Volumes/SSD/music /Volumes/SSD/movies /Volumes/SSD/tvshows /Volumes/SSD
+    ```
+
+    Then re-plug the drive and re-run the start command with `--force-recreate`. Do the same after
+    any unplug and re-plug (see
+    [Playback error after unplugging the SSD](#playback-error-after-unplugging-the-ssd)).
+- **cAdvisor and Alloy see Docker Desktop's Linux VM, not macOS.** Their host mounts (`/sys`,
+  `/var/lib/docker`, `/var/log`) are that VM's, so host CPU/memory/log numbers in Grafana are the
+  VM's slice, not the whole Mac.
+- **The Mac's IP changed:** put the placeholder back, then redo step 4 of
+  [One-time setup](#one-time-setup) so the records get the new IP. After that, pass the new
+  `GATUS_DNS` and update each device's DNS:
+
+    ```bash
+    git checkout -- docker/pihole/etc-dnsmasq.d/10-homelab.conf
+    ```
+
+- **Home Assistant** needs one extra variable on the Mac, see
+  [Running it on the Mac](#running-it-on-the-mac).
+
 # Commands
 
 - To pull all new versions of images and run all services:
@@ -1599,6 +1782,8 @@ JELLYFIN_MUSIC_DIR=/Volumes/SSD/music JELLYFIN_MOVIES_DIR=/Volumes/SSD/movies JE
 ```
 
 The `JELLYFIN_*` overrides are explained under [Running through docker compose](#running-through-docker-compose). Navidrome needs no override; `navidrome/.env` already points `NAVIDROME_MUSIC_DIR` at `/Volumes/SSD/music`.
+
+To reach these from other devices on the network by `.homelab` name, see [Running on the Mac (LAN access)](#running-on-the-mac-lan-access).
 
 ### Jellyfin
 
