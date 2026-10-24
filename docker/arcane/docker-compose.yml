@@ -1,0 +1,48 @@
+# Arcane (Docker management UI: containers, images, volumes, networks, compose projects)
+# at http://arcane.homelab. Upstream port 3552 is free on this host, so it's published as-is.
+#
+# First login is arcane / arcane-admin -- Arcane forces a password change on first sign-in.
+#
+# ENCRYPTION_KEY comes from ARCANE_ENCRYPTION_KEY in the shared docker/.env (generated with
+# `openssl rand -hex 32`). Don't rotate it casually -- it encrypts stored credentials in
+# arcane_data, so a new key orphans them.
+#
+# Projects folder: Arcane needs it mounted at the SAME absolute path inside the container so
+# relative mounts in its compose projects resolve identically for Arcane and the Docker daemon.
+# It's a dedicated folder under ~/docker-volumes, deliberately NOT this repo -- the repo's stacks
+# are deployed by git pull + compose.all.yml, and letting Arcane edit them would drift from git.
+#
+# Named volume for Arcane's own state (not a bind mount): backup-remote-volumes.sh tars named
+# volumes and would skip a bind mount.
+#
+# The docker.sock mount is read-write on purpose -- same root-equivalent trade-off as dockhand.
+#
+# main-network is declared in the root docker-compose.yml, not here -- like the other
+# per-service files in this repo, this only comes up via compose.all.yml:
+#   docker compose -f compose.all.yml up -d arcane
+
+services:
+  arcane:
+    image: ghcr.io/getarcaneapp/manager:latest
+    container_name: arcane
+    restart: unless-stopped
+    ports:
+      - "3552:3552" # exposed on localhost for testing; caddy also proxies internally
+    environment:
+      - TZ=${TZ}
+      - APP_URL=http://arcane.homelab
+      - PUID=1000
+      - PGID=1000
+      - ENCRYPTION_KEY=${ARCANE_ENCRYPTION_KEY}
+      - PROJECTS_DIRECTORY=${HOME}/docker-volumes/arcane/projects
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - arcane_data:/app/data
+      - ${HOME}/docker-volumes/arcane/projects:${HOME}/docker-volumes/arcane/projects
+    # Upstream sets this so Arcane can read host cgroup stats for its resource graphs.
+    cgroup: host
+    networks:
+      - main-network
+
+volumes:
+  arcane_data:
