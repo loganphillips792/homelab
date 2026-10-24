@@ -180,6 +180,12 @@ endpoints:
     interval: 60s
     conditions:
       - "[STATUS] == 200"
+  - name: Arcane
+    group: apps
+    url: http://arcane.homelab
+    interval: 60s
+    conditions:
+      - "[STATUS] == 200"
   # /manifest.json answers 200 without a login; every other path needs a session or token.
   - name: Home Assistant
     group: apps

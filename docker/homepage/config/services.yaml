@@ -201,6 +201,10 @@
         icon: docker
         href: http://dockhand.homelab
         description: Docker container management UI
+    - Arcane:
+        icon: arcane
+        href: http://arcane.homelab
+        description: Docker and compose project management UI
     - Excalidraw:
         icon: https://cdn.jsdelivr.net/gh/walkxcode/dashboard-icons@master/svg/excalidraw.svg
         href: http://excalidraw.homelab

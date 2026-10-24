@@ -45,6 +45,7 @@
   - [Linkwarden](#linkwarden)
   - [Forgejo](#forgejo-1)
   - [Dockhand](#dockhand)
+  - [Arcane](#arcane)
   - [Home Assistant](#home-assistant-1)
   - [C Advisor](#c-advisor)
   - [Matomo](#matomo)
@@ -547,7 +548,7 @@ Name the service to limit `up` to just it:
 ```bash
 docker compose -f docker/compose.all.yml up -d gatus
 docker compose -f docker/compose.all.yml up -d dynacat
-docker compose -f docker/compose.all.yml up -d silo vaults3 rustfs gatus homepage dockhand dozzle
+docker compose -f docker/compose.all.yml up -d silo vaults3 rustfs gatus homepage arcane dozzle
 ```
 
 None of the extra flags from the full-update command are needed: `up -d` already recreates the container when its compose config changed. If you only edited a bind-mounted config file (nothing in the YAML), add `--force-recreate` so the process comes up fresh and re-reads it. Avoid `docker compose restart <service>` after YAML/env changes — restart reuses the existing container config and silently ignores them.
@@ -1425,10 +1426,10 @@ than a service list, so neither needs a per-service edit.
 
 ### Running the media stack
 
-To bring up the observability stack, dockhand, gatus, navidrome and jellyfin:
+To bring up the observability stack, arcane, gatus, navidrome and jellyfin:
 
 ```bash
-JELLYFIN_MUSIC_DIR=/Volumes/SSD/music JELLYFIN_MOVIES_DIR=/Volumes/SSD/movies JELLYFIN_TVSHOWS_DIR=/Volumes/SSD/tvshows docker compose -f docker/compose.all.yml up -d prometheus loki alloy grafana cadvisor dockhand gatus navidrome jellyfin
+JELLYFIN_MUSIC_DIR=/Volumes/SSD/music JELLYFIN_MOVIES_DIR=/Volumes/SSD/movies JELLYFIN_TVSHOWS_DIR=/Volumes/SSD/tvshows docker compose -f docker/compose.all.yml up -d prometheus loki alloy grafana cadvisor arcane gatus navidrome jellyfin
 ```
 
 The `JELLYFIN_*` overrides are explained under [Running through docker compose](#running-through-docker-compose). Navidrome needs no override; `navidrome/.env` already points `NAVIDROME_MUSIC_DIR` at `/Volumes/SSD/music`.
@@ -1448,10 +1449,10 @@ docker compose -f docker/compose.all.yml up -d jellyfin
 
 Then add libraries in the Jellyfin UI pointing at `/media/music` and `/media/movies`, and a separate **Shows** library at `/media/tvshows`.
 
-To bring up the observability stack, dockhand and homepage alongside it:
+To bring up the observability stack, arcane and homepage alongside it:
 
 ```bash
-JELLYFIN_MUSIC_DIR=/Volumes/SSD/music JELLYFIN_MOVIES_DIR=/Volumes/SSD/movies JELLYFIN_TVSHOWS_DIR=/Volumes/SSD/tvshows docker compose -f docker/compose.all.yml up -d prometheus loki alloy grafana cadvisor dockhand homepage jellyfin
+JELLYFIN_MUSIC_DIR=/Volumes/SSD/music JELLYFIN_MOVIES_DIR=/Volumes/SSD/movies JELLYFIN_TVSHOWS_DIR=/Volumes/SSD/tvshows docker compose -f docker/compose.all.yml up -d prometheus loki alloy grafana cadvisor arcane homepage jellyfin
 ```
 
 Variables written this way apply only to that one command. They take priority over the `/mnt/ssd/...` values in `docker/.env`, so Jellyfin mounts the SSD folders instead. Only Jellyfin uses these three variables, so the other services aren't affected.
@@ -3165,7 +3166,7 @@ wizard writes that file once.
 
 ```
 docker compose -f docker/compose.all.yml up -d forgejo
-docker compose -f docker/compose.all.yml up -d --force-recreate pihole caddy gatus homepage dockhand grafana prometheus loki
+docker compose -f docker/compose.all.yml up -d --force-recreate pihole caddy gatus homepage arcane grafana prometheus loki
 ```
 
 The second line picks up the bind-mounted config edits (DNS record, Caddy site block, Gatus
@@ -3352,6 +3353,73 @@ docker volume rm docker_dockhand_data
 docker compose -f docker/compose.all.yml up -d dockhand
 ```
 
+## Arcane
+
+Docker management UI at http://arcane.homelab — containers, images, volumes, networks and
+compose projects. Overlaps with Dockhand; both run side by side to compare.
+
+One container, defined in `arcane/docker-compose.yml` and included from `compose.all.yml`:
+
+| Container | Purpose | Storage |
+|-|-|-|
+| `arcane` | the UI and its own state | `arcane_data` (`/app/data`) |
+| | compose projects created in Arcane | `~/docker-volumes/arcane/projects` (same path inside the container) |
+
+**Two ways in:**
+
+| URL | Path |
+|-|-|
+| http://arcane.homelab | Caddy → `arcane:3552` over `main-network` (needs Pi-hole DNS) |
+| http://localhost:3552 (on the server) or http://192.168.1.150:3552 (LAN) | host port `3552:3552`, bypasses Caddy and DNS |
+
+3552 is upstream's default and was free on the host, so it's published unchanged. Use the direct
+port when Pi-hole or Caddy is down; Homepage's direct-link toggle uses it too (`arcane: 3552` in
+`homepage/config/custom.js`).
+
+**Deploy** (on the server, after `git pull` — edits on the Mac are inert until pulled):
+
+```
+docker compose -f docker/compose.all.yml up -d arcane
+docker compose -f docker/compose.all.yml up -d --force-recreate pihole caddy gatus homepage
+```
+
+Why the two lines differ:
+
+- **`up -d arcane`** — Arcane is new (or its YAML changed), so compose sees a config-hash mismatch
+  and creates/recreates it on its own. No flag needed.
+- **`--force-recreate pihole caddy gatus homepage`** — their YAML didn't change; only the files they
+  bind-mount did (dnsmasq record, Caddyfile, Gatus config, Homepage tile). Compose can't see inside
+  bind mounts, so plain `up -d` would leave them running with the old config in memory.
+  `--force-recreate` replaces those containers with new ones so they re-read the files.
+
+Rule of thumb: edited the compose YAML or `.env` → `up -d`. Edited only a mounted config file →
+`up -d --force-recreate`. Adding the flag unnecessarily is harmless. Avoid `docker compose restart`
+for either — it reuses the old container config. Full explanation:
+[Why `--force-recreate` is only sometimes needed](#why---force-recreate-is-only-sometimes-needed).
+
+**`ENCRYPTION_KEY`** comes from `ARCANE_ENCRYPTION_KEY` in `docker/.env` (32 bytes, generated with
+`openssl rand -hex 32`). It encrypts stored credentials in `arcane_data`; changing it orphans them.
+Arcane does not use `JWT_SECRET` — it signs sessions with a key it generates itself.
+
+**Projects folder is not this repo.** `PROJECTS_DIRECTORY` points at
+`~/docker-volumes/arcane/projects`, mounted at the identical absolute path inside the container so
+relative mounts (`./config`) resolve the same for Arcane and the Docker daemon. The homelab stacks
+stay managed by git pull + `compose.all.yml`; Arcane still *sees* and can stop/start their
+containers through the socket, but it won't edit their compose files.
+
+**The docker socket is mounted read-write** — same root-equivalent trade-off as Dockhand. Don't
+expose `arcane.homelab` through Tailscale funnel or a port forward.
+
+First login: `arcane` / `arcane-admin`. Arcane forces a password change on first sign-in.
+
+Full reset (wipes users and settings; projects folder is untouched):
+
+```
+docker compose -f docker/compose.all.yml rm -fsv arcane
+docker volume rm docker_arcane_data
+docker compose -f docker/compose.all.yml up -d arcane
+```
+
 ## Home Assistant
 
 Three containers from `homeassistant/docker-compose.yml`. Zigbee devices talk to the SLZB-06M coordinator,
@@ -3384,7 +3452,7 @@ rule from [Adding a new service](#adding-a-new-service), which shows up in three
 1. Start Home Assistant, the broker and Zigbee2MQTT:
 
 ```bash
-docker compose -f docker/compose.all.yml up -d homeassistant mosquitto zigbee2mqtt gatus dockhand grafana prometheus
+docker compose -f docker/compose.all.yml up -d homeassistant mosquitto zigbee2mqtt gatus arcane grafana prometheus
 ```
 
    Leave out `zigbee2mqtt` until `SLZB_HOST` is set in `docker/.env` (see
@@ -3439,7 +3507,7 @@ macOS, so nothing answers on `localhost:8123`. Switch Home Assistant to Docker's
 run time, which is what makes its `8123:8123` port mapping take effect:
 
 ```bash
-HA_NETWORK_MODE=bridge docker compose -f docker/compose.all.yml up -d homeassistant mosquitto zigbee2mqtt gatus dockhand grafana prometheus
+HA_NETWORK_MODE=bridge docker compose -f docker/compose.all.yml up -d homeassistant mosquitto zigbee2mqtt gatus arcane grafana prometheus
 ```
 
 Leave out `zigbee2mqtt` until `SLZB_HOST` is set in `docker/.env` (see
@@ -4231,6 +4299,7 @@ These services bake their public URL into the frontend at startup — they only 
 | linkwarden | http://localhost:3000 | http://linkwarden.homelab | set on first run (first user is admin) |
 | forgejo | http://localhost:3014 | http://forgejo.homelab | set on first run (install wizard creates the admin) |
 | dockhand | http://localhost:3001 | http://dockhand.homelab | set on first run |
+| arcane | http://localhost:3552 | http://arcane.homelab | arcane / arcane-admin (forced change on first login) |
 | beszel | http://localhost:8090 | http://beszel.homelab | set on first run |
 | backrest | http://localhost:9898 | http://backrest.homelab | set on first run |
 | paperless-ngx | http://localhost:8001 | http://paperless.homelab | admin / changeMe |
