@@ -2225,34 +2225,44 @@ you to handle by hand.
 
 #### Data
 
-Settings and the SQLite DB live in the `seerr_config` named volume (`docker_seerr_config` on
-disk, because of the project prefix), mounted at `/app/config`. It's deliberately not a
-`~/docker-volumes` bind mount, for the same SQLite-locking reason as Navidrome's `navidrome_data`.
-Recreating or updating the container keeps everything.
+Settings and the SQLite DB live in `~/docker-volumes/seerr/config` on the host, bind-mounted at
+`/app/config` as in the [upstream docs](https://docs.seerr.dev/getting-started/docker/). Recreating
+or updating the container keeps everything, and Backrest backs the folder up along with the rest
+of `~/docker-volumes`.
 
-> **"The `/app/config` volume mount was not configured properly" banner:** this is a false alarm
-> with a named volume. The image ships an empty `/app/config/DOCKER` marker file, and Seerr shows
-> the banner whenever it can see that file. A bind mount hides it, but a new named volume gets a
-> copy from the image. Delete it once per new volume (first start, on the VM, or after a reset):
+**On the VM**, create the folder and give it to the container's `node` user (UID 1000) **before**
+the first start. Otherwise docker creates it as root and Seerr can't write its settings. The Mac
+doesn't need this, since Docker Desktop maps ownership itself.
+
+```bash
+mkdir -p ~/docker-volumes/seerr/config && sudo chown -R 1000:1000 ~/docker-volumes/seerr/config
+```
+
+To confirm the mount is right (this is also what drives the "`/app/config` volume mount was not
+configured properly" banner):
+
+```bash
+curl -s http://localhost:5055/api/v1/status/appdata   # wants "appData":true
+```
+
+> **Watch for SQLite lock errors on the Mac.** Seerr's DB runs in WAL mode, the same mode that broke
+> Navidrome on a Docker Desktop bind mount (see the volume comment in
+> `navidrome/docker-compose.yml`). It passed `PRAGMA integrity_check` after the switch, but if the
+> logs ever show `database is locked`, `disk I/O error` or `malformed`, move the config back to a
+> named volume:
 >
 > ```bash
-> docker exec seerr rm /app/config/DOCKER
+> docker logs seerr 2>&1 | grep -iE 'locked|i/o error|malformed'
 > ```
->
-> ```bash
-> docker compose -f docker/compose.all.yml restart seerr
-> ```
->
-> `curl -s http://localhost:5055/api/v1/status/appdata` should then show `"appData":true`.
 
-To start fresh (then delete the marker file again, as above):
+To start fresh, wipe the folder:
 
 ```bash
 docker compose -f docker/compose.all.yml rm -sf seerr
 ```
 
 ```bash
-docker volume rm docker_seerr_config
+rm -rf ~/docker-volumes/seerr/config
 ```
 
 ```bash
