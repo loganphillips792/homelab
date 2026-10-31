@@ -13,7 +13,9 @@ services:
     # Resolve *.homelab via Pi-hole (port 53 published on the host). Docker's
     # embedded DNS forwards to the host's upstream resolvers, which don't know
     # the .homelab zone, so without this every check fails DNS.
-    dns: 192.168.1.150
+    # Defaults to the VM. On the Mac, pass GATUS_DNS=<Mac's IP> so it uses the
+    # Mac's own Pi-hole (see "Running on the Mac (LAN access)" in README.md).
+    dns: ${GATUS_DNS:-192.168.1.150}
     ports:
       - 8082:8080
     volumes:
