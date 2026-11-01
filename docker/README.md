@@ -2818,6 +2818,24 @@ To ssh into VM:
 - `kafka-network` carries only the Kafka stack (`kafka`, `kafka-ui`, `akhq`, `kafka-consumer`, `kafka-producer`)
   plus Caddy, which reverse-proxies the two UIs
 
+### Reaching Jellyfin from your phone (off Wi-Fi)
+
+With Tailscale on the phone, you can turn off Wi-Fi and open Jellyfin directly at `http://192.168.1.124:8096`, once these are all true:
+
+1. The phone is signed into the same tailnet as the container, meaning the same Tailscale account or organization.
+2. The route is `192.168.1.0/24` and approved. The container must advertise the new route, which you can check with the `debug prefs` command in [Updating the auth key](#updating-the-auth-key), and you must have approved it in the admin console. This is the step people most often miss.
+3. Your access rules allow it. Tailscale's default rules let every device reach everything. If you've edited the Access Controls, make sure your phone is allowed to reach `192.168.1.0/24`.
+
+You don't need to change any settings on the phone. The iPhone and Android apps use approved subnet routes automatically. Then turn off Wi-Fi, connect Tailscale, and open `http://192.168.1.124:8096`.
+
+Things that can still trip you up:
+
+- Networks that also use `192.168.1.x`: that range is very common, so a friend's Wi-Fi or a hotel might use it too. Then the phone may try to find `192.168.1.124` on that local network instead of at home. Cellular data is fine. If this happens often, consider moving your home network to a less common range.
+- The VM's IP can change. `192.168.1.124` was given out automatically by the router, so it could be different after a reboot. Reserve that address for the VM in your router's settings, or use a static IP in netplan, so the URL keeps working.
+- `*.homelab` names won't work yet. The phone doesn't use Pi-hole for DNS, so `http://jellyfin.homelab` won't resolve. The raw IP works. For the names, add Pi-hole as a DNS server in the Tailscale admin console under **DNS**.
+
+Quick test: with Wi-Fi off and Tailscale connected, open `http://192.168.1.124:8096` in the phone's browser. If it times out, the route most likely isn't approved yet. Check the node's route settings at login.tailscale.com.
+
 
 ## Test Postgres
 
