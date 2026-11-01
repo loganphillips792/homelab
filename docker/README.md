@@ -242,6 +242,7 @@ Confirm port 53 is now free: `sudo ss -lunpt | grep :53 || echo "Port 53 is free
 9. Bring up Docker containers
     1. docker login -u dockedupstream
     2. `docker compose -f docker/compose.all.yml up -d`
+      - If you are running just the jellyfin stack: `sudo JELLYFIN_MUSIC_DIR=/Volumes/SSD/music JELLYFIN_MOVIES_DIR=/Volumes/SSD/movies JELLYFIN_TVSHOWS_DIR=/Volumes/SSD/tvshows GATUS_DNS=192.168.1.130 docker compose -f docker/compose.all.yml up -d caddy pihole homepage gatus arcane cadvisor prometheus loki alloy grafana jellyfin tailscale` (Note: don't worry about the mounted directories. [We will fix that later](#changing-the-mount-path-external-drive-on-the-vm))
 
 10. `sudo ss -lunpt | grep :53` If you see docker-proxy, that means that PiHole has binded to port 53
 
@@ -385,7 +386,9 @@ Permission denied, please try again.
 
 Those are failed *empty* attempts, not a wrong password. Don't debug the password — the prompt never reached you. This applies to the `!` prefix in Claude Code too: `! ssh-copy-id ...` fails the same way, because that also runs without a TTY.
 
-Also: **don't paste the password into the chat.** It would be stored in the conversation transcript in plaintext and resent to the API on every subsequent turn. Key auth avoids the problem entirely.
+Giving Claude the password doesn't help either. Claude won't sign in with a password, even one you hand it, and that includes feeding it to `ssh` through a tool like `sshpass` or `expect`. Typing a password to log in is something you have to do yourself. So run `ssh-copy-id` once (step 2 below) and type the password yourself. After that, Claude logs in with the key and no password is involved.
+
+Also: **don't paste the password into the chat.** It would be stored in the conversation transcript in plaintext and resent to the API on every subsequent turn. Key auth avoids the problem entirely. If you already pasted it, change it on the VM with `passwd`, especially if it's an easy-to-guess one like `password`.
 
 ### Setup
 
@@ -411,6 +414,23 @@ Do this in a **real terminal** (Terminal.app or iTerm — not Claude Code, which
     ```
 
     This prompts for the account password — the last time you type it. Pass `-i` explicitly: without it, `ssh-copy-id` installs whatever key it finds first (e.g. `id_rsa_terraform.pub`), which probably isn't the one you want.
+
+    A successful run looks like this:
+
+    ```
+    ❯ ssh-copy-id logan@192.168.1.124
+    /usr/bin/ssh-copy-id: INFO: Source of key(s) to be installed: "/Users/logan/.ssh/id_ed25519.pub"
+    /usr/bin/ssh-copy-id: INFO: attempting to log in with the new key(s), to filter out any that are already installed
+    /usr/bin/ssh-copy-id: INFO: 1 key(s) remain to be installed -- if you are prompted now it is to install the new keys
+    logan@192.168.1.124's password:
+
+    Number of key(s) added:        1
+
+    Now try logging into the machine, with: "ssh 'logan@192.168.1.124'"
+    and check to make sure that only the key(s) you wanted were added.
+    ```
+
+    Check the `Source of key(s)` line names the key you meant, and that `Number of key(s) added` is 1. If the key was already on the VM, it skips the password prompt and prints `All keys were skipped because they already exist on the remote system` instead.
 
 3. Verify it works without a TTY, the same way Claude will call it:
 
@@ -948,6 +968,20 @@ On a headless box (Proxmox LXC/VM), answer `n` to the web browser question, run
 Optionally, add `use_trash = false` under `[gdrive]` in `~/.config/rclone/rclone.conf`.
 Otherwise every file `restic prune` deletes goes to Drive's trash and keeps counting against your
 quota.
+
+If rclone fails with `couldn't fetch token: invalid_grant: maybe token expired?`, reconnect the
+remote on a machine with a browser (your Mac):
+
+```bash
+rclone config reconnect gdrive:
+```
+
+Answer `y` to "Use web browser", sign in with the Google account that owns the Drive, and
+approve. Then check it works:
+
+```bash
+rclone ls gdrive:restic-docker
+```
 
 ### 3a. Use Drive as a restic repo directly (recommended)
 
@@ -1632,6 +1666,26 @@ JELLYFIN_MUSIC_DIR=/Volumes/SSD/music JELLYFIN_MOVIES_DIR=/Volumes/SSD/movies JE
 - Plug the SSD in **before** running this. If `/Volumes/SSD` isn't mounted, docker silently creates empty dirs and the libraries show up empty — unmount isn't detected either, so after re-plugging the drive run the same command with `--force-recreate`.
 - The overrides only apply to that one command. A later plain `up -d` (e.g. the full update command) recreates jellyfin with the `/mnt/ssd` paths, since the resolved config changed.
 
+##### Changing the directories in `docker/.env` instead
+
+To make a path stick without typing overrides every time, edit the three lines in `docker/.env` (compose reads it automatically because it sits next to `compose.all.yml`):
+
+```bash
+JELLYFIN_MUSIC_DIR=/mnt/ssd/music
+JELLYFIN_MOVIES_DIR=/mnt/ssd/movies
+JELLYFIN_TVSHOWS_DIR=/mnt/ssd/tvshows
+```
+
+Then recreate jellyfin. A plain `up -d` is enough, because the resolved config changed:
+
+```bash
+docker compose -f docker/compose.all.yml up -d jellyfin
+docker compose -f docker/compose.all.yml config jellyfin | grep source   # confirm the new paths
+```
+
+- `docker/.env` is committed and shared by the Mac and the VM. Only commit a change when you are moving the **VM** paths (e.g. the SSD is now mounted somewhere other than `/mnt/ssd`). If you edit it on the Mac to use `/Volumes/SSD/...`, don't commit it: once the VM runs `git pull`, Jellyfin there would mount empty dirs. Undo the Mac edit with `git checkout docker/.env` when you're done.
+- Shell variables beat `.env`. If `JELLYFIN_*_DIR` is exported in your shell (check with `env | grep JELLYFIN`), your `.env` edit is silently ignored.
+
 
 #### Running Jellyfin without docker compose
 
@@ -1715,6 +1769,12 @@ rsync -avh --info=progress2 --exclude='.DS_Store' --exclude='._*' /Volumes/Eleme
 rsync -avh --info=progress2 --exclude='.DS_Store' --exclude='._*' /Volumes/Elements/media/tvshows/ /Volumes/SSD/tvshows/
 ```
 
+List the movies the container can see:
+
+```bash
+sudo docker exec jellyfin ls "/media/movies/"
+```
+
 #### New or deleted media not showing in Jellyfin
 
 Jellyfin only picks up added or removed files when it rescans the library. Real-time monitoring doesn't work through the bind mount on the Mac, so new media (e.g. copied in with the rsync commands above) doesn't appear, and deleted media stays listed, until the next scan.
@@ -1760,6 +1820,76 @@ osascript -e 'quit app "Docker"' && sleep 5 && open -a Docker
 ```
 
 Then run the `--force-recreate` command above again. Restarting Docker Desktop stops every running container, not just Jellyfin; the ones with `restart: unless-stopped` come back up on their own.
+
+#### Libraries empty on the VM even though the SSD is mounted
+
+Symptom: `/mnt/ssd/movies` has files on the VM, but `sudo docker exec jellyfin ls /media/movies` prints nothing.
+
+The container was created with different paths. That's usually the `/media/logan/SSD/...` desktop automount path, or `JELLYFIN_*_DIR=` overrides typed in front of the command. Check what it's actually bound to:
+
+```bash
+sudo docker inspect jellyfin --format '{{range .Mounts}}{{.Source}} -> {{.Destination}}{{println}}{{end}}'
+```
+
+If the sources aren't `/mnt/ssd/...`, that's the problem. If a path didn't exist when the container was created, Docker silently created it as an empty root-owned folder on the VM's own disk, and Jellyfin has been reading that empty folder ever since.
+
+**Fix:** recreate the container so it picks up the `/mnt/ssd/...` paths from `docker/.env`:
+
+```bash
+cd ~/homelab && sudo docker compose -f docker/compose.all.yml up -d --force-recreate jellyfin
+sudo docker exec jellyfin ls /media/movies | head   # should list the movies now
+```
+
+Then run **Scan All Libraries** in the dashboard.
+
+Docker sets a container's folder mappings when it creates the container, and they can't be changed afterwards. The container keeps its old paths until it's deleted and created again. `docker restart` doesn't help, because it reuses the same container with the same mappings.
+
+What each part of the command does:
+
+- `cd ~/homelab` runs it from the repo, so `docker/compose.all.yml` is found.
+- `sudo` is needed because `logan` isn't in the `docker` group. Without it you get `permission denied` on the Docker socket.
+- `up -d jellyfin` reads the compose file and `docker/.env` (which give `/mnt/ssd/...`) and starts only the Jellyfin service, in the background.
+- `--force-recreate` deletes and recreates the container even if Compose thinks nothing changed.
+
+Is `--force-recreate` needed here? Probably not. Compose compares the settings it calculates now with the ones the container was created with. The paths differ, so a plain `up -d jellyfin` should recreate it anyway. The flag means you don't have to depend on that comparison, and it costs nothing: Jellyfin restarts for a few seconds either way. Config and watch history live in `~/docker-volumes/jellyfin`, so nothing is lost.
+
+Leave out the `JELLYFIN_*_DIR=` overrides here. Shell variables beat `.env`, and leaving them out is what makes Compose use `/mnt/ssd`.
+
+If the bad path was `/media/logan/SSD`, remove the empty folders Docker created. Otherwise the desktop keeps automounting the SSD at `/media/logan/SSD1` because the name is taken:
+
+```bash
+sudo rmdir /media/logan/SSD/movies /media/logan/SSD/music /media/logan/SSD/tvshows /media/logan/SSD
+```
+
+#### Unplugging and replugging the SSD on the VM
+
+Plugging the SSD back in isn't enough on its own. Here's what happens:
+
+1. When you unplug it, the drive disappears from the VM and `/mnt/ssd` stops working. Jellyfin keeps its connection to the old mount, now dead. Titles still show in the library because they're in Jellyfin's database, but playback fails.
+2. When you plug it back in, Proxmox reconnects the USB device to the VM by itself, since the passthrough is set by vendor/device ID. But `/etc/fstab` only runs at boot, so `/mnt/ssd` normally isn't mounted again. If you're logged into the desktop, Ubuntu mounts the drive at `/media/logan/SSD` instead.
+3. Even after `/mnt/ssd` is mounted again, Jellyfin is still holding the dead mount. It only sees the drive after the container is recreated.
+
+After plugging it back in, run:
+
+```bash
+sudo mount /mnt/ssd && findmnt /mnt/ssd
+```
+
+```bash
+cd ~/homelab && sudo docker compose -f docker/compose.all.yml up -d --force-recreate jellyfin
+```
+
+If Navidrome also reads from the SSD, recreate it too.
+
+To unplug cleanly, stop Jellyfin first, then unmount, then pull the drive:
+
+```bash
+sudo docker stop jellyfin && sudo umount /mnt/ssd
+```
+
+The drive is mounted read-only on the VM, so pulling it without unmounting won't corrupt it. Unmounting just avoids leaving dead mounts behind.
+
+This unplug/replug sequence hasn't been tested on the VM yet. After replugging, check that `findmnt /mnt/ssd` prints a row before you recreate Jellyfin.
 
 
 ### Navidrome
@@ -1815,7 +1945,7 @@ Two separate things have to be true: the host path has to be **mounted before th
 
 **1. Make the mount permanent (do this first)**
 
-Add the SSD to the VM: `VM > Hardweare > Add > USB Device > Use USB Vendor/Device ID > Select the SSD`
+Add the SSD to the VM: `VM > Hardware > Add > USB Device > Use USB Vendor/Device ID > Select the SSD`
 
 A bind mount resolves its source once, at container-create time. If the container already existed when you ran `mount /dev/sdb1 /mnt/ssd`, it is still bound to the empty pre-mount directory — mounting afterwards does not propagate into a running container. The same trap fires on every reboot if the mount isn't in `/etc/fstab`.
 
@@ -1848,12 +1978,26 @@ UUID=<uuid>  /mnt/ssd  exfat    defaults,nofail,uid=1000,gid=1000,umask=022  0 0
 UUID=<uuid>  /mnt/ssd  hfsplus  ro,nofail                                0 0
 ```
 
-Or skip the editor and append:
+Or skip the editor and append. This reads the UUID and filesystem type off the partition and picks the matching options from the table above, so it writes the right line whatever the drive is formatted as:
 
 ```
-# substitute the partition you identified above for /dev/sdb1
-echo "UUID=$(sudo blkid -s UUID -o value /dev/sdb1)  /mnt/ssd  ext4  defaults,nofail  0 2" | sudo tee -a /etc/fstab
+DEV=/dev/sdb1   # substitute the partition you identified above
+UUID=$(sudo blkid -s UUID -o value "$DEV")
+TYPE=$(sudo blkid -s TYPE -o value "$DEV")
+case "$TYPE" in
+  ext4)       OPTS="defaults,nofail"                             PASS=2 ;;
+  exfat|ntfs) OPTS="defaults,nofail,uid=1000,gid=1000,umask=022" PASS=0 ;;
+  hfsplus)    OPTS="ro,nofail"                                   PASS=0 ;;
+  *)          OPTS="" ; echo "unhandled filesystem '$TYPE' on $DEV, add the line by hand" ;;
+esac
+if grep -q '[[:space:]]/mnt/ssd[[:space:]]' /etc/fstab; then
+  echo "/etc/fstab already has a /mnt/ssd line, edit it instead of appending"
+elif [ -n "$UUID" ] && [ -n "$OPTS" ]; then
+  echo "UUID=$UUID  /mnt/ssd  $TYPE  $OPTS  0 $PASS" | sudo tee -a /etc/fstab
+fi
 ```
+
+It won't append a second `/mnt/ssd` line if one is already there, and it writes nothing if `$DEV` is wrong (no UUID) or the type isn't one of the three above.
 
 `nofail` matters — without it the VM drops to emergency mode at boot if the SSD is ever unplugged. Then verify before trusting it to a reboot:
 
@@ -2555,16 +2699,54 @@ nothing changed, force it:
 docker compose -f compose.all.yml up -d --force-recreate tailscale
 ```
 
+On the Ubuntu VM, where your user needs `sudo` for Docker, run it from `~/homelab`:
+
+```bash
+sudo docker compose -f docker/compose.all.yml up -d --force-recreate tailscale
+```
+
 **4. Verify**
 
 ```bash
 docker compose -f compose.all.yml exec tailscale tailscale status
 ```
 
+On the Ubuntu VM, from `~/homelab`:
+
+```bash
+sudo docker compose -f docker/compose.all.yml exec tailscale tailscale status
+```
+
 The node should show as online. Then confirm it's still in the tailnet at
 https://login.tailscale.com/admin/machines, and that the `10.0.0.0/24` subnet route is still
 approved — a re-auth can drop route approval, and losing it breaks `*.homelab` access from
 outside the house without the container itself looking broken.
+
+On a fresh node, the machine should be listed on that page, and you'll need to approve its
+subnet route there (the node's **⋯** menu → *Edit route settings*).
+
+The route has to match the home network. The container advertises
+`--advertise-routes=10.0.0.0/24` (`docker-compose.yml`, in `TS_EXTRA_ARGS`). If the network
+has moved to `192.168.1.x`, Tailscale still connects, but you can't reach home devices
+remotely, including `*.homelab`. To fix it, change the route to `192.168.1.0/24`, deploy it to
+the VM, recreate the container again, and approve the new route in the admin console.
+
+Once the change is on the VM, recreate the Tailscale container from `~/homelab`:
+
+```bash
+sudo docker compose -f docker/compose.all.yml up -d --force-recreate tailscale
+```
+
+The new route won't work until you approve it. Go to https://login.tailscale.com/admin/machines,
+open the node's **⋯** menu → *Edit route settings*, and approve `192.168.1.0/24`. To confirm
+the container is advertising it:
+
+```bash
+sudo docker compose -f docker/compose.all.yml exec tailscale tailscale debug prefs | grep -A3 AdvertiseRoutes
+```
+
+You don't need a new auth key. The container applies the route settings each time it starts,
+even when it's already logged in.
 
 **5. Revoke the old key**
 
@@ -3613,6 +3795,11 @@ rule from [Adding a new service](#adding-a-new-service), which shows up in three
 - Home Assistant reaches the broker at `127.0.0.1:1883`, while Zigbee2MQTT uses
   `mqtt://mosquitto:1883`.
 
+`docker ps` shows no port for `homeassistant`. That's expected. `homeassistant` runs with
+`network_mode: host` (`homeassistant/docker-compose.yml:50`), so Docker drops the `ports:` mapping
+and `docker ps` shows no port. Home Assistant still listens on 8123, just directly on the host's
+network instead of through a published port.
+
 ### First boot
 
 1. Start Home Assistant, the broker and Zigbee2MQTT:
@@ -3857,21 +4044,35 @@ After install, go to Administration → System → General settings and uncheck 
 
 [Hermes Agent](https://hermes-agent.nousresearch.com/docs/user-guide/docker) (Nous Research) runs as a long-lived gateway plus a web dashboard. A single container hosts the supervised gateway and dashboard via its s6 supervisor.
 
-Start it: `docker compose -f compose.all.yml up -d hermes-agent`. All state lives in `~/docker-volumes/hermes-agent` (mounted at `/opt/data`).
+All state lives in `~/docker-volumes/hermes-agent` (mounted at `/opt/data`), including configuration, credentials, sessions, skills, and memories.
 
 Set these in `docker/.env` before first start:
 
 - `ANTHROPIC_API_KEY` — model provider key (forwarded via the compose `environment:` block)
+- `OPENROUTER_API_KEY` — optional; lets Hermes use any model on [OpenRouter](https://openrouter.ai) (Claude, GPT, Gemini, Llama, DeepSeek, …) with one key. OpenRouter adds a ~5% fee on top of provider pricing.
 - `HERMES_DASHBOARD_USER` / `HERMES_DASHBOARD_PASSWORD` — basic-auth login for the dashboard (it exposes API keys, so don't run it unauthenticated)
 - `HERMES_DASHBOARD_SECRET` — restart-stable session secret (`openssl rand -hex 32`)
 
-The dashboard is reached at http://hermes.homelab (Caddy → `hermes:9119`). No host ports are published.
+From the repository root, run the one-time setup wizard in a real terminal before starting the gateway:
 
-First-boot notes:
+```bash
+docker compose -f docker/compose.all.yml run --rm -it hermes-agent setup
+```
 
-- The first start seeds `~/docker-volumes/hermes-agent` with a default `config.yaml`, `SOUL.md`, and `.env`. Since we skip the interactive `hermes setup` wizard, edit `config.yaml` so `model.provider`/`model.model` match the forwarded key (Anthropic), and configure any chat platform there.
-- The container drops to UID 10000. If logs show "Permission denied" on the data dir, set `PUID`/`PGID` to the host owner or `chmod -R 755 ~/docker-volumes/hermes-agent`.
-- Check status: `docker exec hermes hermes status` (reports `Manager: s6 (container supervisor)`).
+Choose Anthropic when configuring the model. The wizard writes `config.yaml`, `.env`, and `SOUL.md` under the data directory. Then start Hermes:
+
+```bash
+docker compose -f docker/compose.all.yml up -d hermes-agent
+```
+
+The dashboard is available at http://hermes.homelab (Caddy → `hermes:9119`) and http://localhost:9119 on the Docker VM. Host port `9119` is published; the OpenAI-compatible API on port `8642` is not enabled or published.
+
+Operation notes:
+
+- The container drops to UID 10000. If logs show "Permission denied" on the data directory, set `PUID`/`PGID` to the host owner or run `sudo chown -R 10000:10000 ~/docker-volumes/hermes-agent`.
+- Check status: `docker exec hermes hermes status --full` (reports `Manager: s6 (container supervisor)`).
+- Follow logs: `docker compose -f docker/compose.all.yml logs -f hermes-agent`.
+- Switch provider/model (e.g. to OpenRouter): `docker exec -it hermes hermes model`. A newly added key in `docker/.env` only reaches the container after it is recreated with `docker compose -f docker/compose.all.yml up -d hermes-agent`.
 
 
 ## ArchiveBox
@@ -4475,7 +4676,7 @@ These services bake their public URL into the frontend at startup — they only 
 | immich | http://localhost:2283 | http://immich.homelab | set on first run |
 | jotty | http://localhost:1122 | http://jotty.homelab | N/A |
 | cta-map | http://localhost:8087 | http://cta-map.homelab | N/A |
-| hermes | http://localhost:9119 | http://hermes.homelab | admin / changeMe |
+| hermes | http://localhost:9119 | http://hermes.homelab | admin / value of `HERMES_DASHBOARD_PASSWORD` in `docker/.env` |
 | archivebox | http://localhost:8010 | http://archivebox.homelab | admin / changeme |
 | navidrome | http://localhost:4533 | http://navidrome.homelab | set on first run (first user is admin) |
 | penpot | http://localhost:9001 | http://penpot.homelab | set on first run (registration) |
