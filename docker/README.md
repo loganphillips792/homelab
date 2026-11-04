@@ -128,6 +128,12 @@ scp 'logan@VM_NAME:/mnt/ssd/movies/2001*.eng.srt' ~/Downloads/
 
 Replace `VM_NAME` with the VM's Tailscale name, and `2001*` with the start of the movie's file name. A movie in its own folder needs that folder in the path, and shows are under `/mnt/ssd/tvshows/Show Name/Season 1/`.
 
+To copy all the subtitles for a season, run this from your Mac, not the VM. It skips the videos and leaves the originals on the SSD:
+
+```bash
+rsync -rtP --include='*.srt' --exclude='*' "logan@192.168.1.124:/mnt/ssd/tvshows/The Americans/Season 1/" ~/Downloads/"The Americans Season 1 subtitles"/
+```
+
 This needs two changes first, or Jellyfin keeps saving subtitles to its `/config` folder:
 
 1. Remove `:ro` from the movies and tvshows mounts in `docker/jellyfin/docker-compose.yml`, then recreate the container.
