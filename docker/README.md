@@ -129,6 +129,18 @@ This needs two changes first, or Jellyfin keeps saving subtitles to its `/config
 
 Subtitles downloaded before these changes stay in `/config`.
 
+To check the mounts after recreating the container, run this on the VM. Movies and tvshows should say `true`, and music `false`:
+
+```bash
+sudo docker inspect jellyfin --format '{{range .Mounts}}{{.Destination}} rw={{.RW}}{{"\n"}}{{end}}'
+```
+
+To check where a subtitle saved after downloading it, run this on the VM. The path should start with `/media/`, with no `ERR` line after it:
+
+```bash
+sudo docker logs --since 10m jellyfin 2>&1 | grep -A3 'Saving subtitles'
+```
+
 ## What could still cause trouble
 
 - Crashes: my notes from August say the VM and Proxmox host were crashing, with the cause still unknown. Tailscale on the host helps if only the VM dies, but not if the whole machine freezes. For that, set the BIOS to power on after power loss and add a smart plug so you can power cycle it remotely.
