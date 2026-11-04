@@ -1,0 +1,43 @@
+# Seerr (media request manager; the project formerly called Jellyseerr) at http://seerr.homelab.
+# Users browse and request movies/shows; Seerr checks them against the Jellyfin library.
+#
+# Config (SQLite DB + settings.json) is a bind mount under ~/docker-volumes, as in the upstream
+# docs, so Backrest picks it up and the files are browsable on the host. The DB runs in WAL mode,
+# which is what broke navidrome_data on a Docker Desktop (VirtioFS) bind mount -- if Seerr ever
+# logs "database is locked" / "disk I/O error" on the Mac, that's the cause; switch back to a
+# named volume (see "Seerr" in README.md).
+#
+# The container runs as the node user (UID 1000). On the VM, create the dir and chown it BEFORE
+# the first start, or docker creates it as root and Seerr can't write to it:
+#   mkdir -p ~/docker-volumes/seerr/config && sudo chown -R 1000:1000 ~/docker-volumes/seerr/config
+# On the Mac, Docker Desktop maps ownership itself, so no chown is needed.
+#
+# main-network is declared in the root docker-compose.yml, not here -- like the other
+# per-service files in this repo, this only comes up via compose.all.yml:
+#   docker compose -f compose.all.yml up -d seerr
+
+services:
+  seerr:
+    image: ghcr.io/seerr-team/seerr:latest
+    init: true
+    container_name: seerr
+    restart: unless-stopped
+    environment:
+      - LOG_LEVEL=info
+      - TZ=${TZ}
+    ports:
+      - "5055:5055" # exposed on localhost for testing; caddy also proxies internally
+    volumes:
+      - ~/docker-volumes/seerr/config:/app/config
+    healthcheck:
+      test: wget --no-verbose --tries=1 --spider http://localhost:5055/api/v1/settings/public || exit 1
+      start_period: 20s
+      timeout: 3s
+      interval: 15s
+      retries: 3
+    security_opt:
+      - no-new-privileges
+    cap_drop:
+      - ALL
+    networks:
+      - main-network
