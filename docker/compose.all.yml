@@ -24,6 +24,7 @@ include:
   - dockhand/docker-compose.yml
   - arcane/docker-compose.yml
   - jellyfin/docker-compose.yml
+  - seerr/docker-compose.yml
   # Home Assistant + Mosquitto + Zigbee2MQTT. homeassistant runs with network_mode: host,
   # so it is the one service Caddy reaches through host.docker.internal instead of by name.
   - homeassistant/docker-compose.yml
