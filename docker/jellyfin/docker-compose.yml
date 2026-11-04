@@ -23,12 +23,13 @@ services:
       # resolves its source once, and docker silently creates a missing source as
       # an empty dir rather than failing, so the library shows up empty.
       - ${JELLYFIN_MUSIC_DIR:-~/docker-volumes/jellyfin/music}:/media/music:ro
-      # Movie library, same rules. Also on the SSD, so it's covered by the same
-      # /mnt/ssd fstab entry -- and it goes stale on a remount for the same reason.
-      - ${JELLYFIN_MOVIES_DIR:-~/docker-volumes/jellyfin/movies}:/media/movies:ro
-      # TV show library, same rules. Kept separate from movies because Jellyfin
-      # scans each library with a single content type (Movies vs Shows).
-      - ${JELLYFIN_TVSHOWS_DIR:-~/docker-volumes/jellyfin/tvshows}:/media/tvshows:ro
+      # Movie library. Writable so Jellyfin can save downloaded subtitles next to the
+      # videos, which needs the SSD to be ext4. Also on the SSD, so it's covered by the
+      # same /mnt/ssd fstab entry -- and it goes stale on a remount for the same reason.
+      - ${JELLYFIN_MOVIES_DIR:-~/docker-volumes/jellyfin/movies}:/media/movies
+      # TV show library, writable for the same reason. Kept separate from movies because
+      # Jellyfin scans each library with a single content type (Movies vs Shows).
+      - ${JELLYFIN_TVSHOWS_DIR:-~/docker-volumes/jellyfin/tvshows}:/media/tvshows
       # Additional libraries: add more mounts under /media, one per content type.
       # Optional - extra fonts to be used during transcoding with subtitle burn-in
       # - type: bind

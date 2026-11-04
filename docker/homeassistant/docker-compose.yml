@@ -75,11 +75,13 @@ services:
     # docker/.env on every start keeps .env the single source of truth, so there is no
     # manual `mosquitto_passwd` step and changing the password is just an edit plus
     # `up -d`. $$ defers expansion to the container's shell. The chown matters because
-    # the broker drops to the mosquitto user and warns about files it does not own.
+    # the broker drops to the mosquitto user and warns about files it does not own. The rm
+    # is needed because mosquitto_passwd -c refuses to overwrite an existing file (2.1+).
     command:
       - sh
       - -ec
       - |
+        rm -f /mosquitto/data/passwd
         mosquitto_passwd -b -c /mosquitto/data/passwd "$$MQTT_USER" "$$MQTT_PASSWORD"
         chown mosquitto:mosquitto /mosquitto/data/passwd
         exec mosquitto -c /mosquitto/config/mosquitto.conf
