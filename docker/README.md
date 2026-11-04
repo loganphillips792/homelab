@@ -112,6 +112,12 @@ rsync -rtP "Movie Name (2024)" logan@VM_NAME:/mnt/ssd/movies/
 
 Replace `VM_NAME` with the VM's Tailscale name, and use `/mnt/ssd/tvshows/` for shows. If the connection drops, run the same command again and it resumes. Then run a library scan in Jellyfin if the new title doesn't appear on its own.
 
+To add a new season to a show that's already there, copy the folder's contents into a `Season N` folder. For example, from your Mac:
+
+```bash
+rsync -rtP ~/Desktop/Silo\ 2023\ Season\ 3\ Complete\ 720p\ WEB\ x264\ \[i_c\]/ "logan@192.168.1.124:/mnt/ssd/tvshows/Silo/Season 3/"
+```
+
 ## Getting a subtitle onto your Mac
 
 Once the SSD is ext4, Jellyfin can save subtitles next to the video, so you can copy them straight off the SSD without `sudo` or `docker cp`:
