@@ -2059,6 +2059,50 @@ This unplug/replug sequence hasn't been tested on the VM yet. After replugging, 
 
 Burn in the subtitles: turn this on in your user **Settings > Subtitles**. The text becomes part of the video, so it can't drift from it. The catch is that Jellyfin must then re-encode the video, which puts more load on your VM's CPU.
 
+#### Downloading subtitles for a whole season
+
+1. Install it on the VM:
+
+   ```bash
+   sudo apt install -y pipx && pipx install subliminal
+   ```
+
+2. Create the file on the VM:
+
+   ```bash
+   mkdir -p ~/.config/subliminal && nano ~/.config/subliminal/subliminal.toml
+   ```
+
+3. Add this, with your new password:
+
+   ```toml
+   [provider.opensubtitlescom]
+   username = "phillipsx56"
+   password = "YOUR_NEW_PASSWORD"
+   ```
+
+4. Make it readable only by you:
+
+   ```bash
+   chmod 600 ~/.config/subliminal/subliminal.toml
+   ```
+
+5. Run it without a login in the command:
+
+   ```bash
+   subliminal download -l en -p opensubtitlescom -m 100 "/mnt/ssd/tvshows/Snowfall/Season 1"
+   ```
+
+   ```bash
+   subliminal download -l en -p opensubtitlescom -m 100 "/mnt/ssd/tvshows/The Americans/Season 1"
+   ```
+
+   If `-m 100` finds nothing, lower the score to accept close matches, then check a couple of episodes for sync:
+
+   ```bash
+   subliminal download -l en -p opensubtitlescom -m 90 "/mnt/ssd/tvshows/The Americans/Season 1"
+   ```
+
 
 ### Navidrome
 
