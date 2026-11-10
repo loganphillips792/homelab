@@ -2315,6 +2315,12 @@ Burn in the subtitles: turn this on in your user **Settings > Subtitles**. The t
    subliminal download -l en -p opensubtitlescom -m 90 "/mnt/ssd/tvshows/The Americans/Season 1"
    ```
 
+   If it reports `0 subtitle downloaded` and `--debug` shows `Skipping provider 'opensubtitlescom': not a valid provider for the query languages`, the `.mkv` files already have an embedded English track, so subliminal skips them. Force the download anyway. `-R omdb` skips the OMDb refiner, which returns 401 errors with the default key:
+
+   ```bash
+   subliminal download -l en -p opensubtitlescom --force-embedded-subtitles -R omdb "/mnt/ssd/tvshows/The Americans/Season 2"
+   ```
+
 
 ### Navidrome
 
