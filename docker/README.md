@@ -2273,6 +2273,15 @@ Burn in the subtitles: turn this on in your user **Settings > Subtitles**. The t
 
 #### Downloading subtitles for a whole season
 
+First check whether the `.mkv` files already contain English subtitles. Run this on the VM and look for a stream with `TAG:language=eng`. If its `codec_name` is `subrip`, `ass`, or `ssa`, it can be extracted. If it's `hdmv_pgs_subtitle` or `dvd_subtitle`, it's image-based, so download instead:
+
+```bash
+ffprobe -v error -show_entries stream=index,codec_name:stream_tags=language -select_streams s "/mnt/ssd/tvshows/The Americans/Season 2/The Americans S02E01 Comrades.mkv"
+```
+
+- **If they're already in the `.mkv`,** you don't need to download anything. Extract them with ffmpeg instead. See [Extracting embedded subtitles to your Mac](#extracting-embedded-subtitles-to-your-mac).
+- **If they're not,** download them from OpenSubtitles with the subliminal Python library, using the steps below.
+
 1. Install it on the VM:
 
    ```bash
