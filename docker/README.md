@@ -2321,6 +2321,33 @@ Burn in the subtitles: turn this on in your user **Settings > Subtitles**. The t
    subliminal download -l en -p opensubtitlescom --force-embedded-subtitles -R omdb "/mnt/ssd/tvshows/The Americans/Season 2"
    ```
 
+#### Extracting embedded subtitles to your Mac
+
+Jellyfin has no button for exporting a subtitle track that's embedded in an `.mkv`. Instead, ffmpeg runs on the server and sends each `.srt` back over SSH. Only the small subtitle files cross the network, and nothing is written into the library.
+
+Install ffmpeg on the server once:
+
+```bash
+ssh -t logan@192.168.1.124 'sudo apt install -y ffmpeg'
+```
+
+Then run this on your Mac:
+
+```bash
+HOST=logan@192.168.1.124
+DIR="/mnt/ssd/tvshows/The Americans/Season 2"
+OUT=~/Downloads/americans-s2
+mkdir -p "$OUT"
+ssh "$HOST" "ls \"$DIR\"/*.mkv" | while IFS= read -r f; do
+  name=$(basename "$f" .mkv)
+  [ -s "$OUT/$name.en.srt" ] && continue
+  ssh -n "$HOST" "ffmpeg -nostdin -loglevel error -i \"$f\" -map '0:s:m:language:eng?' -c:s srt -f srt -" > "$OUT/$name.en.srt"
+  [ -s "$OUT/$name.en.srt" ] || { echo "No English text subtitle: $name"; rm -f "$OUT/$name.en.srt"; }
+done
+```
+
+To use a different season, change `DIR`. To save the files somewhere else, change `OUT`. Episodes that already have a subtitle in `OUT` are skipped, so it's safe to re-run. "No English text subtitle" means the episode has no English track, or its track is image-based (PGS or VobSub) and can't be converted to `.srt`.
+
 
 ### Navidrome
 
