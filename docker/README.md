@@ -1,180 +1,7 @@
-# TODO IMMIDATELY
-
-That changes my answer: reformat the SSD to ext4 before you leave. You won't be able to reach the drive to plug it into a Mac, so the VM has to be able to write to it. You can then upload from anywhere over Tailscale.
-
-## Do this before you leave
-
-1. Install Tailscale directly on the VM: right now it only runs as a Docker container that gives you access to `192.168.1.x`, which causes two problems:
-   - If Docker or that container goes down, you're locked out.
-   - Many hotels and Airbnbs also use `192.168.1.x`, so `192.168.1.124` may point at their network instead of your VM. Installing it on the VM gives you a fixed address that avoids this.
-2. Install Tailscale on the Proxmox host too: then you can restart the VM from abroad if it dies.
-3. Test it away from home: tether your Mac to your phone, upload a file, and reboot the VM to confirm the SSD and Jellyfin come back on their own.
-
-## Reformatting the SSD as ext4
-
-macOS can't create ext4, so that list is all you'll get in Disk Utility. Cancel that dialog and format the SSD on the VM instead. I haven't run any of this, so check each step's output as you go.
-
-Back up first: make sure `movies` and `tvshows` are safely on `Elements` and that you've checked them. Your Mac can't natively read ext4, so after this you can't plug the SSD into it and copy files directly.
-
-### 1. Find the drive on the VM
-
-Plug the SSD back into the server, then run this on the VM:
-
-```bash
-lsblk -o NAME,SIZE,FSTYPE,LABEL,MOUNTPOINT
-```
-
-Find the partition with the right size and `hfsplus` as its type. It was `/dev/sdb1` last time, but if it's different now, use that name in the commands below. Formatting the wrong one erases it.
-
-### 2. Format it
-
-```bash
-sudo docker stop jellyfin
-```
-
-```bash
-sudo umount /mnt/ssd
-```
-
-This is the step that erases the drive. `-m 0` skips ext4's default 5% reserved space, which you don't need on a drive that only holds media.
-
-```bash
-sudo mkfs.ext4 -m 0 -L ssd /dev/sdb1
-```
-
-### 3. Update `/etc/fstab`
-
-Get the new UUID:
-
-```bash
-sudo blkid -s UUID -o value /dev/sdb1
-```
-
-```bash
-sudo nano /etc/fstab
-```
-
-Replace the existing `/mnt/ssd` hfsplus line with this, using the new UUID:
-
-```
-UUID=<new-uuid>  /mnt/ssd  ext4  defaults,nofail  0 2
-```
-
-### 4. Mount it and recreate the folders
-
-```bash
-sudo systemctl daemon-reload
-```
-
-```bash
-sudo mount /mnt/ssd && findmnt /mnt/ssd
-```
-
-```bash
-sudo chown logan:logan /mnt/ssd
-```
-
-```bash
-mkdir /mnt/ssd/movies /mnt/ssd/tvshows /mnt/ssd/music
-```
-
-### 5. Copy everything back
-
-Run this on your Mac with `Elements` plugged in. The trailing slashes copy the folders' contents, and you can rerun the command if it gets interrupted.
-
-```bash
-rsync -rtP /Volumes/Elements/media/movies/ logan@192.168.1.124:/mnt/ssd/movies/
-```
-
-```bash
-rsync -rtP /Volumes/Elements/media/tvshows/ logan@192.168.1.124:/mnt/ssd/tvshows/
-```
-
-### 6. Bring Jellyfin back
-
-```bash
-cd ~/homelab && sudo docker compose -f docker/compose.all.yml up -d --force-recreate jellyfin
-```
-
-Then run a library scan and play something to confirm it works. Finally, reboot the VM and check that the SSD mounts on its own with `findmnt /mnt/ssd`.
-
-To copy only certain shows:
-
-```bash
-rsync -rtP /Volumes/Elements/media/tvshows/{"South Park","Snowfall","The Expanse","The Mandalorian","The Americans"} logan@192.168.1.124:/mnt/ssd/tvshows/
-```
-
-## Adding a movie or show while you're away
-
-```bash
-rsync -rtP "Movie Name (2024)" logan@VM_NAME:/mnt/ssd/movies/
-```
-
-Replace `VM_NAME` with the VM's Tailscale name, and use `/mnt/ssd/tvshows/` for shows. For example, copying a whole show folder from the Desktop:
-
-```bash
-rsync -avP "/Users/logan/Desktop/The Remarried Empress" logan@VM_IP:/mnt/ssd/tvshows/
-```
-
-Replace `VM_IP` with the VM's IP (`192.168.1.124` at home). With no trailing `/` on the source, rsync copies the folder itself, so the show lands in `/mnt/ssd/tvshows/The Remarried Empress/`.
-
-If the connection drops, run the same command again and it resumes. Then run a library scan in Jellyfin if the new title doesn't appear on its own.
-
-To add a new season to a show that's already there, copy the folder's contents into a `Season N` folder. For example, from your Mac:
-
-```bash
-rsync -rtP ~/Desktop/Silo\ 2023\ Season\ 3\ Complete\ 720p\ WEB\ x264\ \[i_c\]/ "logan@192.168.1.124:/mnt/ssd/tvshows/Silo/Season 3/"
-```
-
-## Getting a subtitle onto your Mac
-
-Once the SSD is ext4, Jellyfin can save subtitles next to the video, so you can copy them straight off the SSD without `sudo` or `docker cp`:
-
-```bash
-scp 'logan@VM_NAME:/mnt/ssd/movies/2001*.eng.srt' ~/Downloads/
-```
-
-Replace `VM_NAME` with the VM's Tailscale name, and `2001*` with the start of the movie's file name. A movie in its own folder needs that folder in the path, and shows are under `/mnt/ssd/tvshows/Show Name/Season 1/`.
-
-To copy all the subtitles for a season, run this from your Mac, not the VM. It skips the videos and leaves the originals on the SSD:
-
-```bash
-rsync -rtP --include='*.srt' --exclude='*' "logan@192.168.1.124:/mnt/ssd/tvshows/The Americans/Season 1/" ~/Downloads/"The Americans Season 1 subtitles"/
-```
-
-This needs two changes first, or Jellyfin keeps saving subtitles to its `/config` folder:
-
-1. Remove `:ro` from the movies and tvshows mounts in `docker/jellyfin/docker-compose.yml`, then recreate the container.
-2. Turn on **Save subtitles into media folders** for both libraries in Jellyfin.
-
-Subtitles downloaded before these changes stay in `/config`.
-
-To check the mounts after recreating the container, run this on the VM. Movies and tvshows should say `true`, and music `false`:
-
-```bash
-sudo docker inspect jellyfin --format '{{range .Mounts}}{{.Destination}} rw={{.RW}}{{"\n"}}{{end}}'
-```
-
-To check where a subtitle saved after downloading it, run this on the VM. The path should start with `/media/`, with no `ERR` line after it:
-
-```bash
-sudo docker logs --since 10m jellyfin 2>&1 | grep -A3 'Saving subtitles'
-```
-
-## What could still cause trouble
-
-- Crashes: my notes from August say the VM and Proxmox host were crashing, with the cause still unknown. Tailscale on the host helps if only the VM dies, but not if the whole machine freezes. For that, set the BIOS to power on after power loss and add a smart plug so you can power cycle it remotely.
-- Space: the SSD has about 333 GB free, and that has to cover anything you copy from `Elements` too.
-- Upload speed: large files could take a long time on hotel Wi-Fi. Running `tailscale status` shows whether your connection is `direct` or going through a slower `relay`. If you can get a file from a direct link, it's faster to SSH in and download it straight to the server.
-- Tailscale key: check when the VM's Tailscale key expires, and turn off key expiry for the VM and the Proxmox host so you don't get locked out mid-trip.
-
-## If you'd rather not reformat
-
-You could upload to a new folder on the VM's boot disk, which has 217 GB free, and add it to Jellyfin as a second library folder. There's no erase or backup step, but you get less space, and filling that disk could take down the VM and all your containers. I'd only use it as a fallback.
-
 # Table of Contents
 
-- [Setting Up VM and Docker](#setting-up-vm-and-docker)
+- [Setting Up VM, Docker and Running the Services](#setting-up-vm-docker-and-running-the-services)
+  - [Increasing Disk Space After Set up](#increasing-disk-space-after-set-up)
   - [Changing the Proxmox Host IP (router / subnet changed)](#changing-the-proxmox-host-ip-router--subnet-changed)
   - [Allowing Claude to ssh into VM](#allowing-claude-to-ssh-into-vm)
   - [TailScale](#tailscale)
@@ -185,10 +12,10 @@ You could upload to a new folder on the VM's boot disk, which has 217 GB free, a
 - [Backup and Restore](#backup-and-restore)
   - [General commands](#general-commands)
   - [Set up](#set-up)
+  - [Move the repo to an external drive](#move-the-repo-to-an-external-drive)
   - [Upload the repo to Google Drive](#upload-the-repo-to-google-drive)
   - [Forgejo](#forgejo)
   - [Home Assistant](#home-assistant)
-- [Deploying](#deploying)
 - [Running on the Mac (LAN access)](#running-on-the-mac-lan-access)
   - [One-time setup](#one-time-setup)
   - [Starting the stack](#starting-the-stack)
@@ -203,6 +30,11 @@ You could upload to a new folder on the VM's boot disk, which has 217 GB free, a
   - [Media](#media)
     - [Running the media stack](#running-the-media-stack)
     - [Jellyfin](#jellyfin)
+      - [Reformatting the SSD as ext4](#reformatting-the-ssd-as-ext4)
+      - [Adding a movie or show while you're away](#adding-a-movie-or-show-while-youre-away)
+      - [Getting a subtitle onto your Mac](#getting-a-subtitle-onto-your-mac)
+      - [What could still cause trouble](#what-could-still-cause-trouble)
+      - [If you'd rather not reformat](#if-youd-rather-not-reformat)
     - [Navidrome](#navidrome)
     - [Seerr](#seerr)
   - [Kafka Testing Stack](#kafka-testing-stack)
@@ -252,7 +84,7 @@ You could upload to a new folder on the VM's boot disk, which has 217 GB free, a
 - [Adding linux VM and setting up RDP and tailscale](#adding-linux-vm-and-setting-up-rdp-and-tailscale)
 
 
-# Setting Up VM and Docker
+# Setting Up VM, Docker and Running the Services
 
 1. Download ISO image (Proxmox ISO installer): https://www.proxmox.com/en/proxmox-virtual-environment/get-started and use Balena Etcher to flash ISO image to USB Drive
 2. Boot from USB
@@ -457,30 +289,100 @@ Confirm port 53 is now free: `sudo ss -lunpt | grep :53 || echo "Port 53 is free
 
 13. Update MacOS wifi to use Proxmox VM PIhole container as DNS. Set the DNS Server to be the IP of the Ubuntu VM. The request will automatically be sent to port 53
 
+## Increasing Disk Space After Set up
 
-- If you need to increase disk space
-    - Increase size of disk of VM through proxmox
-    - df -h
-    - lsblk
-    - sudo su
-    - parted
-    - print
-    - resizepart 3 100%
-    - print
-    - resize2fs /dev/sda3
-    - Exit
-    - apt install lvm2
-    - If you get not enough storage error, you have to clear space
-    - See what is taking up so much space 
-        - du -sh /var/* | sort -h 
-        - We see that docker takes up most of the space in /var/
-        - `docker images --format "{{.Repository}}:{{.Tag}} {{.Size}}" | sort -h -r`
-        - `sudo ctr -n moby images prune --all`
-    - sudo rm -rf /var/cache/apt/archives/*.deb
-    - sudo journalctl --vacuum-size=50M
-    - apt install lvm2
-    - resize2fs /dev/sda3
-- If at anytime there is a permission denied error during git pull process: `sudo chown -R logan:logan .` and then run `git pull` again
+Growing the disk takes three steps: make the disk bigger in Proxmox, grow partition 3 to fill it, then grow the filesystem. The VM was installed from the Ubuntu Desktop ISO, which puts the root filesystem as plain ext4 on `/dev/sda3` with no LVM, so you don't need `lvm2`. The `local-lvm` in Proxmox is the host's storage and doesn't affect the layout inside the VM.
+
+### 1. Grow the disk in Proxmox
+
+In the Proxmox UI: **UbuntuServerForDockerServices > Hardware > Hard Disk > Disk Action > Resize**, then enter how many GiB to add. The VM can stay running.
+
+### 2. Check the layout on the VM
+
+```bash
+df -h /
+```
+
+```bash
+lsblk -f
+```
+
+`sda` should show the new size, and `sda3` should show `ext4` and be mounted at `/`. If `sda3` shows `LVM2_member` instead, these steps don't apply: grow the partition the same way, then run `sudo pvresize /dev/sda3` and `sudo lvextend -r -l +100%FREE /dev/mapper/<vg>-<lv>` instead of `resize2fs`.
+
+### 3. Grow partition 3
+
+```bash
+sudo parted /dev/sda
+```
+
+Then inside `parted`:
+
+```
+print
+resizepart 3 100%
+print
+quit
+```
+
+- If `print` warns that the GPT doesn't use all the space, answer `Fix`.
+- `resizepart` warns that the partition is in use. Answer `Yes`, because growing a mounted ext4 partition is safe.
+- The second `print` should show partition 3 ending at the new disk size.
+
+### 4. Grow the filesystem
+
+```bash
+sudo resize2fs /dev/sda3
+```
+
+```bash
+df -h /
+```
+
+`/` should now show the extra space. The resize doesn't need any free space, so it works even on a full disk. You don't need to clean up first.
+
+### Freeing space without growing the disk
+
+See what's using `/var`. Docker is usually most of it:
+
+```bash
+sudo du -sh /var/* | sort -h
+```
+
+List images by size, largest first:
+
+```bash
+docker images --format "{{.Repository}}:{{.Tag}} {{.Size}}" | sort -h -r
+```
+
+Remove images that no container is using:
+
+```bash
+docker image prune -a
+```
+
+The daemon uses the containerd image store, so if that doesn't free enough, prune through containerd directly:
+
+```bash
+sudo ctr -n moby images prune --all
+```
+
+Clear apt's download cache and shrink the systemd journal:
+
+```bash
+sudo rm -rf /var/cache/apt/archives/*.deb
+```
+
+```bash
+sudo journalctl --vacuum-size=50M
+```
+
+### Permission denied during `git pull`
+
+Run this from the repo root, then run `git pull` again:
+
+```bash
+sudo chown -R logan:logan .
+```
 
 ## Changing the Proxmox Host IP (router / subnet changed)
 
@@ -1558,36 +1460,6 @@ the containers by itself, so either add pre/post hooks that do, or accept a smal
 the recorder database mid-write. Home Assistant's own backups in `config/backups/` are inside the
 snapshot either way.
 
-# Deploying
-
-1. On the machine you want to access services from, set DNS servers (in this order):
-   - `10.0.0.32`
-   - `75.75.75.75`
-   - `1.1.1.1`
-
-2. SSH into the server: `ssh logan@10.0.0.32`
-
-3. Pull latest changes:
-```
-git stash
-git pull
-git stash pop
-```
-
-4. Deploy all services:
-```
-docker compose -f docker/compose.all.yml up -d --pull always
-```
-
-or just services that need to be restarted: `docker compose restart alloy prometheus grafana`
-
-5. Flush DNS cache on your local machine (macOS):
-```
-sudo dscacheutil -flushcache && sudo killall -HUP mDNSResponder
-```
-
-6. Access `http://grafana.homelab` to verify services are running
-
 # Running on the Mac (LAN access)
 
 Runs Jellyfin, Seerr, Homepage, Gatus, Arcane and the observability stack (Prometheus, Loki, Alloy,
@@ -2038,6 +1910,169 @@ The `JELLYFIN_*` overrides are explained under [Running through docker compose](
 To reach these from other devices on the network by `.homelab` name, see [Running on the Mac (LAN access)](#running-on-the-mac-lan-access).
 
 ### Jellyfin
+
+#### Reformatting the SSD as ext4
+
+macOS can't create ext4, so that list is all you'll get in Disk Utility. Cancel that dialog and format the SSD on the VM instead. I haven't run any of this, so check each step's output as you go.
+
+Back up first: make sure `movies` and `tvshows` are safely on `Elements` and that you've checked them. Your Mac can't natively read ext4, so after this you can't plug the SSD into it and copy files directly.
+
+##### 1. Find the drive on the VM
+
+Plug the SSD back into the server, then run this on the VM:
+
+```bash
+lsblk -o NAME,SIZE,FSTYPE,LABEL,MOUNTPOINT
+```
+
+Find the partition with the right size and `hfsplus` as its type. It was `/dev/sdb1` last time, but if it's different now, use that name in the commands below. Formatting the wrong one erases it.
+
+##### 2. Format it
+
+```bash
+sudo docker stop jellyfin
+```
+
+```bash
+sudo umount /mnt/ssd
+```
+
+This is the step that erases the drive. `-m 0` skips ext4's default 5% reserved space, which you don't need on a drive that only holds media.
+
+```bash
+sudo mkfs.ext4 -m 0 -L ssd /dev/sdb1
+```
+
+##### 3. Update `/etc/fstab`
+
+Get the new UUID:
+
+```bash
+sudo blkid -s UUID -o value /dev/sdb1
+```
+
+```bash
+sudo nano /etc/fstab
+```
+
+Replace the existing `/mnt/ssd` hfsplus line with this, using the new UUID:
+
+```
+UUID=<new-uuid>  /mnt/ssd  ext4  defaults,nofail  0 2
+```
+
+##### 4. Mount it and recreate the folders
+
+```bash
+sudo systemctl daemon-reload
+```
+
+```bash
+sudo mount /mnt/ssd && findmnt /mnt/ssd
+```
+
+```bash
+sudo chown logan:logan /mnt/ssd
+```
+
+```bash
+mkdir /mnt/ssd/movies /mnt/ssd/tvshows /mnt/ssd/music
+```
+
+##### 5. Copy everything back
+
+Run this on your Mac with `Elements` plugged in. The trailing slashes copy the folders' contents, and you can rerun the command if it gets interrupted.
+
+```bash
+rsync -rtP /Volumes/Elements/media/movies/ logan@192.168.1.124:/mnt/ssd/movies/
+```
+
+```bash
+rsync -rtP /Volumes/Elements/media/tvshows/ logan@192.168.1.124:/mnt/ssd/tvshows/
+```
+
+##### 6. Bring Jellyfin back
+
+```bash
+cd ~/homelab && sudo docker compose -f docker/compose.all.yml up -d --force-recreate jellyfin
+```
+
+Then run a library scan and play something to confirm it works. Finally, reboot the VM and check that the SSD mounts on its own with `findmnt /mnt/ssd`.
+
+To copy only certain shows:
+
+```bash
+rsync -rtP /Volumes/Elements/media/tvshows/{"South Park","Snowfall","The Expanse","The Mandalorian","The Americans"} logan@192.168.1.124:/mnt/ssd/tvshows/
+```
+
+#### Adding a movie or show while you're away
+
+```bash
+rsync -rtP "Movie Name (2024)" logan@VM_NAME:/mnt/ssd/movies/
+```
+
+Replace `VM_NAME` with the VM's Tailscale name, and use `/mnt/ssd/tvshows/` for shows. For example, copying a whole show folder from the Desktop:
+
+```bash
+rsync -avP "/Users/logan/Desktop/The Remarried Empress" logan@VM_IP:/mnt/ssd/tvshows/
+```
+
+Replace `VM_IP` with the VM's IP (`192.168.1.124` at home). With no trailing `/` on the source, rsync copies the folder itself, so the show lands in `/mnt/ssd/tvshows/The Remarried Empress/`.
+
+If the connection drops, run the same command again and it resumes. Then run a library scan in Jellyfin if the new title doesn't appear on its own.
+
+To add a new season to a show that's already there, copy the folder's contents into a `Season N` folder. For example, from your Mac:
+
+```bash
+rsync -rtP ~/Desktop/Silo\ 2023\ Season\ 3\ Complete\ 720p\ WEB\ x264\ \[i_c\]/ "logan@192.168.1.124:/mnt/ssd/tvshows/Silo/Season 3/"
+```
+
+#### Getting a subtitle onto your Mac
+
+Once the SSD is ext4, Jellyfin can save subtitles next to the video, so you can copy them straight off the SSD without `sudo` or `docker cp`:
+
+```bash
+scp 'logan@VM_NAME:/mnt/ssd/movies/2001*.eng.srt' ~/Downloads/
+```
+
+Replace `VM_NAME` with the VM's Tailscale name, and `2001*` with the start of the movie's file name. A movie in its own folder needs that folder in the path, and shows are under `/mnt/ssd/tvshows/Show Name/Season 1/`.
+
+To copy all the subtitles for a season, run this from your Mac, not the VM. It skips the videos and leaves the originals on the SSD:
+
+```bash
+rsync -rtP --include='*.srt' --exclude='*' "logan@192.168.1.124:/mnt/ssd/tvshows/The Americans/Season 1/" ~/Downloads/"The Americans Season 1 subtitles"/
+```
+
+This needs two changes first, or Jellyfin keeps saving subtitles to its `/config` folder:
+
+1. Remove `:ro` from the movies and tvshows mounts in `docker/jellyfin/docker-compose.yml`, then recreate the container.
+2. Turn on **Save subtitles into media folders** for both libraries in Jellyfin.
+
+Subtitles downloaded before these changes stay in `/config`.
+
+To check the mounts after recreating the container, run this on the VM. Movies and tvshows should say `true`, and music `false`:
+
+```bash
+sudo docker inspect jellyfin --format '{{range .Mounts}}{{.Destination}} rw={{.RW}}{{"\n"}}{{end}}'
+```
+
+To check where a subtitle saved after downloading it, run this on the VM. The path should start with `/media/`, with no `ERR` line after it:
+
+```bash
+sudo docker logs --since 10m jellyfin 2>&1 | grep -A3 'Saving subtitles'
+```
+
+#### What could still cause trouble
+
+- Crashes: my notes from August say the VM and Proxmox host were crashing, with the cause still unknown. Tailscale on the host helps if only the VM dies, but not if the whole machine freezes. For that, set the BIOS to power on after power loss and add a smart plug so you can power cycle it remotely.
+- Space: the SSD has about 333 GB free, and that has to cover anything you copy from `Elements` too.
+- Upload speed: large files could take a long time on hotel Wi-Fi. Running `tailscale status` shows whether your connection is `direct` or going through a slower `relay`. If you can get a file from a direct link, it's faster to SSH in and download it straight to the server.
+- Tailscale key: check when the VM's Tailscale key expires, and turn off key expiry for the VM and the Proxmox host so you don't get locked out mid-trip.
+
+#### If you'd rather not reformat
+
+You could upload to a new folder on the VM's boot disk, which has 217 GB free, and add it to Jellyfin as a second library folder. There's no erase or backup step, but you get less space, and filling that disk could take down the VM and all your containers. I'd only use it as a fallback.
+
 
 #### Running through docker compose
 
