@@ -40,7 +40,39 @@ services:
     # Optional - alternative address used for autodiscovery
     environment:
       - JELLYFIN_PublishedServerUrl=http://example.com
+    # Jellyfin shares tailscale-jellyfin's network stack, so it can't have its own
+    # ports/networks -- those live on the sidecar below.
+    network_mode: service:tailscale-jellyfin
+    depends_on:
+      - tailscale-jellyfin
+
+  # Tailscale sidecar: puts Jellyfin on the tailnet as its own machine ("jellyfin",
+  # http://jellyfin:8096), so it can be shared with people outside the tailnet
+  # (admin console -> Machines -> jellyfin -> Share). Node sharing doesn't carry the
+  # main tailscale container's subnet routes, which is why this needs its own node.
+  # Uses the same reusable TS_AUTHKEY as the main tailscale container in docker/.env.
+  tailscale-jellyfin:
+    image: tailscale/tailscale:latest
+    container_name: tailscale-jellyfin
+    hostname: jellyfin
+    environment:
+      - TS_AUTHKEY=${TS_AUTHKEY}
+      - TS_HOSTNAME=jellyfin
+      - TS_STATE_DIR=/var/lib/tailscale
+      - TS_USERSPACE=false
+    volumes:
+      - ~/docker-volumes/tailscale-jellyfin/state:/var/lib/tailscale
+    devices:
+      - /dev/net/tun:/dev/net/tun
+    cap_add:
+      - NET_ADMIN
+      - SYS_MODULE
+    restart: unless-stopped
     ports:
       - "8096:8096" # exposed on localhost for testing; caddy also proxies internally
     networks:
-      - main-network
+      main-network:
+        # Caddy, homepage and uptime-kuma reach Jellyfin as jellyfin:8096 -- this
+        # alias keeps that name resolving now that the sidecar owns the network.
+        aliases:
+          - jellyfin
