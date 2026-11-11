@@ -170,6 +170,7 @@ You could upload to a new folder on the VM's boot disk, which has 217 GB free, a
   - [Changing the Proxmox Host IP (router / subnet changed)](#changing-the-proxmox-host-ip-router--subnet-changed)
   - [Allowing Claude to ssh into VM](#allowing-claude-to-ssh-into-vm)
   - [TailScale](#tailscale)
+    - [Sharing Jellyfin with someone outside the tailnet](#sharing-jellyfin-with-someone-outside-the-tailnet)
   - [Useful Commands](#useful-commands)
 - [Backup strategy](#backup-strategy)
   - [ArchiveBox volume backup](#archivebox-volume-backup)
@@ -712,6 +713,22 @@ To access services outside of home network, we will use tailscale
 9. Sign into Tailscale account (Same account where you generated the auth key)
 10. Ensure it is set to `Active`
 11. Type `http://homepage.homelab`
+
+### Sharing Jellyfin with someone outside the tailnet
+
+You can reach `jellyfin:8096` from your own devices with no setup, because every device signed into your Tailscale account can reach your other machines. Someone who signs in with their own account has a separate tailnet and sees none of your machines until you share one with them. Sharing adds only that one machine to their tailnet.
+
+Sharing doesn't pass subnet routes along, so sharing the main `tailscale` container wouldn't work for them: it only routes to the LAN, and nothing is listening on its own `100.x` IP. Jellyfin has its own Tailscale sidecar for this (`tailscale-jellyfin` in `jellyfin/docker-compose.yml`). Jellyfin uses the sidecar's network (`network_mode: service:tailscale-jellyfin`), so it shows up as its own machine named `jellyfin`. The sidecar has the network alias `jellyfin` on `main-network`, so Caddy, homepage and uptime-kuma still reach `jellyfin:8096` as before. It uses the same `TS_AUTHKEY` from `docker/.env`. If that key has expired, the sidecar won't start.
+
+1. Check that `jellyfin` appears under **Machines** in the Tailscale admin console. If it shows a key expiry, turn expiry off.
+2. Click **⋯ → Share…** next to it and send them the link.
+
+They then:
+
+1. Install Tailscale on whatever they'll watch on (phone, laptop, Apple TV, Android TV / Google TV; Samsung and LG TVs have no Tailscale app), sign in with any account, and accept the share link.
+2. Open the Jellyfin app and add the server `http://jellyfin:8096`, logging in with a Jellyfin user made for them (**Dashboard → Users**, not the admin account).
+
+If a stale `jellyfin` machine already exists in the admin console, delete it before starting the sidecar. Otherwise the new one registers as `jellyfin-1` and `http://jellyfin:8096` points at the old one.
 
 ## Useful Commands
 
