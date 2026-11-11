@@ -726,7 +726,9 @@ Sharing doesn't pass subnet routes along, so sharing the main `tailscale` contai
 They then:
 
 1. Install Tailscale on whatever they'll watch on (phone, laptop, Apple TV, Android TV / Google TV; Samsung and LG TVs have no Tailscale app), sign in with any account, and accept the share link.
-2. Open the Jellyfin app and add the server `http://jellyfin:8096`, logging in with a Jellyfin user made for them (**Dashboard → Users**, not the admin account).
+2. Open the Jellyfin app and add the server `http://jellyfin.taila18977.ts.net:8096` (confirmed working over mobile data, off the home Wi-Fi), logging in with a Jellyfin user made for them (**Dashboard → Users**, not the admin account).
+
+The short name `jellyfin` only works inside your own tailnet. Tailscale requires the full domain name for a shared machine (the tailnet name, `taila18977.ts.net`, is on the admin console's **DNS** page). Keep the `:8096`: without it the browser tries port 80, where nothing is listening, so `http://jellyfin.taila18977.ts.net` alone doesn't load. The `100.x` IP shown next to `jellyfin` in their Tailscale app also works. Both `http://jellyfin.taila18977.ts.net:8096` and `http://100.110.252.82:8096` are confirmed working. The IP is a fallback, though: it can differ from yours if that address is already taken in their tailnet.
 
 If a stale `jellyfin` machine already exists in the admin console, delete it before starting the sidecar. Otherwise the new one registers as `jellyfin-1` and `http://jellyfin:8096` points at the old one.
 
