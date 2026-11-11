@@ -2014,10 +2014,10 @@ rsync -rtP "Movie Name (2024)" logan@VM_NAME:/mnt/ssd/movies/
 Replace `VM_NAME` with the VM's Tailscale name, and use `/mnt/ssd/tvshows/` for shows. For example, copying a whole show folder from the Desktop:
 
 ```bash
-rsync -avP "/Users/logan/Desktop/The Remarried Empress" logan@VM_IP:/mnt/ssd/tvshows/
+rsync -rtP "/Users/logan/Desktop/The Remarried Empress" logan@VM_NAME:/mnt/ssd/tvshows/
 ```
 
-Replace `VM_IP` with the VM's IP (`192.168.1.124` at home). With no trailing `/` on the source, rsync copies the folder itself, so the show lands in `/mnt/ssd/tvshows/The Remarried Empress/`.
+With no trailing `/` on the source, rsync copies the folder itself, so the show lands in `/mnt/ssd/tvshows/The Remarried Empress/`.
 
 If the connection drops, run the same command again and it resumes. Then run a library scan in Jellyfin if the new title doesn't appear on its own.
 
