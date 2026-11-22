@@ -35,6 +35,7 @@
       - [Getting a subtitle onto your Mac](#getting-a-subtitle-onto-your-mac)
       - [What could still cause trouble](#what-could-still-cause-trouble)
       - [If you'd rather not reformat](#if-youd-rather-not-reformat)
+      - [Listing Jellyfin users](#listing-jellyfin-users)
     - [Navidrome](#navidrome)
     - [Seerr](#seerr)
   - [Kafka Testing Stack](#kafka-testing-stack)
@@ -2418,6 +2419,37 @@ done
 ```
 
 To use a different season, change `DIR`. To save the files somewhere else, change `OUT`. Episodes that already have a subtitle in `OUT` are skipped, so it's safe to re-run. "No English text subtitle" means the episode has no English track, or its track is image-based (PGS or VobSub) and can't be converted to `.srt`.
+
+#### Listing Jellyfin users
+
+Jellyfin has no CLI for this. Read the users straight from its SQLite database on the VM. The image doesn't include `sqlite3`, so install it on the VM first (`sudo apt install sqlite3`):
+
+```bash
+sudo sqlite3 -readonly /root/docker-volumes/jellyfin/config/data/jellyfin.db \
+  "SELECT Username, Id, LastLoginDate FROM Users;"
+```
+
+If that says "unable to open database file", Jellyfin is holding a lock on the database. Open it with `immutable=1` instead:
+
+```bash
+sudo sqlite3 "file:/root/docker-volumes/jellyfin/config/data/jellyfin.db?immutable=1" \
+  "SELECT Username, Id, LastLoginDate FROM Users;"
+```
+
+You can also get the users from the API, which includes their permissions. Create a key under **Dashboard → Advanced → API Keys**, then run:
+
+```bash
+curl -s -H "Authorization: MediaBrowser Token=YOUR_API_KEY" http://192.168.1.150:8096/Users \
+  | jq -r '.[] | "\(.Name)\t\(.Id)\tadmin=\(.Policy.IsAdministrator)"'
+```
+
+**Why the path is under `/root`:** the compose file mounts `~/docker-volumes/jellyfin/config`, and compose expands `~` for the user who runs it. The stack is started with `sudo`, so `~` is `/root`. `/home/logan/docker-volumes/jellyfin/` has no `config` folder. To check where `/config` is mounted from, run:
+
+```bash
+docker inspect jellyfin --format '{{range .Mounts}}{{.Source}} -> {{.Destination}}{{"\n"}}{{end}}'
+```
+
+Always start the stack with `sudo`. If you run compose without it, Jellyfin mounts an empty config folder under `/home/logan` and starts as a new install with no users or libraries.
 
 
 ### Navidrome
