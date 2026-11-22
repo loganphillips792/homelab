@@ -2028,6 +2028,14 @@ To add a new season to a show that's already there, copy the folder's contents i
 rsync -rtP ~/Desktop/Silo\ 2023\ Season\ 3\ Complete\ 720p\ WEB\ x264\ \[i_c\]/ "logan@192.168.1.124:/mnt/ssd/tvshows/Silo/Season 3/"
 ```
 
+To add a few new episodes to a season that's already there, match the files with a glob. For example, this copies only the `.mkv` files for episodes 7 and 8, each from its own download folder:
+
+```bash
+rsync -tP ~/Downloads/www.UIndex.org*The.Remarried.Empress.S01E0[78]*/*.mkv "logan@192.168.1.124:/mnt/ssd/tvshows/The Remarried Empress/Season 1/"
+```
+
+`[78]` matches either digit, so use `S01E0[1-5]` for a range or `S01E1[0-2]` for 10 to 12. `-r` isn't needed because the glob picks out files, not folders. Leave the glob unquoted so your Mac's shell expands it.
+
 #### Getting a subtitle onto your Mac
 
 Once the SSD is ext4, Jellyfin can save subtitles next to the video, so you can copy them straight off the SSD without `sudo` or `docker cp`:
